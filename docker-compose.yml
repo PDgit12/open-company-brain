@@ -1,0 +1,24 @@
+# Local Postgres for LIVE-mode development. Not needed for the default mock demo.
+#   docker compose up -d
+#   # then set DATABASE_URL=postgres://brain:brain@localhost:5432/company_brain
+#   npm run seed:db
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: company-brain-db
+    environment:
+      POSTGRES_USER: brain
+      POSTGRES_PASSWORD: brain
+      POSTGRES_DB: company_brain
+    ports:
+      - '5432:5432'
+    volumes:
+      - brain-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U brain -d company_brain']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  brain-db:

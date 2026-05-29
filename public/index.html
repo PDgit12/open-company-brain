@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Company Brain</title>
+    <style>
+      :root {
+        --bg: oklch(98% 0.005 250);
+        --surface: oklch(100% 0 0);
+        --ink: oklch(22% 0.02 260);
+        --muted: oklch(55% 0.02 260);
+        --accent: oklch(55% 0.16 265);
+        --accent-soft: oklch(95% 0.03 265);
+        --border: oklch(90% 0.01 260);
+        --radius: 14px;
+        --shadow: 0 1px 2px oklch(0% 0 0 / 0.04), 0 8px 24px oklch(0% 0 0 / 0.06);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: radial-gradient(120% 80% at 50% -10%, var(--accent-soft), var(--bg) 55%);
+        color: var(--ink);
+        min-height: 100vh;
+      }
+      .wrap { max-width: 880px; margin: 0 auto; padding: 48px 20px 80px; }
+      header h1 { font-size: clamp(1.6rem, 1rem + 2vw, 2.4rem); margin: 0 0 6px; letter-spacing: -0.02em; }
+      header p { color: var(--muted); margin: 0 0 4px; }
+      .mode { display: inline-block; margin-top: 10px; font-size: 12px; color: var(--muted);
+        background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; }
+      .grid { display: grid; gap: 18px; margin-top: 30px; }
+      .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 22px; box-shadow: var(--shadow); }
+      .card h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 14px; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; }
+      input, select {
+        flex: 1 1 200px; min-width: 0; padding: 11px 13px; font-size: 15px;
+        border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--ink);
+      }
+      input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+      button {
+        padding: 11px 18px; font-size: 15px; font-weight: 600; cursor: pointer;
+        border: none; border-radius: 10px; background: var(--accent); color: white;
+        transition: transform 120ms ease, filter 120ms ease;
+      }
+      button:hover { filter: brightness(1.08); }
+      button:active { transform: translateY(1px); }
+      .out { margin-top: 16px; }
+      .answer { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border);
+        border-radius: 10px; padding: 16px; min-height: 20px; }
+      .sources { margin-top: 12px; }
+      .sources summary { cursor: pointer; color: var(--accent); font-size: 13px; font-weight: 600; }
+      .chunk { font-size: 13px; color: var(--muted); border-left: 2px solid var(--border);
+        padding: 4px 0 4px 12px; margin: 8px 0; white-space: pre-wrap; }
+      .tag { font-size: 11px; background: var(--accent-soft); color: var(--accent);
+        padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
+      footer { margin-top: 36px; color: var(--muted); font-size: 13px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Company Brain</h1>
+        <p>Grounded briefings & Q&A over your records — every answer cites the records it came from.</p>
+        <span class="mode" id="mode">checking mode…</span>
+      </header>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Partner briefing</h2>
+          <div class="row">
+            <select id="company"></select>
+            <button onclick="brief()">Brief me</button>
+          </div>
+          <div class="out">
+            <div class="answer" id="briefAnswer">Pick a partner and click “Brief me”.</div>
+            <details class="sources" id="briefSources" hidden></details>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Ask the brain</h2>
+          <div class="row">
+            <input id="question" placeholder="e.g. Which partners care about ML research?" />
+            <button onclick="ask()">Ask</button>
+          </div>
+          <div class="out">
+            <div class="answer" id="askAnswer">Ask anything grounded in the partner records.</div>
+            <details class="sources" id="askSources" hidden></details>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Relationship path <span class="tag">knowledge graph</span></h2>
+          <div class="row">
+            <select id="pathFrom"></select>
+            <select id="pathTo"></select>
+            <button onclick="introPath()">Find path</button>
+          </div>
+          <div class="out"><div class="answer" id="pathAnswer">How are two partners connected through shared people or programs?</div></div>
+        </section>
+      </div>
+
+      <footer>Company Brain · runs on seed data in mock mode · add a Langbase key to go live</footer>
+    </div>
+
+    <script>
+      async function api(path, body) {
+        const res = await fetch(path, {
+          method: body ? 'POST' : 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        return res.json();
+      }
+      function renderSources(el, sources) {
+        if (!sources || !sources.length) { el.hidden = true; return; }
+        el.hidden = false;
+        el.innerHTML =
+          `<summary>${sources.length} source record${sources.length > 1 ? 's' : ''}</summary>` +
+          sources.map((s) => `<div class="chunk">${s.text}<span class="tag">${s.source}</span></div>`).join('');
+      }
+      async function brief() {
+        const company = document.getElementById('company').value;
+        document.getElementById('briefAnswer').textContent = 'Thinking…';
+        const r = await api('/api/brief', { company });
+        document.getElementById('briefAnswer').textContent = r.answer;
+        renderSources(document.getElementById('briefSources'), r.sources);
+      }
+      async function ask() {
+        const question = document.getElementById('question').value;
+        if (!question) return;
+        document.getElementById('askAnswer').textContent = 'Thinking…';
+        const r = await api('/api/ask', { question });
+        document.getElementById('askAnswer').textContent = r.answer;
+        renderSources(document.getElementById('askSources'), r.sources);
+      }
+      async function introPath() {
+        const from = document.getElementById('pathFrom').value;
+        const to = document.getElementById('pathTo').value;
+        const r = await api('/api/intro-path', { from, to });
+        document.getElementById('pathAnswer').textContent = r.path
+          ? r.path.description
+          : 'No known connection path in the data yet.';
+      }
+      (async function init() {
+        const health = await api('/health');
+        document.getElementById('mode').textContent = health.mode;
+        const { companies } = await api('/api/companies');
+        for (const id of ['company', 'pathFrom', 'pathTo']) {
+          const sel = document.getElementById(id);
+          sel.innerHTML = companies.map((c) => `<option>${c}</option>`).join('');
+        }
+        if (companies.length > 1) document.getElementById('pathTo').selectedIndex = 1;
+      })();
+    </script>
+  </body>
+</html>
