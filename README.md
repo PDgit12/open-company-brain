@@ -41,15 +41,21 @@ yours; see *Make it yours* below.
 - **A clean adapter seam** — one file maps your tables onto the model.
 - **Batteries** — demo UI, HTTP API, tests, Docker, and a full study playbook.
 
-## Quick start (mock mode, zero setup)
+## Get started in one command
+
+Scaffold your own instance, add your keys, run. That's the whole framework promise —
+you bring API keys; everything else is built in.
 
 ```bash
-npm install
+npx degit PDgit12/open-company-brain my-brain
+cd my-brain && npm install
+npm run init          # guided setup — paste your keys, or skip for mock mode
 npm run demo          # → http://localhost:4000
 ```
 
-Open the page: pick an entity → **Brief me**, ask a question, find a **relationship
-path**. No API key, no database — it runs on synthetic seed data.
+`npm run init` writes your `.env`; `npm run doctor` reports the active mode and
+what's still needed. With no keys it runs immediately in mock mode on synthetic seed
+data — pick an entity → **Brief me**, ask a question, find a **relationship path**.
 
 ## Go live
 
