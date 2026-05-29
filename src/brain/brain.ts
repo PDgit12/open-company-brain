@@ -15,16 +15,13 @@ import { createDataSource } from '../db/datasource.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk } from './memory.js';
 import { createGenerator, type Generator } from '../agents/generator.js';
 import { snapshotToDocuments } from './documents.js';
-import {
-  buildGraph,
-  findIntroPath,
-  type CompanyGraph,
-  type Path,
-} from '../graph/relationships.js';
+import { type Path } from '../graph/relationships.js';
+import { createGraphBackend, type GraphBackend } from '../graph/backend.js';
 import {
   buildContextBlock,
   buildBriefingPrompt,
   buildAskPrompt,
+  buildHealthPrompt,
 } from '../agents/prompts.js';
 import type { BrainSnapshot } from '../domain/types.js';
 
@@ -40,7 +37,7 @@ export class Brain {
     private readonly memory: MemoryStore,
     private readonly generator: Generator,
     private readonly snapshot: BrainSnapshot,
-    private readonly graph: CompanyGraph,
+    private readonly graph: GraphBackend,
   ) {}
 
   /** Build the brain: load source-of-truth, sync it into recall, build the graph. */
@@ -49,8 +46,19 @@ export class Brain {
     try {
       const snapshot = await dataSource.loadSnapshot();
       const memory = createMemoryStore();
-      await memory.upsert(snapshotToDocuments(snapshot));
-      const graph = buildGraph(snapshot);
+      // Best-effort boot sync. If the recall layer can't be populated (e.g. a
+      // live provider isn't configured yet), the brain still boots and simply
+      // answers "I don't have that" until `npm run sync` succeeds — safe by
+      // design (cite-or-refuse), never a hard crash.
+      try {
+        await memory.upsert(snapshotToDocuments(snapshot));
+      } catch (err) {
+        console.warn(
+          `⚠ Boot sync skipped: ${(err as Error).message}. ` +
+            `Run "npm run sync" once the recall provider is configured.`,
+        );
+      }
+      const graph = createGraphBackend(snapshot);
       return new Brain(memory, createGenerator(), snapshot, graph);
     } finally {
       await dataSource.close();
@@ -84,12 +92,48 @@ export class Brain {
     return { answer, sources: chunks };
   }
 
+  /**
+   * Generic grounded draft: retrieve for `query`, then generate using a custom
+   * `instruction`. Used by the action layer and the health agent so they reuse
+   * the same recall + generation (and the same trust contract) as brief/ask.
+   */
+  async draft(
+    query: string,
+    instruction: string,
+    accessScopes: string[],
+  ): Promise<{ text: string; sources: RetrievedChunk[] }> {
+    const chunks = await this.memory.retrieve({ query, accessScopes, topK: 8 });
+    const context = buildContextBlock(chunks);
+    const text = await this.generator.generate({
+      prompt: `${instruction}\n\nCONTEXT:\n${context}`,
+      chunks,
+    });
+    return { text, sources: chunks };
+  }
+
+  /** Relationship-health agent: what needs attention across the brain. */
+  async health(accessScopes: string[]): Promise<BrainAnswer> {
+    const chunks = await this.memory.retrieve({
+      query: 'open actions follow up stale renewal overdue next steps engagements',
+      accessScopes,
+      topK: 12,
+    });
+    const prompt = buildHealthPrompt(buildContextBlock(chunks));
+    const answer = await this.generator.generate({ prompt, chunks });
+    return { answer, sources: chunks };
+  }
+
+  /** Resolve a company name to its id (public for the action layer). */
+  resolveCompanyId(name: string): string | null {
+    return this.findCompanyId(name) ?? null;
+  }
+
   /** Graph query exposed directly: warm-intro path between two companies. */
-  introPath(fromCompany: string, toCompany: string): Path | null {
+  async introPath(fromCompany: string, toCompany: string): Promise<Path | null> {
     const from = this.findCompanyId(fromCompany);
     const to = this.findCompanyId(toCompany);
     if (!from || !to) return null;
-    return findIntroPath(this.graph, from, to);
+    return this.graph.introPath(from, to);
   }
 
   /** Names the brain knows about — handy for demo UIs and autocomplete. */

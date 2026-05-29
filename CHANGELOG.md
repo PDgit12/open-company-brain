@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.2.0] — 2026-05-30
+
+### Added — Tiers 1–3
+- **Action layer** (`src/actions/*`) — agents propose write-actions (draft email,
+  log engagement); human approval required; idempotent execution; full audit log.
+  Email is queued to an outbox, never silently sent.
+- **Multi-scope access control** — per-request `x-access-scopes`; company documents
+  no longer leak more-restricted child records (security fix surfaced by the eval).
+- **Incremental sync** — only changed rows re-embed, tracked by a watermark
+  (`npm run sync`, `npm run sync:full`).
+- **Postgres recursive-CTE graph backend** behind the same graph interface.
+- **Relation-enrichment** — deterministic theme tagging on documents (LLM-swappable).
+- **Relationship-health agent** — flags stale relationships / open actions.
+- **Streaming** — SSE answer endpoint.
+- **Observability + evals** — structured request logging; golden eval set
+  (`npm run eval`) also asserted in tests.
+- Test suite grown to 31 tests; CI runs typecheck + tests + build.
+
 ## [0.1.0] — 2026-05-30
 
 Initial open-source release.

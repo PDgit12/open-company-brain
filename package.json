@@ -12,6 +12,8 @@
     "build": "tsc -p tsconfig.json",
     "demo": "tsx src/server/index.ts",
     "sync": "tsx src/brain/sync.ts",
+    "sync:full": "tsx src/brain/sync.ts -- --full",
+    "eval": "tsx src/eval/run.ts",
     "seed:db": "tsx src/seed/seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",

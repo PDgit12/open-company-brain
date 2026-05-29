@@ -85,13 +85,31 @@ If you can map your tables in ten minutes, the integration is done.
 
 ## HTTP API
 
+Read (grounded + cited, access-scoped):
+
 | Endpoint | Body | Returns |
 |---|---|---|
 | `GET /health` | — | status + active mode |
 | `GET /api/companies` | — | known entity names |
 | `POST /api/brief` | `{ company }` | grounded briefing + sources |
 | `POST /api/ask` | `{ question }` | grounded answer + sources |
-| `POST /api/intro-path` | `{ from, to }` | relationship path |
+| `POST /api/ask/stream` | `{ question }` | SSE token stream |
+| `POST /api/intro-path` | `{ from, to }` | relationship path (graph) |
+| `GET /api/health-check` | — | what needs attention (health agent) |
+
+Write (action layer — human-approved, idempotent, audited):
+
+| Endpoint | Body | Returns |
+|---|---|---|
+| `POST /api/actions/draft-email` | `{ company, goal }` | a proposed action (not executed) |
+| `POST /api/actions/log-engagement` | `{ company, summary, ... }` | a proposed action |
+| `POST /api/actions/:id/approve` | — | executes (idempotent) |
+| `POST /api/actions/:id/reject` | `{ reason? }` | marks rejected |
+| `GET /api/actions` | — | list of actions |
+| `GET /api/actions/audit` | — | the audit log |
+
+**Access scopes:** send `x-access-scopes: scopeA,scopeB`; retrieval only ever
+returns chunks within those scopes.
 
 ```ts
 const res = await fetch('http://localhost:4000/api/ask', {
@@ -108,9 +126,11 @@ const { answer, sources } = await res.json();
 |---|---|
 | `npm run demo` | run the API + demo page |
 | `npm run dev` | same, with hot reload |
-| `npm run sync` | (re)build the recall layer from the data source |
+| `npm run sync` | incremental rebuild of the recall layer (changed rows only) |
+| `npm run sync:full` | full rebuild of the recall layer |
+| `npm run eval` | run the golden behavioural eval set |
 | `npm run seed:db` | load schema + sample data into Postgres |
-| `npm test` | run the test suite (14 tests) |
+| `npm test` | run the test suite (31 tests) |
 | `npm run typecheck` | strict type check |
 | `npm run build` | compile to `dist/` |
 
@@ -121,11 +141,30 @@ const { answer, sources } = await res.json();
   basics→mastery study guide explaining every concept and every file.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to set up and contribute.
 
-## Scope
+## Capabilities
 
-v0 is deliberately the trustworthy read-only core. Held back on purpose (and
-documented as next steps): autonomous write-actions, the Apache AGE / Neo4j graph
-upgrade, and LLM relation-enrichment. See `ARCHITECTURE.md`.
+- **Read core** — grounded, cited briefing & Q&A; FK knowledge graph.
+- **Action layer** — agents *draft* write-actions (email, log engagement); a human
+  *approves*; execution is **idempotent** and every step is **audited**. Email is
+  queued to an outbox by default (never silently sent).
+- **Multi-scope access control** — per-request scopes; cross-scope records stay
+  hidden (a company document never leaks a more-restricted child).
+- **Incremental sync** — only changed rows re-embed, tracked by a watermark.
+- **Graph backends** — in-memory (default) or a Postgres recursive-CTE backend;
+  Apache AGE / Neo4j drop in behind the same interface.
+- **Relation-enrichment** — deterministic theme tagging (LLM-swappable).
+- **Health agent** — flags stale relationships and open items.
+- **Streaming, observability, evals** — SSE answers, structured request logs, and a
+  golden eval set wired into CI.
+
+Still intentionally deferred: real email/calendar delivery providers, a visual
+relationship-map UI, and live LLM enrichment. See `ARCHITECTURE.md`.
+
+> **Not a visual workflow builder.** Company Brain is code-first: a "workflow" is a
+> small, typed *action recipe* (a prompt + an executor) a developer adds in a few
+> lines — grounded, governed, and audited by the framework. It is deliberately
+> **not** an n8n-style drag-and-drop canvas; it gives opinionated, safe agentic
+> primitives instead of a blank automation board.
 
 ## Contributing
 

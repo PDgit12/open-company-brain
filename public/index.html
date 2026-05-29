@@ -100,6 +100,34 @@
           </div>
           <div class="out"><div class="answer" id="pathAnswer">How are two partners connected through shared people or programs?</div></div>
         </section>
+
+        <section class="card">
+          <h2>What needs attention <span class="tag">health agent</span></h2>
+          <div class="row">
+            <button onclick="healthCheck()">Run health check</button>
+          </div>
+          <div class="out">
+            <div class="answer" id="healthAnswer">Surface stale relationships and open action items.</div>
+            <details class="sources" id="healthSources" hidden></details>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Draft an action <span class="tag">human-approved</span></h2>
+          <div class="row">
+            <select id="actCompany"></select>
+            <input id="actGoal" placeholder="goal, e.g. follow up on the renewal" />
+            <button onclick="draftEmail()">Draft email</button>
+          </div>
+          <div class="out">
+            <div class="answer" id="actAnswer">Agents draft; you approve before anything executes (with an audit log).</div>
+            <div class="row" id="actButtons" style="margin-top:12px" hidden>
+              <button id="approveBtn">Approve & execute</button>
+              <button id="rejectBtn" style="background:oklch(55% 0.02 260)">Reject</button>
+            </div>
+            <details class="sources" id="actSources" hidden></details>
+          </div>
+        </section>
       </div>
 
       <footer>Company Brain · runs on seed data in mock mode · add a Langbase key to go live</footer>
@@ -144,11 +172,50 @@
           ? r.path.description
           : 'No known connection path in the data yet.';
       }
+      async function healthCheck() {
+        document.getElementById('healthAnswer').textContent = 'Reviewing…';
+        const r = await api('/api/health-check');
+        document.getElementById('healthAnswer').textContent = r.answer;
+        renderSources(document.getElementById('healthSources'), r.sources);
+      }
+      let pendingActionId = null;
+      async function draftEmail() {
+        const company = document.getElementById('actCompany').value;
+        const goal = document.getElementById('actGoal').value || 'follow up';
+        document.getElementById('actAnswer').textContent = 'Drafting…';
+        document.getElementById('actButtons').hidden = true;
+        const r = await api('/api/actions/draft-email', { company, goal });
+        if (!r.ok) {
+          document.getElementById('actAnswer').textContent = '⚠ ' + r.reason;
+          renderSources(document.getElementById('actSources'), []);
+          return;
+        }
+        pendingActionId = r.action.id;
+        const p = r.action.payload;
+        document.getElementById('actAnswer').textContent =
+          'Subject: ' + p.subject + '\n\n' + p.body + '\n\n[status: ' + r.action.status + ']';
+        renderSources(document.getElementById('actSources'), r.action.sources);
+        document.getElementById('actButtons').hidden = false;
+      }
+      document.getElementById('approveBtn').onclick = async () => {
+        if (!pendingActionId) return;
+        const r = await api('/api/actions/' + pendingActionId + '/approve', {});
+        document.getElementById('actAnswer').textContent = r.ok
+          ? '✓ Executed: ' + r.action.effect
+          : '⚠ ' + r.reason;
+        document.getElementById('actButtons').hidden = true;
+      };
+      document.getElementById('rejectBtn').onclick = async () => {
+        if (!pendingActionId) return;
+        await api('/api/actions/' + pendingActionId + '/reject', { reason: 'declined in demo' });
+        document.getElementById('actAnswer').textContent = '✗ Rejected — nothing executed.';
+        document.getElementById('actButtons').hidden = true;
+      };
       (async function init() {
         const health = await api('/health');
         document.getElementById('mode').textContent = health.mode;
         const { companies } = await api('/api/companies');
-        for (const id of ['company', 'pathFrom', 'pathTo']) {
+        for (const id of ['company', 'pathFrom', 'pathTo', 'actCompany']) {
           const sel = document.getElementById(id);
           sel.innerHTML = companies.map((c) => `<option>${c}</option>`).join('');
         }

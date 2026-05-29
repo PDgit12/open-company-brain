@@ -24,3 +24,6 @@ export const META_COMPANY = 'company' as const;
 
 /** Metadata key carrying the last-verified ISO date (freshness / trust signal). */
 export const META_LAST_VERIFIED = 'last_verified' as const;
+
+/** Metadata key carrying derived theme tags (relation-enrichment). */
+export const META_THEMES = 'themes' as const;

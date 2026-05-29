@@ -9,6 +9,7 @@
 import type { BrainSnapshot } from '../domain/types.js';
 
 const ACCESS = 'default-team';
+const LEADERSHIP = 'leadership'; // a second scope, to demonstrate access denial
 const now = '2026-05-01T00:00:00.000Z';
 
 export const SEED_SNAPSHOT: BrainSnapshot = {
@@ -63,6 +64,8 @@ export const SEED_SNAPSHOT: BrainSnapshot = {
     { id: '3', companyId: '2', kind: 'event', date: '2026-02-20', summary: 'Hosted a fintech case competition; 120 attendees.', openActions: null, access: ACCESS, updatedAt: now },
     { id: '4', companyId: '4', kind: 'sponsorship', date: '2026-01-15', summary: 'Confirmed funding for two sponsored projects.', openActions: 'Share mid-cycle progress report.', access: ACCESS, updatedAt: now },
     { id: '5', companyId: '3', kind: 'intro', date: '2026-04-28', summary: 'Initial intro call about a possible research collaboration.', openActions: 'Send research capability one-pager.', access: ACCESS, updatedAt: now },
+    // Leadership-only: a default-team caller must NOT see this in retrieval.
+    { id: '6', companyId: '2', kind: 'confidential', date: '2026-05-02', summary: 'Confidential: NorthBridge exploring a large multi-year mandate; sensitive figures discussed.', openActions: 'Leadership to follow up directly.', access: LEADERSHIP, updatedAt: now },
   ],
   programs: [
     { id: '1', name: 'Talent Pipeline', description: 'Year-round placements for early-career talent.', access: ACCESS, updatedAt: now },

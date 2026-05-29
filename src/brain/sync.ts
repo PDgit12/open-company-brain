@@ -1,39 +1,70 @@
 /**
  * Sync CLI — reads the source of truth and (re)builds the recall layer.
  *
- * Run: `npm run sync`
+ * Modes:
+ *   npm run sync           incremental — only records changed since last sync
+ *   npm run sync -- --full full rebuild of every document
  *
- * In LIVE mode this uploads/refreshes documents in Langbase Memory. In MOCK mode
- * it exercises the exact same code path against the in-memory store, so the sync
- * pipeline is verifiable without credentials. Idempotent: safe to run repeatedly.
+ * Incremental sync reads a watermark (the latest updatedAt seen last time) from
+ * a small state file and only re-embeds what changed. The first run, or --full,
+ * does everything. Idempotent either way.
  *
- * Schedule this (cron / a webhook on form submit) to keep the brain fresh.
+ * Schedule this (cron, or a webhook on form submit) to keep the brain fresh.
  */
 
+import { readFile, writeFile } from 'node:fs/promises';
 import { createDataSource } from '../db/datasource.js';
 import { createMemoryStore } from './memory.js';
-import { snapshotToDocuments } from './documents.js';
+import { snapshotToDocuments, latestTimestamp } from './documents.js';
 import { describeMode } from '../config.js';
 
-export async function runSync(): Promise<{ documents: number }> {
+const STATE_FILE = '.brain-state.json';
+
+interface SyncState {
+  watermark: string;
+}
+
+async function readWatermark(): Promise<string | undefined> {
+  try {
+    const raw = await readFile(STATE_FILE, 'utf8');
+    return (JSON.parse(raw) as SyncState).watermark || undefined;
+  } catch {
+    return undefined; // no prior sync
+  }
+}
+
+async function writeWatermark(watermark: string): Promise<void> {
+  await writeFile(STATE_FILE, JSON.stringify({ watermark }, null, 2));
+}
+
+export interface SyncResult {
+  documents: number;
+  mode: 'full' | 'incremental';
+  watermark: string;
+}
+
+export async function runSync(opts: { full?: boolean } = {}): Promise<SyncResult> {
   const dataSource = createDataSource();
   try {
     const snapshot = await dataSource.loadSnapshot();
-    const docs = snapshotToDocuments(snapshot);
+    const since = opts.full ? undefined : await readWatermark();
+    const docs = snapshotToDocuments(snapshot, since !== undefined ? { since } : {});
     const memory = createMemoryStore();
     const count = await memory.upsert(docs);
-    return { documents: count };
+    const watermark = latestTimestamp(snapshot);
+    if (watermark) await writeWatermark(watermark);
+    return { documents: count, mode: since === undefined ? 'full' : 'incremental', watermark };
   } finally {
     await dataSource.close();
   }
 }
 
-// Run when invoked directly (node/tsx), not when imported.
 if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log(`▸ Sync starting  (${describeMode()})`);
-  runSync()
-    .then(({ documents }) => {
-      console.log(`✓ Sync complete — ${documents} documents in the brain.`);
+  const full = process.argv.includes('--full');
+  console.log(`▸ Sync starting (${full ? 'full' : 'incremental'})  (${describeMode()})`);
+  runSync({ full })
+    .then(({ documents, mode }) => {
+      console.log(`✓ Sync complete — ${documents} document(s) upserted (${mode}).`);
       process.exit(0);
     })
     .catch((err: unknown) => {

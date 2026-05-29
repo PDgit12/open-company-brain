@@ -40,8 +40,34 @@ agents answer only from what those two layers return.
 | Graph | `src/graph/relationships.ts` | in-memory (→ SQL/AGE) | FK traversal = warm-intro paths |
 | Prompts | `src/agents/prompts.ts` | pure | the trust contract lives here |
 | Generation | `src/agents/generator.ts` | Langbase Pipe / Mock | LLM in prod; deterministic in demo |
-| Orchestration | `src/brain/brain.ts` | — | wires it all into `brief()` / `ask()` |
+| Orchestration | `src/brain/brain.ts` | — | wires it all into `brief()` / `ask()` / `health()` |
+| Enrichment | `src/brain/enrichment.ts` | pure (→ LLM) | derive theme tags for sharper retrieval |
+| Graph backend | `src/graph/backend.ts` | InMemory / Postgres-CTE | scale traversal without changing callers |
+| Action layer | `src/actions/*` | InMemory / Postgres stores | propose → approve → execute (idempotent) + audit |
+| Observability | `src/observability/logger.ts` | — | one JSON line per request |
+| Eval | `src/eval/*` | — | golden behavioural set, also a CI gate |
 | API | `src/server/app.ts` | — | the surface your webapp calls |
+
+## The action layer — how "workflows" work here (and why it isn't n8n)
+
+A workflow in Company Brain is **not** a visual graph of nodes a user wires together.
+It is a small, typed **action recipe** a developer adds in code:
+
+```
+a prompt/instruction  +  an executor  =  a governed workflow
+```
+
+The framework supplies the hard, safety-critical parts once, for every recipe:
+
+- **Grounding** — a draft is only proposed if the brain can ground it (trust contract).
+- **Human-in-the-loop** — nothing executes without an explicit `approve()`.
+- **Idempotency** — approving the same action twice executes it once.
+- **Audit log** — every propose/approve/reject/execute is recorded.
+
+So adding "draft a renewal reminder" or "log a call" is a few lines (a prompt + an
+executor), and it inherits all of the above. This is the deliberate opposite of a
+generic automation canvas: opinionated, grounded, governed primitives instead of an
+open-ended node editor. You get *your* workflows without becoming a workflow builder.
 
 ## The two contracts that keep it honest
 

@@ -126,9 +126,12 @@ export class LangbaseMemoryStore implements MemoryStore {
   async upsert(docs: MemoryDocument[]): Promise<number> {
     await this.ensureMemory();
     for (const d of docs) {
+      // Langbase requires a valid filename with an allowed extension. Our ids
+      // look like "company:1"; turn them into "company-1.txt".
+      const documentName = `${d.id.replace(/[^a-z0-9_-]+/gi, '-')}.txt`;
       await this.lb.memories.documents.upload({
         memoryName: this.memoryName,
-        documentName: d.id,
+        documentName,
         contentType: 'text/plain',
         document: Buffer.from(d.text, 'utf8'),
         meta: d.metadata,
