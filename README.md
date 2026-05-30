@@ -82,13 +82,20 @@ data — pick an entity → **Brief me**, ask a question, find a **relationship 
 ```bash
 cp .env.example .env
 # 1) add your Langbase key:        LANGBASE_API_KEY=...
-# 2) (optional) point at Postgres: DATABASE_URL=postgres://user:pass@localhost:5432/yourdb
+# 2) add an LLM provider key in the Langbase dashboard → Settings → LLM API keys
+#    (OpenAI by default — powers BOTH embeddings and generation)
+# 3) (optional) point at Postgres:  DATABASE_URL=postgres://user:pass@localhost:5432/yourdb
 
 docker compose up -d   # optional: a local Postgres
 npm run seed:db        # optional: load schema + sample data
-npm run sync           # build/refresh the recall layer
+npm run setup:live     # provisions the Langbase Memory + Pipe, then syncs your data
 npm run demo
 ```
+
+`npm run setup:live` is idempotent and safe to re-run. If your workspace is missing
+the provider key it tells you exactly that — the key itself must be added in the
+Langbase dashboard (there is no API for it). Prefer a different provider? Set
+`LANGBASE_EMBEDDING_MODEL` / `LANGBASE_GENERATION_MODEL` in `.env`.
 
 `/health` will report `recall=live generation=live`. **No application code changes —
 only environment.**
@@ -152,11 +159,12 @@ const { answer, sources } = await res.json();
 |---|---|
 | `npm run demo` | run the API + demo page |
 | `npm run dev` | same, with hot reload |
+| `npm run setup:live` | provision the Langbase Memory + Pipe and sync data (idempotent) |
 | `npm run sync` | incremental rebuild of the recall layer (changed rows only) |
 | `npm run sync:full` | full rebuild of the recall layer |
 | `npm run eval` | run the golden behavioural eval set |
 | `npm run seed:db` | load schema + sample data into Postgres |
-| `npm test` | run the test suite (31 tests) |
+| `npm test` | run the test suite (53 tests) |
 | `npm run typecheck` | strict type check |
 | `npm run build` | compile to `dist/` |
 

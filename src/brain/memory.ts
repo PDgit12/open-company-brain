@@ -116,6 +116,7 @@ export class LangbaseMemoryStore implements MemoryStore {
       await this.lb.memories.create({
         name: this.memoryName,
         description: 'Company Brain — semantic recall layer',
+        embedding_model: config.langbase.embeddingModel,
       });
     } catch {
       // Already exists — that's fine; create is the only idempotency we need.

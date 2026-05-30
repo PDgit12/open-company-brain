@@ -13,6 +13,17 @@ const EnvSchema = z.object({
   LANGBASE_API_KEY: z.string().trim().optional(),
   LANGBASE_MEMORY_NAME: z.string().trim().default('company-brain'),
   LANGBASE_PIPE_NAME: z.string().trim().default('company-brain-agent'),
+  // Embedding model for recall + generation model for the pipe. Both must match
+  // a provider key configured in your Langbase workspace. OpenAI by default.
+  LANGBASE_EMBEDDING_MODEL: z
+    .enum([
+      'openai:text-embedding-3-large',
+      'cohere:embed-multilingual-v3.0',
+      'cohere:embed-multilingual-light-v3.0',
+      'google:text-embedding-004',
+    ])
+    .default('openai:text-embedding-3-large'),
+  LANGBASE_GENERATION_MODEL: z.string().trim().default('openai:gpt-4o-mini'),
   DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DEMO_USER_ACCESS_SCOPE: z.string().trim().default('default-team'),
   // Data connector: auto | seed | postgres | csv | json. `auto` picks postgres
@@ -45,6 +56,8 @@ export const config = {
     apiKey: env.LANGBASE_API_KEY,
     memoryName: env.LANGBASE_MEMORY_NAME,
     pipeName: env.LANGBASE_PIPE_NAME,
+    embeddingModel: env.LANGBASE_EMBEDDING_MODEL,
+    generationModel: env.LANGBASE_GENERATION_MODEL,
   },
   database: {
     url: env.DATABASE_URL,
