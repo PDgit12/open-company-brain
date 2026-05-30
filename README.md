@@ -107,16 +107,19 @@ generation (Ollama), local embeddings (Ollama), and a pgvector recall store. The
 swappable seams mean no brain logic changes — only `LLM_BACKEND=local`.
 
 ```bash
-# 1) local models
-ollama serve & ollama pull llama3.2:1b nomic-embed-text
-# 2) a Postgres with pgvector
-docker compose up -d
-# 3) point the brain at them and sync
+ollama serve &                 # 1) local model server
+docker compose up -d           # 2) Postgres + pgvector (host port 5433)
+
 export LLM_BACKEND=local
-export VECTOR_DATABASE_URL=postgres://brain:brain@localhost:5432/company_brain
-npm run sync:full       # embeds your data into pgvector, locally
-npm run demo            # /health → recall=local generation=local
+export VECTOR_DATABASE_URL=postgres://brain:brain@localhost:5433/company_brain
+npm run setup:local            # 3) pulls models if needed + embeds your data
+npm run demo                   # /health → recall=local generation=local
 ```
+
+`npm run setup:local` is the one-command path: it checks Ollama is running, pulls
+`llama3.2:1b` + `nomic-embed-text` if missing, and embeds your data into pgvector.
+It's idempotent. (Host port is **5433** so it never collides with a system Postgres
+already on 5432.)
 
 The cite-or-refuse contract is preserved: `RETRIEVAL_MIN_SCORE` (default `0.5`) is a
 similarity floor so the brain still refuses when nothing is genuinely relevant — tune
@@ -187,6 +190,7 @@ const { answer, sources } = await res.json();
 | `npm run demo` | run the API + demo page |
 | `npm run dev` | same, with hot reload |
 | `npm run setup:live` | provision the Langbase Memory + Pipe and sync data (idempotent) |
+| `npm run setup:local` | pull local models + embed data into pgvector ($0/query, idempotent) |
 | `npm run sync` | incremental rebuild of the recall layer (changed rows only) |
 | `npm run sync:full` | full rebuild of the recall layer |
 | `npm run eval` | run the golden behavioural eval set |

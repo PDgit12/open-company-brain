@@ -11,6 +11,7 @@
  * Both are access-scoped: a caller only ever sees chunks their scopes allow.
  */
 
+import { config } from '../config.js';
 import { createDataSource } from '../db/datasource.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk } from './memory.js';
 import { createGenerator, type Generator } from '../agents/generator.js';
@@ -77,17 +78,12 @@ export class Brain {
     try {
       const snapshot = await dataSource.loadSnapshot();
       const memory = createMemoryStore();
-      // Best-effort boot sync. If the recall layer can't be populated (e.g. a
-      // live provider isn't configured yet), the brain still boots and simply
-      // answers "I don't have that" until `npm run sync` succeeds — safe by
-      // design (cite-or-refuse), never a hard crash.
-      try {
+      // The mock store is in-memory, so it MUST be populated on every boot.
+      // Persistent stores (Langbase, pgvector) are populated once by
+      // `npm run setup:live` / `setup:local` / `sync`, so re-embedding on every
+      // boot would be slow and wasteful — skip it and start instantly.
+      if (config.backend === 'mock') {
         await memory.upsert(snapshotToDocuments(snapshot));
-      } catch (err) {
-        console.warn(
-          `⚠ Boot sync skipped: ${(err as Error).message}. ` +
-            `Run "npm run sync" once the recall provider is configured.`,
-        );
       }
       const graph = createGraphBackend(snapshot);
       return new Brain(memory, createGenerator(), snapshot, graph, getFeedbackStore());

@@ -17,6 +17,7 @@
     "build": "tsc -p tsconfig.json",
     "demo": "tsx src/server/index.ts",
     "setup:live": "tsx src/brain/setup-live.ts",
+    "setup:local": "tsx src/brain/setup-local.ts",
     "sync": "tsx src/brain/sync.ts",
     "sync:full": "tsx src/brain/sync.ts -- --full",
     "eval": "tsx src/eval/run.ts",
