@@ -56,8 +56,8 @@ yours; see *Make it yours* below.
 - **Knowledge graph** — built from your foreign keys (no AI-invented edges); answers
   "how is X connected to Y?" with shortest-path search.
 - **Two agents** — grounded **briefing** and **Q&A**, both access-scoped and cited.
-- **Two run modes** — mock (no credentials) and live (Langbase + Postgres), chosen
-  automatically from your `.env`.
+- **Three backends** — mock (no credentials), live (Langbase + Postgres), and
+  fully local (Ollama + pgvector, $0/query), chosen from your `.env`.
 - **A clean adapter seam** — one file maps your tables onto the model.
 - **Batteries** — demo UI, HTTP API, tests, Docker, and a full study playbook.
 
@@ -99,6 +99,33 @@ Langbase dashboard (there is no API for it). Prefer a different provider? Set
 
 `/health` will report `recall=live generation=live`. **No application code changes —
 only environment.**
+
+## Run it fully local — $0 per query
+
+For cost- or privacy-sensitive production, run with **zero API spend**: local LLM
+generation (Ollama), local embeddings (Ollama), and a pgvector recall store. The
+swappable seams mean no brain logic changes — only `LLM_BACKEND=local`.
+
+```bash
+# 1) local models
+ollama serve & ollama pull llama3.2:1b nomic-embed-text
+# 2) a Postgres with pgvector
+docker compose up -d
+# 3) point the brain at them and sync
+export LLM_BACKEND=local
+export VECTOR_DATABASE_URL=postgres://brain:brain@localhost:5432/company_brain
+npm run sync:full       # embeds your data into pgvector, locally
+npm run demo            # /health → recall=local generation=local
+```
+
+The cite-or-refuse contract is preserved: `RETRIEVAL_MIN_SCORE` (default `0.5`) is a
+similarity floor so the brain still refuses when nothing is genuinely relevant — tune
+it to your embedding model. Mix and match freely (e.g. local embeddings + a hosted
+generator) since generation and recall are independent seams.
+
+> **Cost note:** in a RAG brain, generation dominates cost and embeddings are nearly
+> free. Cheapest→priciest: fully local (`$0`) · hosted embeddings + local generation ·
+> Gemini Flash / GPT-4o-mini / Claude Haiku · frontier models.
 
 ## Make it yours (any domain, any stack)
 
@@ -164,7 +191,7 @@ const { answer, sources } = await res.json();
 | `npm run sync:full` | full rebuild of the recall layer |
 | `npm run eval` | run the golden behavioural eval set |
 | `npm run seed:db` | load schema + sample data into Postgres |
-| `npm test` | run the test suite (53 tests) |
+| `npm test` | run the test suite (56 tests) |
 | `npm run typecheck` | strict type check |
 | `npm run build` | compile to `dist/` |
 

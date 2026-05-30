@@ -15,8 +15,10 @@
  */
 
 import { Langbase } from 'langbase';
+import pg from 'pg';
 import { config } from '../config.js';
-import { META_ACCESS } from '../constants.js';
+import { META_ACCESS, META_SOURCE } from '../constants.js';
+import { createEmbedder, type Embedder } from './embedding.js';
 import type { MemoryDocument } from './documents.js';
 
 export interface RetrievedChunk {
@@ -164,8 +166,94 @@ export class LangbaseMemoryStore implements MemoryStore {
   }
 }
 
+// ─── Local (pgvector + Ollama embeddings) implementation ─────────────────────
+
+/**
+ * Fully-local recall: embeddings come from a local Embedder (Ollama) and vectors
+ * live in Postgres + pgvector. $0 per query, self-hosted. Access control is the
+ * same seam as every other store: the META_ACCESS scope is a column, filtered in
+ * SQL so out-of-scope chunks never leave the database.
+ */
+export class PgVectorMemoryStore implements MemoryStore {
+  private readonly pool: pg.Pool;
+  private ready = false;
+
+  constructor(
+    connectionString: string,
+    private readonly embedder: Embedder = createEmbedder(),
+    private readonly minScore: number = config.ollama.minScore,
+    private readonly table = 'brain_chunks',
+  ) {
+    this.pool = new pg.Pool({ connectionString });
+  }
+
+  private vec(v: number[]): string {
+    return `[${v.join(',')}]`;
+  }
+
+  private async ensure(): Promise<void> {
+    if (this.ready) return;
+    await this.pool.query('CREATE EXTENSION IF NOT EXISTS vector');
+    await this.pool.query(
+      `CREATE TABLE IF NOT EXISTS ${this.table} (
+         id text PRIMARY KEY,
+         text text NOT NULL,
+         source text,
+         access text,
+         metadata jsonb NOT NULL DEFAULT '{}',
+         embedding vector(${this.embedder.dim})
+       )`,
+    );
+    this.ready = true;
+  }
+
+  async upsert(docs: MemoryDocument[]): Promise<number> {
+    await this.ensure();
+    if (!docs.length) return 0;
+    const vectors = await this.embedder.embed(docs.map((d) => d.text));
+    for (let i = 0; i < docs.length; i++) {
+      const d = docs[i]!;
+      await this.pool.query(
+        `INSERT INTO ${this.table} (id, text, source, access, metadata, embedding)
+         VALUES ($1, $2, $3, $4, $5, $6::vector)
+         ON CONFLICT (id) DO UPDATE
+           SET text = EXCLUDED.text, source = EXCLUDED.source, access = EXCLUDED.access,
+               metadata = EXCLUDED.metadata, embedding = EXCLUDED.embedding`,
+        [d.id, d.text, d.metadata[META_SOURCE] ?? null, d.metadata[META_ACCESS] ?? null, d.metadata, this.vec(vectors[i]!)],
+      );
+    }
+    return docs.length;
+  }
+
+  async retrieve(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
+    await this.ensure();
+    const [queryVec] = await this.embedder.embed([opts.query]);
+    const { rows } = await this.pool.query(
+      `SELECT text, source, metadata, 1 - (embedding <=> $1::vector) AS score
+         FROM ${this.table}
+        WHERE access = ANY($2::text[])
+          AND (1 - (embedding <=> $1::vector)) >= $4
+        ORDER BY embedding <=> $1::vector
+        LIMIT $3`,
+      [this.vec(queryVec!), opts.accessScopes, opts.topK ?? 8, this.minScore],
+    );
+    return rows.map((r: { text: string; source: string | null; metadata: Record<string, string>; score: number }) => ({
+      text: r.text,
+      source: r.source ?? 'unknown',
+      metadata: r.metadata,
+      score: Math.max(0, Math.min(1, Number(r.score))),
+    }));
+  }
+}
+
 export function createMemoryStore(): MemoryStore {
-  if (config.memoryMode === 'live' && config.langbase.apiKey) {
+  if (config.backend === 'local') {
+    if (!config.ollama.vectorDatabaseUrl) {
+      throw new Error('Local backend needs a Postgres for pgvector — set VECTOR_DATABASE_URL (or DATABASE_URL).');
+    }
+    return new PgVectorMemoryStore(config.ollama.vectorDatabaseUrl);
+  }
+  if (config.backend === 'langbase' && config.langbase.apiKey) {
     return new LangbaseMemoryStore(config.langbase.apiKey, config.langbase.memoryName);
   }
   return new MockMemoryStore();

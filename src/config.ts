@@ -24,6 +24,23 @@ const EnvSchema = z.object({
     ])
     .default('openai:text-embedding-3-large'),
   LANGBASE_GENERATION_MODEL: z.string().trim().default('openai:gpt-4o-mini'),
+
+  // Backend selection. `auto` = langbase if keyed, else mock. `local` = fully
+  // self-hosted (Ollama generation + Ollama embeddings + pgvector recall): $0/query.
+  LLM_BACKEND: z.enum(['auto', 'mock', 'langbase', 'local']).default('auto'),
+  OLLAMA_BASE_URL: z.string().trim().url().default('http://localhost:11434'),
+  OLLAMA_GENERATION_MODEL: z.string().trim().default('llama3.2:1b'),
+  OLLAMA_EMBEDDING_MODEL: z.string().trim().default('nomic-embed-text'),
+  // Vector dimension of the embedding model (nomic-embed-text = 768).
+  EMBEDDING_DIM: z.coerce.number().int().positive().default(768),
+  // Minimum cosine similarity for a vector hit to count as grounding. Vector
+  // search always returns nearest neighbours; without a floor the brain would
+  // answer from loosely-related chunks and break the cite-or-refuse contract.
+  // Tune per embedding model (nomic-embed-text has a high baseline ~0.4).
+  RETRIEVAL_MIN_SCORE: z.coerce.number().min(0).max(1).default(0.5),
+  // Postgres holding the pgvector recall table (local backend). Falls back to
+  // DATABASE_URL if unset, so one Postgres can serve both data + vectors.
+  VECTOR_DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DEMO_USER_ACCESS_SCOPE: z.string().trim().default('default-team'),
   // Data connector: auto | seed | postgres | csv | json. `auto` picks postgres
@@ -48,9 +65,16 @@ const env = parsed.data;
 const hasLangbase = Boolean(env.LANGBASE_API_KEY);
 const hasPostgres = Boolean(env.DATABASE_URL);
 
+// Resolve the backend: explicit wins; `auto` picks langbase-if-keyed, else mock.
+const backend: 'mock' | 'langbase' | 'local' =
+  env.LLM_BACKEND !== 'auto' ? env.LLM_BACKEND : hasLangbase ? 'langbase' : 'mock';
+
 export const config = {
   port: env.PORT,
   demoUserAccessScope: env.DEMO_USER_ACCESS_SCOPE,
+
+  /** Resolved backend: 'mock' | 'langbase' | 'local'. The factories switch on this. */
+  backend,
 
   langbase: {
     apiKey: env.LANGBASE_API_KEY,
@@ -59,14 +83,22 @@ export const config = {
     embeddingModel: env.LANGBASE_EMBEDDING_MODEL,
     generationModel: env.LANGBASE_GENERATION_MODEL,
   },
+  ollama: {
+    baseUrl: env.OLLAMA_BASE_URL,
+    generationModel: env.OLLAMA_GENERATION_MODEL,
+    embeddingModel: env.OLLAMA_EMBEDDING_MODEL,
+    embeddingDim: env.EMBEDDING_DIM,
+    vectorDatabaseUrl: env.VECTOR_DATABASE_URL ?? env.DATABASE_URL,
+    minScore: env.RETRIEVAL_MIN_SCORE,
+  },
   database: {
     url: env.DATABASE_URL,
   },
 
-  /** Recall layer: real Langbase Memory when keyed, else in-memory mock. */
-  memoryMode: hasLangbase ? ('live' as const) : ('mock' as const),
-  /** Generation layer: real Langbase Pipe when keyed, else deterministic mock. */
-  pipeMode: hasLangbase ? ('live' as const) : ('mock' as const),
+  /** Recall layer mode (for the banner). */
+  memoryMode: backend === 'langbase' ? ('live' as const) : backend === 'local' ? ('local' as const) : ('mock' as const),
+  /** Generation layer mode (for the banner). */
+  pipeMode: backend === 'langbase' ? ('live' as const) : backend === 'local' ? ('local' as const) : ('mock' as const),
   /** Data source: Postgres when DATABASE_URL set, else in-memory seed data. */
   dataMode: hasPostgres ? ('postgres' as const) : ('seed' as const),
 

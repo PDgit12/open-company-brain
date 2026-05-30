@@ -1,10 +1,15 @@
-# Local Postgres for LIVE-mode development. Not needed for the default mock demo.
+# Local Postgres (with pgvector) for LIVE-mode and the fully-local backend.
+# Not needed for the default mock demo.
 #   docker compose up -d
-#   # then set DATABASE_URL=postgres://brain:brain@localhost:5432/company_brain
-#   npm run seed:db
+#   # LIVE (managed gen) data source:
+#   #   DATABASE_URL=postgres://brain:brain@localhost:5432/company_brain  &&  npm run seed:db
+#   # LOCAL backend (Ollama + pgvector, $0/query):
+#   #   LLM_BACKEND=local  VECTOR_DATABASE_URL=postgres://brain:brain@localhost:5432/company_brain
+#   #   (run `ollama serve` + `ollama pull llama3.2:1b nomic-embed-text`, then `npm run sync:full`)
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector image = stock Postgres 16 + the `vector` extension the local backend needs.
+    image: pgvector/pgvector:pg16
     container_name: company-brain-db
     environment:
       POSTGRES_USER: brain

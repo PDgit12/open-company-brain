@@ -70,8 +70,37 @@ export class LangbasePipe implements Generator {
   }
 }
 
+/** Local generation via a running Ollama server (e.g. llama3.2). $0/call. */
+export class OllamaGenerator implements Generator {
+  constructor(
+    private readonly baseUrl: string,
+    private readonly model: string,
+  ) {}
+
+  async generate({ prompt }: GenerateInput): Promise<string> {
+    const res = await fetch(`${this.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        stream: false,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Ollama chat failed (${res.status}): ${await res.text()}`);
+    const json = (await res.json()) as { message?: { content?: string } };
+    return json.message?.content ?? '';
+  }
+}
+
 export function createGenerator(): Generator {
-  if (config.pipeMode === 'live' && config.langbase.apiKey) {
+  if (config.backend === 'local') {
+    return new OllamaGenerator(config.ollama.baseUrl, config.ollama.generationModel);
+  }
+  if (config.backend === 'langbase' && config.langbase.apiKey) {
     return new LangbasePipe(config.langbase.apiKey, config.langbase.pipeName);
   }
   return new MockGenerator();
