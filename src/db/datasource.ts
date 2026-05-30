@@ -27,6 +27,8 @@ import {
   type CompanyProgramRow,
 } from '../adapter/index.js';
 import { SEED_SNAPSHOT } from '../seed/seed-data.js';
+import { CsvConnector } from '../connectors/csv.js';
+import { JsonConnector } from '../connectors/json.js';
 
 export interface BrainDataSource {
   /** Pull the full current state of the brain's source-of-truth. */
@@ -77,7 +79,19 @@ class PostgresDataSource implements BrainDataSource {
 }
 
 export function createDataSource(): BrainDataSource {
-  if (config.dataMode === 'postgres' && config.database.url) {
+  const { kind, path } = config.connector;
+
+  // Explicit connector selection wins.
+  if (kind === 'csv') {
+    if (!path) throw new Error('DATA_CONNECTOR=csv requires CONNECTOR_PATH (a folder of CSVs).');
+    return new CsvConnector(path);
+  }
+  if (kind === 'json') {
+    if (!path) throw new Error('DATA_CONNECTOR=json requires CONNECTOR_PATH (a snapshot.json file).');
+    return new JsonConnector(path);
+  }
+  if (kind === 'postgres' || (kind === 'auto' && config.dataMode === 'postgres')) {
+    if (!config.database.url) throw new Error('Postgres connector requires DATABASE_URL.');
     return new PostgresDataSource(config.database.url);
   }
   return new SeedDataSource();

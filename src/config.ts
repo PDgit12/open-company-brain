@@ -15,6 +15,15 @@ const EnvSchema = z.object({
   LANGBASE_PIPE_NAME: z.string().trim().default('company-brain-agent'),
   DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DEMO_USER_ACCESS_SCOPE: z.string().trim().default('default-team'),
+  // Data connector: auto | seed | postgres | csv | json. `auto` picks postgres
+  // when DATABASE_URL is set, else seed.
+  DATA_CONNECTOR: z.enum(['auto', 'seed', 'postgres', 'csv', 'json']).default('auto'),
+  CONNECTOR_PATH: z.string().trim().default(''),
+  // Action delivery: outbox | file | webhook. `outbox` = record only (default,
+  // safe). `file` writes approved actions to a real file. `webhook` POSTs them.
+  ACTION_DELIVERY: z.enum(['outbox', 'file', 'webhook']).default('outbox'),
+  ACTION_OUTBOX_PATH: z.string().trim().default('outbox'),
+  ACTION_WEBHOOK_URL: z.string().trim().default(''),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -47,6 +56,16 @@ export const config = {
   pipeMode: hasLangbase ? ('live' as const) : ('mock' as const),
   /** Data source: Postgres when DATABASE_URL set, else in-memory seed data. */
   dataMode: hasPostgres ? ('postgres' as const) : ('seed' as const),
+
+  connector: {
+    kind: env.DATA_CONNECTOR,
+    path: env.CONNECTOR_PATH,
+  },
+  delivery: {
+    kind: env.ACTION_DELIVERY,
+    outboxPath: env.ACTION_OUTBOX_PATH,
+    webhookUrl: env.ACTION_WEBHOOK_URL,
+  },
 } as const;
 
 export type AppConfig = typeof config;

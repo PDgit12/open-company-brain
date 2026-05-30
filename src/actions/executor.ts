@@ -14,6 +14,7 @@
 
 import pg from 'pg';
 import { config } from '../config.js';
+import { createDeliverySink, type DeliverySink } from './delivery.js';
 import type { ProposedAction, ExecutionOutcome, EmailPayload, EngagementPayload } from './types.js';
 
 export interface ActionExecutor {
@@ -22,12 +23,15 @@ export interface ActionExecutor {
 
 export class DefaultActionExecutor implements ActionExecutor {
   /** pool is null in mock/seed mode. */
-  constructor(private readonly pool: pg.Pool | null) {}
+  constructor(
+    private readonly pool: pg.Pool | null,
+    private readonly sink: DeliverySink,
+  ) {}
 
   async execute(action: ProposedAction): Promise<ExecutionOutcome> {
     switch (action.kind) {
       case 'draft_email':
-        return this.queueEmail(action.payload as EmailPayload);
+        return this.deliverEmail(action);
       case 'log_engagement':
         return this.logEngagement(action.payload as EngagementPayload);
       default:
@@ -35,12 +39,12 @@ export class DefaultActionExecutor implements ActionExecutor {
     }
   }
 
-  private async queueEmail(p: EmailPayload): Promise<ExecutionOutcome> {
-    // Honest by design: we record the intent; we do not send. Real delivery is a
-    // separate provider integration, gated on purpose.
-    return {
-      effect: `Queued to outbox (no mail provider configured): "${p.subject}" → ${p.to ?? 'unspecified recipient'}`,
-    };
+  private async deliverEmail(action: ProposedAction): Promise<ExecutionOutcome> {
+    // Real delivery happens through the configured sink (outbox | file | webhook).
+    // The default outbox sink records only; file/webhook actually write/send.
+    const p = action.payload as EmailPayload;
+    const effect = await this.sink.deliver(action);
+    return { effect: `${effect} — subject: "${p.subject}"` };
   }
 
   private async logEngagement(p: EngagementPayload): Promise<ExecutionOutcome> {
@@ -64,5 +68,5 @@ export function createActionExecutor(): ActionExecutor {
     config.dataMode === 'postgres' && config.database.url
       ? new pg.Pool({ connectionString: config.database.url })
       : null;
-  return new DefaultActionExecutor(pool);
+  return new DefaultActionExecutor(pool, createDeliverySink());
 }

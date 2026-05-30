@@ -1,0 +1,4 @@
+id,name,industry,partnership_tier,summary,access
+c1,Orbital Robotics,Robotics,Platinum,"Automation partner; interested in vision research.",default-team
+c2,Lumen Health,Healthcare,Gold,"Sponsors a data science fellowship.",default-team
+c3,Atlas Logistics,Supply Chain,Prospect,"Early talks about a pilot integration.",default-team

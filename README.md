@@ -151,6 +151,11 @@ const { answer, sources } = await res.json();
 
 ## Capabilities
 
+- **Connectors** — read from Postgres, CSV folders, or a JSON snapshot with no code
+  change (`DATA_CONNECTOR=csv CONNECTOR_PATH=examples/sample-data`). The connector
+  interface is the template for adding more sources.
+- **Real action delivery** — approved actions go to a record-only outbox (default),
+  a real **file** (`outbox/*.jsonl`), or a **webhook** — selected by env.
 - **Read core** — grounded, cited briefing & Q&A; FK knowledge graph.
 - **Action layer** — agents *draft* write-actions (email, log engagement); a human
   *approves*; execution is **idempotent** and every step is **audited**. Email is
