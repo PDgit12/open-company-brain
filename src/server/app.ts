@@ -45,6 +45,11 @@ const EngagementBody = z.object({
   date: z.string().trim().optional(),
   openActions: z.string().trim().optional(),
 });
+const FeedbackBody = z.object({
+  query: z.string().trim().min(1),
+  answer: z.string().trim().min(1),
+  verdict: z.enum(['approved', 'rejected', 'helpful', 'unhelpful']),
+});
 
 /** Parse caller access scopes from the request (governance). */
 function callerScopes(req: Request): string[] {
@@ -117,6 +122,15 @@ export async function createApp(): Promise<express.Express> {
 
   app.get('/api/health-check', async (req, res) => {
     return res.json(await brain.health(callerScopes(req)));
+  });
+
+  // Feedback: a thumbs up/down on an answer. Fuels the few-shot + reranker loops.
+  app.post('/api/feedback', async (req, res) => {
+    const parsed = FeedbackBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'query, answer, verdict required' });
+    const { query, answer, verdict } = parsed.data;
+    await brain.recordAnswerFeedback(query, answer, verdict, callerScopes(req));
+    return res.json({ ok: true });
   });
 
   // ── Action layer ──────────────────────────────────────────────────────────

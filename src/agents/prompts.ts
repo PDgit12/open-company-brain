@@ -50,9 +50,23 @@ CONTEXT:
 ${context}`;
 }
 
-export function buildAskPrompt(question: string, context: string): string {
-  return `Question from a user: ${question}
+export interface Exemplar {
+  query: string;
+  answer: string;
+}
 
+/** Render approved past answers as few-shot exemplars (Phase 0 learning loop). */
+export function buildExemplarBlock(examples: Exemplar[]): string {
+  if (!examples.length) return '';
+  const shown = examples
+    .map((e, i) => `Example ${i + 1}:\nQ: ${e.query}\nA: ${e.answer}`)
+    .join('\n\n');
+  return `\nHere are past answers a human approved — match their style and rigor:\n${shown}\n`;
+}
+
+export function buildAskPrompt(question: string, context: string, examples: Exemplar[] = []): string {
+  return `Question from a user: ${question}
+${buildExemplarBlock(examples)}
 Answer using only the context. Cite sources.
 
 CONTEXT:

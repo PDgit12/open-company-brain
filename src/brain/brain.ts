@@ -17,6 +17,7 @@ import { createGenerator, type Generator } from '../agents/generator.js';
 import { snapshotToDocuments } from './documents.js';
 import { type Path } from '../graph/relationships.js';
 import { createGraphBackend, type GraphBackend } from '../graph/backend.js';
+import { getFeedbackStore, type FeedbackStore, type Verdict } from '../feedback/feedback.js';
 import {
   buildContextBlock,
   buildBriefingPrompt,
@@ -38,7 +39,18 @@ export class Brain {
     private readonly generator: Generator,
     private readonly snapshot: BrainSnapshot,
     private readonly graph: GraphBackend,
+    private readonly feedback: FeedbackStore,
   ) {}
+
+  /** Record a user's verdict on an answer (fuel for the learning loops). */
+  async recordAnswerFeedback(
+    query: string,
+    answer: string,
+    verdict: Verdict,
+    scopes: string[],
+  ): Promise<void> {
+    await this.feedback.record({ kind: 'answer', query, answer, verdict, scopes });
+  }
 
   /** Build the brain: load source-of-truth, sync it into recall, build the graph. */
   static async create(): Promise<Brain> {
@@ -59,7 +71,7 @@ export class Brain {
         );
       }
       const graph = createGraphBackend(snapshot);
-      return new Brain(memory, createGenerator(), snapshot, graph);
+      return new Brain(memory, createGenerator(), snapshot, graph, getFeedbackStore());
     } finally {
       await dataSource.close();
     }
@@ -87,7 +99,10 @@ export class Brain {
   async ask(question: string, accessScopes: string[]): Promise<BrainAnswer> {
     const chunks = await this.memory.retrieve({ query: question, accessScopes, topK: 8 });
     const context = buildContextBlock(chunks);
-    const prompt = buildAskPrompt(question, context);
+    // Few-shot learning loop: inject approved past answers (scope-gated) as
+    // exemplars so the brain's style/rigor compounds with usage.
+    const examples = await this.feedback.approvedExamples(question, accessScopes, 2);
+    const prompt = buildAskPrompt(question, context, examples);
     const answer = await this.generator.generate({ prompt, chunks });
     return { answer, sources: chunks };
   }

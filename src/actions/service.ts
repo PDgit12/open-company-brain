@@ -16,6 +16,7 @@ import type { Brain } from '../brain/brain.js';
 import { buildEmailDraftPrompt } from '../agents/prompts.js';
 import { createActionStore, type ActionStore } from './store.js';
 import { createActionExecutor, type ActionExecutor } from './executor.js';
+import { getFeedbackStore } from '../feedback/feedback.js';
 import type {
   ProposedAction,
   ProposeResult,
@@ -126,6 +127,14 @@ export class ActionService {
     if (action.status === 'failed') return { ok: false, reason: 'Action previously failed.' };
 
     await this.log(action, 'approved', 'human approved');
+    // Feedback fuel: an approved action is a positive signal on its draft.
+    await getFeedbackStore().record({
+      kind: 'action',
+      query: `${action.kind} for ${action.company}`,
+      answer: JSON.stringify(action.payload),
+      verdict: 'approved',
+      scopes: [],
+    });
     try {
       const outcome = await this.executor.execute(action);
       const executed: ProposedAction = {
@@ -153,6 +162,13 @@ export class ActionService {
     const rejected: ProposedAction = { ...action, status: 'rejected', decidedAt: nowIso() };
     await this.store.update(rejected);
     await this.log(rejected, 'rejected', reason ?? 'human rejected');
+    await getFeedbackStore().record({
+      kind: 'action',
+      query: `${action.kind} for ${action.company}`,
+      answer: JSON.stringify(action.payload),
+      verdict: 'rejected',
+      scopes: [],
+    });
     return { ok: true, action: rejected };
   }
 

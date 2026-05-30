@@ -1,0 +1,115 @@
+/**
+ * The feedback substrate — the fuel for every self-improvement loop.
+ *
+ * Every terminal signal (a user's thumbs up/down on an answer, an approved or
+ * rejected action) becomes a FeedbackEvent. From this one canonical store, later
+ * features read:
+ *   • few-shot exemplars (approved answers)        — Phase 0
+ *   • a retrieval reranker (per-chunk reward)       — Phase 3
+ *   • auto-grown eval cases                         — Phase 3
+ *
+ * It is deliberately one small interface with an in-memory default so it works
+ * in mock mode with zero setup. A Postgres-backed impl is a drop-in later.
+ *
+ * SCOPE SAFETY: exemplar retrieval is gated by access scope — an approved answer
+ * from a privileged scope must never leak into a broader-scope prompt.
+ */
+
+export type Verdict = 'approved' | 'rejected' | 'helpful' | 'unhelpful';
+
+export interface FeedbackEvent {
+  id: string;
+  at: string;
+  /** 'answer' (Q&A/brief feedback) or 'action' (approve/reject of a write). */
+  kind: 'answer' | 'action';
+  query: string;
+  answer: string;
+  verdict: Verdict;
+  scopes: string[];
+  /** Normalized reward in [-1, 1]; see rewardFor(). */
+  reward: number;
+}
+
+export interface ApprovedExample {
+  query: string;
+  answer: string;
+}
+
+/** One composite reward currency shared by every loop. */
+export function rewardFor(verdict: Verdict): number {
+  switch (verdict) {
+    case 'approved':
+    case 'helpful':
+      return 1;
+    case 'rejected':
+    case 'unhelpful':
+      return -1;
+  }
+}
+
+export interface FeedbackStore {
+  record(event: Omit<FeedbackEvent, 'id' | 'at' | 'reward'> & { reward?: number }): Promise<void>;
+  /** Approved, positively-rewarded examples similar to `query`, scope-gated. */
+  approvedExamples(query: string, scopes: string[], k: number): Promise<ApprovedExample[]>;
+  all(): Promise<FeedbackEvent[]>;
+}
+
+const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'for', 'with', 'is', 'are', 'what', 'who', 'our', 'we']);
+function tokens(s: string): Set<string> {
+  return new Set(
+    s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((t) => t.length > 1 && !STOP.has(t)),
+  );
+}
+function overlap(a: Set<string>, b: Set<string>): number {
+  if (!a.size) return 0;
+  let hits = 0;
+  for (const t of a) if (b.has(t)) hits++;
+  return hits / a.size;
+}
+
+let counter = 0;
+const nextId = (): string => `fb_${++counter}_${process.pid}`;
+
+export class InMemoryFeedbackStore implements FeedbackStore {
+  private events: FeedbackEvent[] = [];
+
+  async record(
+    e: Omit<FeedbackEvent, 'id' | 'at' | 'reward'> & { reward?: number },
+  ): Promise<void> {
+    this.events.push({
+      ...e,
+      id: nextId(),
+      at: new Date().toISOString(),
+      reward: e.reward ?? rewardFor(e.verdict),
+    });
+  }
+
+  async approvedExamples(query: string, scopes: string[], k: number): Promise<ApprovedExample[]> {
+    const allowed = new Set(scopes);
+    const qt = tokens(query);
+    return this.events
+      // Only human Q&A answers are exemplars — never action payloads (raw JSON,
+      // and often recorded with empty scopes, which would bypass the gate below).
+      .filter((e) => e.kind === 'answer')
+      .filter((e) => e.reward > 0 && e.answer.trim().length > 0)
+      // SCOPE GATE: the example's scopes must all be visible to this caller, and
+      // an unscoped example is not eligible (no empty-array bypass).
+      .filter((e) => e.scopes.length > 0 && e.scopes.every((s) => allowed.has(s)))
+      .map((e) => ({ e, score: overlap(qt, tokens(e.query)) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, k)
+      .map((x) => ({ query: x.e.query, answer: x.e.answer }));
+  }
+
+  async all(): Promise<FeedbackEvent[]> {
+    return [...this.events];
+  }
+}
+
+let singleton: FeedbackStore | null = null;
+/** Process-wide store so API requests and the action layer share one substrate. */
+export function getFeedbackStore(): FeedbackStore {
+  if (!singleton) singleton = new InMemoryFeedbackStore();
+  return singleton;
+}
