@@ -1,0 +1,18 @@
+# Render Blueprint — one-click deploy. https://render.com/docs/blueprint-spec
+# Click "Deploy to Render", and it provisions the web service from the Dockerfile.
+# The brain boots in mock mode with zero config; add LANGBASE_API_KEY / DATABASE_URL
+# in the Render dashboard to go live.
+services:
+  - type: web
+    name: company-brain
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: LANGBASE_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false

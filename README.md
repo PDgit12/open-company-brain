@@ -1,19 +1,39 @@
 # Company Brain
 
-> An open-source template for turning any organization's scattered records into a
-> **governed, grounded AI brain** — semantic recall + a foreign-key knowledge graph +
-> cited briefing & Q&A agents — deployable serverless on [Langbase](https://langbase.com).
+> **Open-source, self-hostable Glean / Dust alternative** — turn any organization's
+> scattered records into a **governed, grounded AI brain**: semantic recall + a
+> foreign-key knowledge graph + cited briefing & Q&A agents + a human-approved
+> **action layer**. Runs with **zero credentials** in mock mode; goes live on
+> [Langbase](https://langbase.com) + Postgres with no code change.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](./tsconfig.json)
-[![Runs with zero setup](https://img.shields.io/badge/demo-zero%20setup-brightgreen.svg)](#quick-start-mock-mode-zero-setup)
+[![Runs with zero setup](https://img.shields.io/badge/demo-zero%20setup-brightgreen.svg)](#get-started-in-one-command)
 
-Bring your own data, your own domain, your own deployment. Company Brain is built to
-be **forked and adapted**: swap the example domain for yours by editing two files,
-point it at your database, add your Langbase key, and ship.
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/PDgit12/open-company-brain)
+&nbsp;[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PDgit12/open-company-brain)
+
+Bring your own data, your own domain, your own deployment. Built to be **forked and
+adapted**: map your tables in one file, add your keys, ship.
 
 > **The trust contract is the product:** every answer cites the records it came from,
-> and the brain refuses to answer when it has no grounding.
+> and the brain refuses when it has no grounding.
+
+## How it compares
+
+| | Company Brain | Glean / Dust / Thunai | Zapier / n8n + AI |
+|---|---|---|---|
+| Open-source & self-hostable | ✅ | ✗ | partial |
+| Runs with zero credentials (mock mode) | ✅ | ✗ | ✗ |
+| Grounded + **cite-or-refuse** trust contract | ✅ | partial | ✗ |
+| Knowledge graph from your real FKs (no AI-guessed edges) | ✅ | partial | ✗ |
+| Governed **action layer** (approve · idempotent · audited) | ✅ | partial (enterprise) | ✗ (ungoverned) |
+| Multi-scope access control, free | ✅ | enterprise tier | ✗ |
+| Every layer swappable (data / recall / graph / generation / actions) | ✅ | ✗ | partial |
+
+It is **not** a visual workflow builder — workflows are code-first *action recipes*
+that inherit grounding, approval, idempotency, and audit. Opinionated safe primitives,
+not a blank automation canvas.
 
 ---
 
