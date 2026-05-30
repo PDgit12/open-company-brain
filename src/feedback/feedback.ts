@@ -28,6 +28,8 @@ export interface FeedbackEvent {
   scopes: string[];
   /** Normalized reward in [-1, 1]; see rewardFor(). */
   reward: number;
+  /** Citation source ids that grounded the answer — fuel for the reranker. */
+  sources?: string[];
 }
 
 export interface ApprovedExample {
@@ -51,7 +53,26 @@ export interface FeedbackStore {
   record(event: Omit<FeedbackEvent, 'id' | 'at' | 'reward'> & { reward?: number }): Promise<void>;
   /** Approved, positively-rewarded examples similar to `query`, scope-gated. */
   approvedExamples(query: string, scopes: string[], k: number): Promise<ApprovedExample[]>;
+  /** Accumulated reward per citation source, scope-gated — drives the reranker. */
+  sourceRewards(scopes: string[]): Promise<Map<string, number>>;
   all(): Promise<FeedbackEvent[]>;
+}
+
+/**
+ * Reorder retrieved chunks by relevance *nudged* by accumulated source reward.
+ * Pure and deterministic: relevance dominates (the nudge is bounded via tanh and
+ * scaled by `lambda`), so feedback only re-orders near-ties and demotes sources a
+ * human has rejected. With no reward for a source, the chunk is unchanged.
+ */
+export function rerankByReward<T extends { source: string; score: number }>(
+  chunks: T[],
+  rewards: Map<string, number>,
+  lambda = 0.25,
+): T[] {
+  return [...chunks]
+    .map((c) => ({ c, adj: c.score * (1 + lambda * Math.tanh(rewards.get(c.source) ?? 0)) }))
+    .sort((a, b) => b.adj - a.adj)
+    .map((x) => x.c);
 }
 
 const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'for', 'with', 'is', 'are', 'what', 'who', 'our', 'we']);
@@ -100,6 +121,19 @@ export class InMemoryFeedbackStore implements FeedbackStore {
       .sort((a, b) => b.score - a.score)
       .slice(0, k)
       .map((x) => ({ query: x.e.query, answer: x.e.answer }));
+  }
+
+  async sourceRewards(scopes: string[]): Promise<Map<string, number>> {
+    const allowed = new Set(scopes);
+    const out = new Map<string, number>();
+    for (const e of this.events) {
+      // Same gate as exemplars: only human answers, never unscoped (no [] bypass).
+      if (e.kind !== 'answer' || !e.sources?.length) continue;
+      if (!(e.scopes.length > 0 && e.scopes.every((s) => allowed.has(s)))) continue;
+      // Reward flows to every source the answer cited — positive boosts, negative demotes.
+      for (const s of e.sources) out.set(s, (out.get(s) ?? 0) + e.reward);
+    }
+    return out;
   }
 
   async all(): Promise<FeedbackEvent[]> {

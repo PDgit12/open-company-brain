@@ -17,7 +17,12 @@ import { createGenerator, type Generator } from '../agents/generator.js';
 import { snapshotToDocuments } from './documents.js';
 import { type Path } from '../graph/relationships.js';
 import { createGraphBackend, type GraphBackend } from '../graph/backend.js';
-import { getFeedbackStore, type FeedbackStore, type Verdict } from '../feedback/feedback.js';
+import {
+  getFeedbackStore,
+  rerankByReward,
+  type FeedbackStore,
+  type Verdict,
+} from '../feedback/feedback.js';
 import {
   buildContextBlock,
   buildBriefingPrompt,
@@ -48,8 +53,21 @@ export class Brain {
     answer: string,
     verdict: Verdict,
     scopes: string[],
+    sources: string[] = [],
   ): Promise<void> {
-    await this.feedback.record({ kind: 'answer', query, answer, verdict, scopes });
+    await this.feedback.record({ kind: 'answer', query, answer, verdict, scopes, sources });
+  }
+
+  /**
+   * Re-rank retrieved chunks by accumulated source reward (scope-gated).
+   * No-op when no feedback exists, so behaviour is identical on a cold brain.
+   */
+  private async rerank(
+    chunks: RetrievedChunk[],
+    scopes: string[],
+  ): Promise<RetrievedChunk[]> {
+    const rewards = await this.feedback.sourceRewards(scopes);
+    return rewards.size ? rerankByReward(chunks, rewards) : chunks;
   }
 
   /** Build the brain: load source-of-truth, sync it into recall, build the graph. */
@@ -85,11 +103,12 @@ export class Brain {
   }
 
   async brief(companyName: string, accessScopes: string[]): Promise<BrainAnswer> {
-    const chunks = await this.memory.retrieve({
+    const retrieved = await this.memory.retrieve({
       query: `${companyName} partnership history recent engagements open actions contacts`,
       accessScopes,
       topK: 10,
     });
+    const chunks = await this.rerank(retrieved, accessScopes);
     const context = buildContextBlock(chunks);
     const prompt = buildBriefingPrompt(companyName, context);
     const answer = await this.generator.generate({ prompt, chunks });
@@ -97,7 +116,9 @@ export class Brain {
   }
 
   async ask(question: string, accessScopes: string[]): Promise<BrainAnswer> {
-    const chunks = await this.memory.retrieve({ query: question, accessScopes, topK: 8 });
+    const retrieved = await this.memory.retrieve({ query: question, accessScopes, topK: 8 });
+    // Reranking loop: boost sources humans found useful, demote rejected ones.
+    const chunks = await this.rerank(retrieved, accessScopes);
     const context = buildContextBlock(chunks);
     // Few-shot learning loop: inject approved past answers (scope-gated) as
     // exemplars so the brain's style/rigor compounds with usage.
@@ -128,11 +149,12 @@ export class Brain {
 
   /** Relationship-health agent: what needs attention across the brain. */
   async health(accessScopes: string[]): Promise<BrainAnswer> {
-    const chunks = await this.memory.retrieve({
+    const retrieved = await this.memory.retrieve({
       query: 'open actions follow up stale renewal overdue next steps engagements',
       accessScopes,
       topK: 12,
     });
+    const chunks = await this.rerank(retrieved, accessScopes);
     const prompt = buildHealthPrompt(buildContextBlock(chunks));
     const answer = await this.generator.generate({ prompt, chunks });
     return { answer, sources: chunks };

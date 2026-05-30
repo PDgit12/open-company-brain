@@ -49,6 +49,9 @@ const FeedbackBody = z.object({
   query: z.string().trim().min(1),
   answer: z.string().trim().min(1),
   verdict: z.enum(['approved', 'rejected', 'helpful', 'unhelpful']),
+  // Echo back the `source` of each chunk from the answer so the reranker can
+  // attribute the verdict to the records that grounded it.
+  sources: z.array(z.string()).optional(),
 });
 
 /** Parse caller access scopes from the request (governance). */
@@ -128,8 +131,8 @@ export async function createApp(): Promise<express.Express> {
   app.post('/api/feedback', async (req, res) => {
     const parsed = FeedbackBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'query, answer, verdict required' });
-    const { query, answer, verdict } = parsed.data;
-    await brain.recordAnswerFeedback(query, answer, verdict, callerScopes(req));
+    const { query, answer, verdict, sources } = parsed.data;
+    await brain.recordAnswerFeedback(query, answer, verdict, callerScopes(req), sources);
     return res.json({ ok: true });
   });
 
