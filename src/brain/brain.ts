@@ -17,6 +17,7 @@ import { createGenerator, type Generator } from '../agents/generator.js';
 import { snapshotToDocuments } from './documents.js';
 import { type Path } from '../graph/relationships.js';
 import { createGraphBackend, type GraphBackend } from '../graph/backend.js';
+import { candidateCasesFromFeedback, type GoldenCase } from '../eval/golden.js';
 import {
   getFeedbackStore,
   rerankByReward,
@@ -176,5 +177,13 @@ export class Brain {
   /** Names the brain knows about — handy for demo UIs and autocomplete. */
   companyNames(): string[] {
     return this.snapshot.companies.map((c) => c.name);
+  }
+
+  /**
+   * Auto-grown eval candidates derived from rejected feedback (scope-gated).
+   * A human-review queue for promotion into the curated golden set, not a CI gate.
+   */
+  async evalCandidates(scopes: string[]): Promise<GoldenCase[]> {
+    return candidateCasesFromFeedback(await this.feedback.all(), scopes);
   }
 }

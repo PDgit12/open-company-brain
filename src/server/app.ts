@@ -136,6 +136,12 @@ export async function createApp(): Promise<express.Express> {
     return res.json({ ok: true });
   });
 
+  // Auto-grown eval candidates from rejected answers — a human-review queue
+  // (scope-gated). Promote good ones into the curated golden set.
+  app.get('/api/eval/candidates', async (req, res) => {
+    return res.json({ candidates: await brain.evalCandidates(callerScopes(req)) });
+  });
+
   // ── Action layer ──────────────────────────────────────────────────────────
 
   app.post('/api/actions/draft-email', async (req, res) => {
