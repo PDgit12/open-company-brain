@@ -59,7 +59,9 @@ yours; see *Make it yours* below.
 - **Three backends** — mock (no credentials), live (Langbase + Postgres), and
   fully local (Ollama + pgvector, $0/query), chosen from your `.env`.
 - **A clean adapter seam** — one file maps your tables onto the model.
-- **Batteries** — demo UI, HTTP API, tests, and Docker.
+- **Agent console** — a built-in web dashboard to ask/brief/scan, see citations,
+  give 👍/👎 feedback, approve or reject actions, and learn to build your own agent.
+- **Batteries** — HTTP API, tests, and Docker.
 
 ## Get started in one command
 
@@ -194,7 +196,7 @@ const { answer, sources } = await res.json();
 
 | Command | Does |
 |---|---|
-| `npm run demo` | run the API + demo page |
+| `npm run demo` | run the API + agent console at http://localhost:4000 |
 | `npm run dev` | same, with hot reload |
 | `npm run setup:live` | provision the Langbase Memory + Pipe and sync data (idempotent) |
 | `npm run setup:local` | pull local models + embed data into pgvector ($0/query, idempotent) |

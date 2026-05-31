@@ -3,223 +3,376 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Company Brain</title>
+    <title>Company Brain — Console</title>
     <style>
       :root {
-        --bg: oklch(98% 0.005 250);
+        --bg: oklch(97.5% 0.006 255);
         --surface: oklch(100% 0 0);
-        --ink: oklch(22% 0.02 260);
-        --muted: oklch(55% 0.02 260);
-        --accent: oklch(55% 0.16 265);
-        --accent-soft: oklch(95% 0.03 265);
-        --border: oklch(90% 0.01 260);
-        --radius: 14px;
-        --shadow: 0 1px 2px oklch(0% 0 0 / 0.04), 0 8px 24px oklch(0% 0 0 / 0.06);
+        --surface-2: oklch(98.5% 0.004 255);
+        --ink: oklch(20% 0.02 262);
+        --muted: oklch(52% 0.02 262);
+        --faint: oklch(68% 0.015 262);
+        --accent: oklch(54% 0.17 266);
+        --accent-ink: oklch(44% 0.18 266);
+        --accent-soft: oklch(96% 0.03 266);
+        --good: oklch(58% 0.14 150);
+        --bad: oklch(56% 0.18 25);
+        --warn: oklch(70% 0.15 75);
+        --border: oklch(91% 0.008 262);
+        --r: 12px;
+        --shadow: 0 1px 2px oklch(0% 0 0 / 0.04), 0 10px 30px oklch(0% 0 0 / 0.07);
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        background: radial-gradient(120% 80% at 50% -10%, var(--accent-soft), var(--bg) 55%);
+        background: radial-gradient(130% 90% at 80% -20%, var(--accent-soft), var(--bg) 50%);
         color: var(--ink);
         min-height: 100vh;
       }
-      .wrap { max-width: 880px; margin: 0 auto; padding: 48px 20px 80px; }
-      header h1 { font-size: clamp(1.6rem, 1rem + 2vw, 2.4rem); margin: 0 0 6px; letter-spacing: -0.02em; }
-      header p { color: var(--muted); margin: 0 0 4px; }
-      .mode { display: inline-block; margin-top: 10px; font-size: 12px; color: var(--muted);
-        background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; }
-      .grid { display: grid; gap: 18px; margin-top: 30px; }
-      .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-        padding: 22px; box-shadow: var(--shadow); }
-      .card h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 14px; }
+      .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+      /* ── Sidebar ── */
+      aside {
+        border-right: 1px solid var(--border);
+        padding: 26px 18px;
+        position: sticky; top: 0; height: 100vh;
+        background: linear-gradient(180deg, var(--surface), var(--surface-2));
+        display: flex; flex-direction: column; gap: 4px;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+      .brand .dot {
+        width: 30px; height: 30px; border-radius: 9px;
+        background: conic-gradient(from 210deg, var(--accent), oklch(62% 0.2 320), var(--accent));
+        box-shadow: 0 2px 10px oklch(54% 0.17 266 / 0.4);
+      }
+      .brand b { font-size: 16px; letter-spacing: -0.02em; }
+      .brand small { display: block; color: var(--faint); font-size: 11px; font-weight: 400; }
+      nav button {
+        all: unset; display: flex; align-items: center; gap: 10px;
+        padding: 9px 12px; border-radius: 9px; cursor: pointer;
+        color: var(--muted); font-weight: 500; font-size: 14px; transition: 120ms;
+      }
+      nav button:hover { background: var(--surface-2); color: var(--ink); }
+      nav button.on { background: var(--accent-soft); color: var(--accent-ink); }
+      nav button .ic { width: 17px; text-align: center; opacity: 0.85; }
+      .mode {
+        margin-top: auto; font-size: 11px; color: var(--faint);
+        border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; background: var(--surface);
+      }
+      .mode .pip { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 6px; }
+      /* ── Main ── */
+      main { padding: 38px clamp(20px, 4vw, 56px); max-width: 1000px; }
+      .view { display: none; animation: fade 0.25s ease; }
+      .view.on { display: block; }
+      @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      h2 { font-size: 1.45rem; letter-spacing: -0.02em; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 24px; max-width: 60ch; }
+      /* ── Cards / controls ── */
+      .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 22px; }
       .row { display: flex; gap: 10px; flex-wrap: wrap; }
-      input, select {
-        flex: 1 1 200px; min-width: 0; padding: 11px 13px; font-size: 15px;
-        border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--ink);
+      input, select, textarea {
+        font: inherit; color: var(--ink); background: var(--surface);
+        border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; width: 100%;
+        transition: 120ms;
       }
-      input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
-      button {
-        padding: 11px 18px; font-size: 15px; font-weight: 600; cursor: pointer;
-        border: none; border-radius: 10px; background: var(--accent); color: white;
-        transition: transform 120ms ease, filter 120ms ease;
+      input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+      textarea { resize: vertical; min-height: 70px; }
+      label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .btn {
+        all: unset; cursor: pointer; padding: 11px 18px; border-radius: 10px; font-weight: 600; font-size: 14px;
+        background: var(--accent); color: white; text-align: center; transition: 120ms;
+        box-shadow: 0 2px 8px oklch(54% 0.17 266 / 0.3);
       }
-      button:hover { filter: brightness(1.08); }
-      button:active { transform: translateY(1px); }
-      .out { margin-top: 16px; }
-      .answer { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border);
-        border-radius: 10px; padding: 16px; min-height: 20px; }
-      .sources { margin-top: 12px; }
-      .sources summary { cursor: pointer; color: var(--accent); font-size: 13px; font-weight: 600; }
-      .chunk { font-size: 13px; color: var(--muted); border-left: 2px solid var(--border);
-        padding: 4px 0 4px 12px; margin: 8px 0; white-space: pre-wrap; }
-      .tag { font-size: 11px; background: var(--accent-soft); color: var(--accent);
-        padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
-      footer { margin-top: 36px; color: var(--muted); font-size: 13px; text-align: center; }
+      .btn:hover { filter: brightness(1.07); transform: translateY(-1px); }
+      .btn:active { transform: none; }
+      .btn.ghost { background: var(--surface-2); color: var(--ink); box-shadow: none; border: 1px solid var(--border); }
+      .btn.ghost:hover { background: var(--accent-soft); border-color: var(--accent); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
+      .btn.sm { padding: 7px 12px; font-size: 13px; }
+      .scope { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+      .scope input { width: 180px; padding: 7px 10px; }
+      /* ── Answer / output ── */
+      .answer { margin-top: 18px; }
+      .answer .body { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 20px; white-space: pre-wrap; }
+      .answer .body.refusal { color: var(--muted); font-style: italic; }
+      .cites { display: flex; gap: 7px; flex-wrap: wrap; margin: 14px 0 0; }
+      .chip { font-size: 12px; background: var(--accent-soft); color: var(--accent-ink); border-radius: 999px; padding: 4px 11px; font-weight: 600; cursor: default; }
+      .chip[title] { cursor: help; }
+      .fb { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+      .fb button { all: unset; cursor: pointer; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border); transition: 120ms; }
+      .fb button:hover { background: var(--surface-2); }
+      .fb button.up:hover { border-color: var(--good); color: var(--good); }
+      .fb button.down:hover { border-color: var(--bad); color: var(--bad); }
+      .fb .done { color: var(--good); font-weight: 600; }
+      .empty { color: var(--faint); font-size: 14px; padding: 14px 0; }
+      .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.7s linear infinite; vertical-align: -2px; }
+      @keyframes sp { to { transform: rotate(360deg); } }
+      /* ── Action / proposal cards ── */
+      .proposal { border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: var(--r); padding: 16px 18px; margin-top: 16px; background: var(--surface-2); }
+      .proposal h4 { margin: 0 0 8px; font-size: 14px; }
+      .proposal pre { margin: 8px 0 14px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 12px; overflow-x: auto; white-space: pre-wrap; }
+      .pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .pill.proposed { background: oklch(70% 0.15 75 / 0.18); color: oklch(50% 0.13 75); }
+      .pill.executed { background: oklch(58% 0.14 150 / 0.16); color: var(--good); }
+      .pill.rejected { background: oklch(56% 0.18 25 / 0.14); color: var(--bad); }
+      .list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+      .item { border: 1px solid var(--border); border-radius: 10px; padding: 12px 15px; font-size: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+      .item .meta { color: var(--muted); font-size: 12px; }
+      /* ── Build-your-own ── */
+      .step h4 { margin: 2px 0 5px; font-size: 15px; }
+      .step p { margin: 0; color: var(--muted); font-size: 14px; }
+      pre.code { background: oklch(22% 0.02 262); color: oklch(92% 0.02 262); border-radius: var(--r); padding: 18px 20px; overflow-x: auto; font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace; margin: 18px 0; }
+      pre.code .k { color: oklch(78% 0.13 300); } pre.code .s { color: oklch(80% 0.12 150); } pre.code .c { color: oklch(60% 0.02 262); }
+      .note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 14px; margin: 18px 0; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 0.9em; }
+      @media (max-width: 780px) { .app { grid-template-columns: 1fr; } aside { position: static; height: auto; flex-direction: row; flex-wrap: wrap; } .mode { margin: 0; } nav { display: flex; flex-wrap: wrap; } .grid2 { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <header>
-        <h1>Company Brain</h1>
-        <p>Grounded briefings & Q&A over your records — every answer cites the records it came from.</p>
-        <span class="mode" id="mode">checking mode…</span>
-      </header>
+    <div class="app">
+      <aside>
+        <div class="brand"><div class="dot"></div><div><b>Company Brain</b><small>agent console</small></div></div>
+        <nav id="nav">
+          <button data-v="ask" class="on"><span class="ic">✦</span> Ask</button>
+          <button data-v="brief"><span class="ic">▦</span> Brief</button>
+          <button data-v="health"><span class="ic">♥</span> Health</button>
+          <button data-v="path"><span class="ic">⤳</span> Intro path</button>
+          <button data-v="actions"><span class="ic">✎</span> Actions</button>
+          <button data-v="learning"><span class="ic">↻</span> Learning</button>
+          <button data-v="build"><span class="ic">⚒</span> Build an agent</button>
+        </nav>
+        <div class="mode" id="mode"><span class="pip"></span> connecting…</div>
+      </aside>
 
-      <div class="grid">
-        <section class="card">
-          <h2>Partner briefing</h2>
-          <div class="row">
-            <select id="company"></select>
-            <button onclick="brief()">Brief me</button>
-          </div>
-          <div class="out">
-            <div class="answer" id="briefAnswer">Pick a partner and click “Brief me”.</div>
-            <details class="sources" id="briefSources" hidden></details>
-          </div>
-        </section>
+      <main>
+        <div class="scope">
+          <span>Access scopes</span>
+          <input id="scopes" value="default-team" title="Comma-separated; the brain only returns records in these scopes" />
+        </div>
 
-        <section class="card">
+        <!-- ASK -->
+        <section class="view on" id="v-ask">
           <h2>Ask the brain</h2>
-          <div class="row">
-            <input id="question" placeholder="e.g. Which partners care about ML research?" />
-            <button onclick="ask()">Ask</button>
-          </div>
-          <div class="out">
-            <div class="answer" id="askAnswer">Ask anything grounded in the partner records.</div>
-            <details class="sources" id="askSources" hidden></details>
-          </div>
-        </section>
-
-        <section class="card">
-          <h2>Relationship path <span class="tag">knowledge graph</span></h2>
-          <div class="row">
-            <select id="pathFrom"></select>
-            <select id="pathTo"></select>
-            <button onclick="introPath()">Find path</button>
-          </div>
-          <div class="out"><div class="answer" id="pathAnswer">How are two partners connected through shared people or programs?</div></div>
-        </section>
-
-        <section class="card">
-          <h2>What needs attention <span class="tag">health agent</span></h2>
-          <div class="row">
-            <button onclick="healthCheck()">Run health check</button>
-          </div>
-          <div class="out">
-            <div class="answer" id="healthAnswer">Surface stale relationships and open action items.</div>
-            <details class="sources" id="healthSources" hidden></details>
+          <p class="sub">A grounded, cited answer over everything the brain knows — or an honest refusal when it has no grounding. That refuse-or-cite contract is the product.</p>
+          <div class="card">
+            <label for="q">Question</label>
+            <textarea id="q" placeholder="e.g. What is our history with Aerodyne and what's still open?"></textarea>
+            <div class="row" style="margin-top:12px"><button class="btn" id="askBtn">Ask</button></div>
+            <div id="askOut"></div>
           </div>
         </section>
 
-        <section class="card">
-          <h2>Draft an action <span class="tag">human-approved</span></h2>
-          <div class="row">
-            <select id="actCompany"></select>
-            <input id="actGoal" placeholder="goal, e.g. follow up on the renewal" />
-            <button onclick="draftEmail()">Draft email</button>
+        <!-- BRIEF -->
+        <section class="view" id="v-brief">
+          <h2>Prepare a briefing</h2>
+          <p class="sub">A conversation-ready snapshot of one entity: status, recent activity, open items, and grounded talking points.</p>
+          <div class="card">
+            <label for="co">Entity</label>
+            <select id="co"></select>
+            <div class="row" style="margin-top:12px"><button class="btn" id="briefBtn">Brief me</button></div>
+            <div id="briefOut"></div>
           </div>
-          <div class="out">
-            <div class="answer" id="actAnswer">Agents draft; you approve before anything executes (with an audit log).</div>
-            <div class="row" id="actButtons" style="margin-top:12px" hidden>
-              <button id="approveBtn">Approve & execute</button>
-              <button id="rejectBtn" style="background:oklch(55% 0.02 260)">Reject</button>
+        </section>
+
+        <!-- HEALTH -->
+        <section class="view" id="v-health">
+          <h2>Relationship health</h2>
+          <p class="sub">A standing agent that scans for what needs attention — stale relationships, overdue follow-ups, open actions.</p>
+          <div class="card">
+            <button class="btn" id="healthBtn">Scan the brain</button>
+            <div id="healthOut"></div>
+          </div>
+        </section>
+
+        <!-- PATH -->
+        <section class="view" id="v-path">
+          <h2>Find a connection</h2>
+          <p class="sub">Shortest path between two entities over the foreign-key knowledge graph — your warm-intro route.</p>
+          <div class="card">
+            <div class="grid2">
+              <div><label>From</label><input id="pFrom" placeholder="Aerodyne Systems" /></div>
+              <div><label>To</label><input id="pTo" placeholder="Veridian Energy" /></div>
             </div>
-            <details class="sources" id="actSources" hidden></details>
+            <div class="row" style="margin-top:12px"><button class="btn" id="pathBtn">Trace path</button></div>
+            <div id="pathOut"></div>
           </div>
         </section>
-      </div>
 
-      <footer>Company Brain · runs on seed data in mock mode · add a Langbase key to go live</footer>
+        <!-- ACTIONS -->
+        <section class="view" id="v-actions">
+          <h2>Action layer</h2>
+          <p class="sub">Agents <em>propose</em>; a human approves. Every action is grounded, idempotent, and audited — nothing is sent without a click.</p>
+          <div class="card">
+            <label for="aco">Company</label>
+            <input id="aco" placeholder="Aerodyne Systems" />
+            <label for="agoal" style="margin-top:12px">Goal for the draft email</label>
+            <input id="agoal" placeholder="schedule a renewal call" />
+            <div class="row" style="margin-top:12px"><button class="btn" id="draftBtn">Draft email (propose)</button></div>
+            <div id="draftOut"></div>
+          </div>
+          <h3 style="margin:26px 0 0;font-size:1rem">Audit log</h3>
+          <div class="list" id="auditList"><div class="empty">No actions yet.</div></div>
+        </section>
+
+        <!-- LEARNING -->
+        <section class="view" id="v-learning">
+          <h2>Learning loop</h2>
+          <p class="sub">Every 👍/👎 reranks retrieval and seeds few-shot examples. Rejected refusals become regression cases here — promote good ones into your golden eval set.</p>
+          <div class="card">
+            <div class="row" style="justify-content:space-between;align-items:center">
+              <strong>Auto-grown eval candidates</strong>
+              <button class="btn ghost sm" id="reloadEval">Reload</button>
+            </div>
+            <div class="list" id="evalList"><div class="empty">Loading…</div></div>
+          </div>
+        </section>
+
+        <!-- BUILD -->
+        <section class="view" id="v-build">
+          <h2>Build your own agent</h2>
+          <p class="sub">Two kinds of agent, both small and grounded by construction. No framework to learn — just a prompt or a recipe.</p>
+
+          <div class="card">
+            <h3 style="margin:0 0 4px">1 · A read agent = a prompt</h3>
+            <p class="sub" style="margin-bottom:0">Retrieve grounded chunks, then ask the model to do something with them. Add a function in <code>src/agents/prompts.ts</code> and a method on the Brain that reuses <code>retrieve → generate</code> — it inherits citations and the refuse-or-cite contract for free.</p>
+            <pre class="code"><span class="c">// src/agents/prompts.ts</span>
+<span class="k">export function</span> buildRiskPrompt(company, context) {
+  <span class="k">return</span> <span class="s">`Flag relationship risks for ${company}.
+Use ONLY the context. Cite each fact. If nothing, say so.
+
+CONTEXT:
+${context}`</span>;
+}
+
+<span class="c">// src/brain/brain.ts — reuse the grounded draft() helper</span>
+<span class="k">async</span> riskScan(company, scopes) {
+  <span class="k">return this</span>.draft(company, buildRiskPrompt(company, <span class="s">''</span>), scopes);
+}</pre>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <h3 style="margin:0 0 4px">2 · A write agent = an action recipe</h3>
+            <p class="sub" style="margin-bottom:0">Anything with a side effect is a <strong>recipe</strong>: a draft step + an executor. It’s automatically grounded, human-approved, idempotent, and audited. Copy <code>examples/custom-action.example.ts</code>.</p>
+            <pre class="code"><span class="c">// a recipe = propose (draft, grounded) + execute (the side effect)</span>
+<span class="k">const</span> recipe = {
+  kind: <span class="s">'slack_nudge'</span>,
+  propose: (brain, company, scopes) =&gt;
+    brain.draft(company, <span class="s">'Draft a Slack nudge…'</span>, scopes),
+  execute: <span class="k">async</span> (action) =&gt; slack.post(action.payload),
+};
+<span class="c">// → proposeAction() → human approves in this console → executor runs once</span></pre>
+            <div class="note">The console you’re using drives these over HTTP. Your front end, a Slack bot, or a cron job can call the same endpoints — the governance (grounding · approval · idempotency · audit) lives in the core, not the caller.</div>
+          </div>
+        </section>
+      </main>
     </div>
 
     <script>
-      async function api(path, body) {
-        const res = await fetch(path, {
-          method: body ? 'POST' : 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          body: body ? JSON.stringify(body) : undefined,
-        });
-        return res.json();
-      }
-      function renderSources(el, sources) {
-        if (!sources || !sources.length) { el.hidden = true; return; }
-        el.hidden = false;
-        el.innerHTML =
-          `<summary>${sources.length} source record${sources.length > 1 ? 's' : ''}</summary>` +
-          sources.map((s) => `<div class="chunk">${s.text}<span class="tag">${s.source}</span></div>`).join('');
-      }
-      async function brief() {
-        const company = document.getElementById('company').value;
-        document.getElementById('briefAnswer').textContent = 'Thinking…';
-        const r = await api('/api/brief', { company });
-        document.getElementById('briefAnswer').textContent = r.answer;
-        renderSources(document.getElementById('briefSources'), r.sources);
-      }
-      async function ask() {
-        const question = document.getElementById('question').value;
-        if (!question) return;
-        document.getElementById('askAnswer').textContent = 'Thinking…';
-        const r = await api('/api/ask', { question });
-        document.getElementById('askAnswer').textContent = r.answer;
-        renderSources(document.getElementById('askSources'), r.sources);
-      }
-      async function introPath() {
-        const from = document.getElementById('pathFrom').value;
-        const to = document.getElementById('pathTo').value;
-        const r = await api('/api/intro-path', { from, to });
-        document.getElementById('pathAnswer').textContent = r.path
-          ? r.path.description
-          : 'No known connection path in the data yet.';
-      }
-      async function healthCheck() {
-        document.getElementById('healthAnswer').textContent = 'Reviewing…';
-        const r = await api('/api/health-check');
-        document.getElementById('healthAnswer').textContent = r.answer;
-        renderSources(document.getElementById('healthSources'), r.sources);
-      }
-      let pendingActionId = null;
-      async function draftEmail() {
-        const company = document.getElementById('actCompany').value;
-        const goal = document.getElementById('actGoal').value || 'follow up';
-        document.getElementById('actAnswer').textContent = 'Drafting…';
-        document.getElementById('actButtons').hidden = true;
-        const r = await api('/api/actions/draft-email', { company, goal });
-        if (!r.ok) {
-          document.getElementById('actAnswer').textContent = '⚠ ' + r.reason;
-          renderSources(document.getElementById('actSources'), []);
-          return;
-        }
-        pendingActionId = r.action.id;
-        const p = r.action.payload;
-        document.getElementById('actAnswer').textContent =
-          'Subject: ' + p.subject + '\n\n' + p.body + '\n\n[status: ' + r.action.status + ']';
-        renderSources(document.getElementById('actSources'), r.action.sources);
-        document.getElementById('actButtons').hidden = false;
-      }
-      document.getElementById('approveBtn').onclick = async () => {
-        if (!pendingActionId) return;
-        const r = await api('/api/actions/' + pendingActionId + '/approve', {});
-        document.getElementById('actAnswer').textContent = r.ok
-          ? '✓ Executed: ' + r.action.effect
-          : '⚠ ' + r.reason;
-        document.getElementById('actButtons').hidden = true;
+      const $ = (s) => document.querySelector(s);
+      const scopesHeader = () => ({ 'x-access-scopes': $('#scopes').value.trim() || 'default-team' });
+      const api = async (path, opts = {}) => {
+        const res = await fetch(path, { ...opts, headers: { 'content-type': 'application/json', ...scopesHeader(), ...(opts.headers || {}) } });
+        return { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
       };
-      document.getElementById('rejectBtn').onclick = async () => {
-        if (!pendingActionId) return;
-        await api('/api/actions/' + pendingActionId + '/reject', { reason: 'declined in demo' });
-        document.getElementById('actAnswer').textContent = '✗ Rejected — nothing executed.';
-        document.getElementById('actButtons').hidden = true;
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      const REFUSAL = "I don't have that in the brain yet.";
+
+      document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => {
+        document.querySelectorAll('#nav button').forEach((x) => x.classList.toggle('on', x === b));
+        document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + b.dataset.v));
+        if (b.dataset.v === 'learning') loadEval();
+        if (b.dataset.v === 'actions') loadAudit();
+      }));
+
+      function renderAnswer(el, query, r) {
+        const refused = !r.sources?.length || (r.answer || '').includes(REFUSAL);
+        const sources = [...new Set((r.sources || []).map((s) => s.source))];
+        el.innerHTML = `<div class="answer">
+          <div class="body ${refused ? 'refusal' : ''}">${esc(r.answer || REFUSAL)}</div>
+          ${sources.length ? `<div class="cites">${sources.map((s) => `<span class="chip">${esc(s)}</span>`).join('')}</div>` : ''}
+          <div class="fb"><span>Was this useful?</span><button class="up">👍 Yes</button><button class="down">👎 No</button></div>
+        </div>`;
+        const fb = el.querySelector('.fb');
+        const send = async (verdict) => {
+          await api('/api/feedback', { method: 'POST', body: JSON.stringify({ query, answer: r.answer || REFUSAL, verdict, sources }) });
+          fb.innerHTML = `<span class="done">✓ Recorded — this ${verdict === 'helpful' ? 'boosts' : 'demotes'} these sources next time.</span>`;
+        };
+        fb.querySelector('.up').onclick = () => send('helpful');
+        fb.querySelector('.down').onclick = () => send('unhelpful');
+      }
+      const busy = (el) => (el.innerHTML = '<div class="answer"><span class="spin"></span> <span style="color:var(--muted)">the brain is thinking…</span></div>');
+
+      $('#askBtn').onclick = async () => {
+        const q = $('#q').value.trim(); if (!q) return;
+        busy($('#askOut'));
+        const { body } = await api('/api/ask', { method: 'POST', body: JSON.stringify({ question: q }) });
+        renderAnswer($('#askOut'), q, body);
       };
-      (async function init() {
-        const health = await api('/health');
-        document.getElementById('mode').textContent = health.mode;
-        const { companies } = await api('/api/companies');
-        for (const id of ['company', 'pathFrom', 'pathTo', 'actCompany']) {
-          const sel = document.getElementById(id);
-          sel.innerHTML = companies.map((c) => `<option>${c}</option>`).join('');
-        }
-        if (companies.length > 1) document.getElementById('pathTo').selectedIndex = 1;
+      $('#briefBtn').onclick = async () => {
+        const co = $('#co').value; if (!co) return;
+        busy($('#briefOut'));
+        const { body } = await api('/api/brief', { method: 'POST', body: JSON.stringify({ company: co }) });
+        renderAnswer($('#briefOut'), 'briefing: ' + co, body);
+      };
+      $('#healthBtn').onclick = async () => {
+        busy($('#healthOut'));
+        const { body } = await api('/api/health-check');
+        renderAnswer($('#healthOut'), 'relationship health scan', body);
+      };
+      $('#pathBtn').onclick = async () => {
+        const from = $('#pFrom').value.trim(), to = $('#pTo').value.trim(); if (!from || !to) return;
+        busy($('#pathOut'));
+        const { body } = await api('/api/intro-path', { method: 'POST', body: JSON.stringify({ from, to }) });
+        $('#pathOut').innerHTML = body.path
+          ? `<div class="answer"><div class="body">${esc(body.path.description)}</div></div>`
+          : `<div class="answer"><div class="body refusal">No path found between those two.</div></div>`;
+      };
+
+      $('#draftBtn').onclick = async () => {
+        const company = $('#aco').value.trim(), goal = $('#agoal').value.trim();
+        if (!company || !goal) return;
+        busy($('#draftOut'));
+        const { body } = await api('/api/actions/draft-email', { method: 'POST', body: JSON.stringify({ company, goal }) });
+        if (!body.ok) { $('#draftOut').innerHTML = `<div class="answer"><div class="body refusal">${esc(body.reason || 'Could not draft.')}</div></div>`; return; }
+        renderProposal(body.action);
+      };
+      function renderProposal(a) {
+        $('#draftOut').innerHTML = `<div class="proposal">
+          <h4>Proposed: ${esc(a.kind)} → ${esc(a.company)} <span class="pill proposed">${esc(a.status)}</span></h4>
+          <pre>${esc(JSON.stringify(a.payload, null, 2))}</pre>
+          <div class="row"><button class="btn sm" id="appr">Approve & execute</button><button class="btn ghost sm" id="rej">Reject</button></div>
+        </div>`;
+        $('#appr').onclick = async () => { await api('/api/actions/' + a.id + '/approve', { method: 'POST', body: '{}' }); $('#draftOut').innerHTML = `<div class="answer"><div class="body"><span class="pill executed">executed</span> — recorded to the outbox & audit log.</div></div>`; loadAudit(); };
+        $('#rej').onclick = async () => { await api('/api/actions/' + a.id + '/reject', { method: 'POST', body: JSON.stringify({ reason: 'declined in console' }) }); $('#draftOut').innerHTML = `<div class="answer"><div class="body refusal"><span class="pill rejected">rejected</span> — nothing was sent.</div></div>`; loadAudit(); };
+      }
+      async function loadAudit() {
+        const { body } = await api('/api/actions/audit');
+        const log = body.audit || [];
+        $('#auditList').innerHTML = log.length ? log.slice().reverse().map((e) =>
+          `<div class="item"><span>${esc(e.kind || e.action || 'action')} <span class="meta">${esc(e.note || e.event || '')}</span></span><span class="meta">${esc((e.at || '').slice(0, 19).replace('T', ' '))}</span></div>`
+        ).join('') : '<div class="empty">No actions yet.</div>';
+      }
+
+      async function loadEval() {
+        $('#evalList').innerHTML = '<div class="empty">Loading…</div>';
+        const { body } = await api('/api/eval/candidates');
+        const c = body.candidates || [];
+        $('#evalList').innerHTML = c.length ? c.map((x) =>
+          `<div class="item"><span>↻ <strong>${esc(x.input)}</strong><div class="meta">${esc((x.checks || []).map((k) => k.check).join(', '))} · from feedback</div></span><span class="chip">${esc(x.kind)}</span></div>`
+        ).join('') : '<div class="empty">No candidates yet — reject a refusal in <strong>Ask</strong> to grow one.</div>';
+      }
+      $('#reloadEval').onclick = loadEval;
+
+      (async () => {
+        try {
+          const h = await (await fetch('/health')).json();
+          $('#mode').innerHTML = `<span class="pip"></span> ${esc(h.mode || 'ready')}`;
+        } catch { $('#mode').innerHTML = '<span class="pip" style="background:var(--bad)"></span> offline'; }
+        try {
+          const { body } = await api('/api/companies');
+          $('#co').innerHTML = (body.companies || []).map((c) => `<option>${esc(c)}</option>`).join('') || '<option>no entities</option>';
+        } catch {}
       })();
     </script>
   </body>
