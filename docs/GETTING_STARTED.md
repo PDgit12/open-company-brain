@@ -66,7 +66,7 @@ The shape:
 ## 5. Verify
 
 ```bash
-npm test          # 56 tests
+npm test          # 65 tests
 npm run eval      # behavioural golden set (grounds when it should, refuses when it must)
 ```
 

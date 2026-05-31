@@ -204,7 +204,7 @@ const { answer, sources } = await res.json();
 | `npm run sync:full` | full rebuild of the recall layer |
 | `npm run eval` | run the golden behavioural eval set |
 | `npm run seed:db` | load schema + sample data into Postgres |
-| `npm test` | run the test suite (56 tests) |
+| `npm test` | run the test suite (65 tests) |
 | `npm run typecheck` | strict type check |
 | `npm run build` | compile to `dist/` |
 

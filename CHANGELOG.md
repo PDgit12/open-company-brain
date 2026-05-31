@@ -24,7 +24,12 @@ semantic versioning.
   instead of crashing the process when a provider is down.
 - **`RETRIEVAL_MIN_SCORE`** similarity floor preserves cite-or-refuse under vector
   search (which always returns nearest neighbours).
-- Test suite grown to **56 tests**; typecheck clean.
+- **Web agent console** (`public/index.html`) — a bento dashboard to ask/brief/scan,
+  see citations, give feedback, approve/reject actions, and review eval candidates.
+- **No-code custom agents** — define an agent from just a prompt in the dashboard,
+  run it live (grounded + cited via `/api/agents/run`), and save it; definitions
+  persist in Postgres (`PgCustomAgentStore`) or in-memory in mock mode.
+- Test suite grown to **65 tests**; typecheck clean.
 
 ## [0.2.0] — 2026-05-30
 
