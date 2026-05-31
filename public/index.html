@@ -260,33 +260,26 @@
 
         <!-- BUILD -->
         <section class="view" id="v-build">
-          <p class="sub">Two kinds of agent, both small and grounded by construction. No framework to learn — just a prompt or a recipe.</p>
+          <p class="sub">Give it a prompt — get a working agent. It retrieves from the brain, follows your instruction, and inherits citations + cite-or-refuse automatically. No code.</p>
           <div class="card">
-            <div class="ctitle"><div class="tile coral">①</div><h3>A read agent = a prompt</h3></div>
-            <p class="sub2">Retrieve grounded chunks, then ask the model to do something. Add a function in <code>src/agents/prompts.ts</code> + a Brain method reusing <code>retrieve → generate</code> — it inherits citations and refuse-or-cite for free.</p>
-            <pre class="code"><span class="c">// src/agents/prompts.ts</span>
-<span class="k">export function</span> buildRiskPrompt(company, context) {
-  <span class="k">return</span> <span class="s">`Flag relationship risks for ${company}.
-Use ONLY the context. Cite each fact. If nothing, say so.
-
-CONTEXT:
-${context}`</span>;
-}
-<span class="c">// src/brain/brain.ts — reuse the grounded draft() helper</span>
-<span class="k">async</span> riskScan(company, scopes) {
-  <span class="k">return this</span>.draft(company, buildRiskPrompt(company, <span class="s">''</span>), scopes);
-}</pre>
+            <div class="ctitle"><div class="tile coral">✦</div><div><h3>New agent</h3><p class="sub2">an instruction + what it should look up</p></div></div>
+            <label class="l" for="agName">Name</label>
+            <input class="fld" id="agName" placeholder="e.g. Risk scanner" />
+            <label class="l" for="agInstr" style="margin-top:12px">Instruction (the prompt it follows)</label>
+            <textarea class="fld" id="agInstr" placeholder="e.g. Flag relationship risks and overdue follow-ups. Be specific and cite each fact."></textarea>
+            <label class="l" for="agQuery" style="margin-top:12px">What it retrieves <span style="text-transform:none;font-weight:400">(a question/topic; leave blank to ask at run time)</span></label>
+            <input class="fld" id="agQuery" placeholder="e.g. open actions overdue renewals risks" />
+            <div class="row" style="margin-top:14px"><button class="btn coral" id="agRun">Run now</button><button class="btn ghost" id="agSave">Save agent</button></div>
+            <div id="agOut"></div>
           </div>
-          <div class="card" style="margin-top:16px">
-            <div class="ctitle"><div class="tile dk">②</div><h3>A write agent = an action recipe</h3></div>
-            <p class="sub2">Anything with a side effect is a <strong>recipe</strong>: a draft step + an executor. Automatically grounded, human-approved, idempotent, audited. Copy <code>examples/custom-action.example.ts</code>.</p>
-            <pre class="code"><span class="c">// recipe = propose (draft, grounded) + execute (side effect)</span>
-<span class="k">const</span> recipe = {
-  kind: <span class="s">'slack_nudge'</span>,
-  propose: (brain, company, scopes) =&gt; brain.draft(company, <span class="s">'Draft a Slack nudge…'</span>, scopes),
-  execute: <span class="k">async</span> (action) =&gt; slack.post(action.payload),
-};</pre>
-            <div class="note">This console drives these over HTTP. A front end, a Slack bot, or a cron job can call the same endpoints — the governance (grounding · approval · idempotency · audit) lives in the core, not the caller.</div>
+
+          <h3 class="sec">Your agents</h3>
+          <div class="list" id="agList"><div class="empty">No saved agents yet — name one and hit <strong>Save agent</strong>.</div></div>
+
+          <div class="card" style="margin-top:22px">
+            <div class="ctitle"><div class="tile dk">⌥</div><div><h3>Prefer code? Two patterns</h3><p class="sub2">the same seams, in the repo</p></div></div>
+            <p class="sub2"><strong>Read agent</strong> = a prompt fn in <code>src/agents/prompts.ts</code> + a Brain method reusing <code>draft()</code>. <strong>Write agent</strong> = an action recipe (<code>propose</code> + <code>execute</code>) — copy <code>examples/custom-action.example.ts</code>; it inherits grounding · approval · idempotency · audit.</p>
+            <div class="note">Everything here runs over the same HTTP API — a front end, Slack bot, or cron job calls it identically. The governance lives in the core, not the caller.</div>
           </div>
         </section>
       </main>
@@ -309,6 +302,7 @@ ${context}`</span>;
         $('#title').textContent = TITLES[v] || v;
         if (v === 'learning') loadEval();
         if (v === 'actions') loadAudit();
+        if (v === 'build') loadAgents();
       }
       document.querySelectorAll('#nav button').forEach((b) => (b.onclick = () => go(b.dataset.v)));
       document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => go(b.dataset.go)));
@@ -361,6 +355,39 @@ ${context}`</span>;
         $('#evalList').innerHTML = c.length ? c.map((x) => `<div class="item"><span>↻ <strong>${esc(x.input)}</strong><div class="meta">${esc((x.checks || []).map((k) => k.check).join(', '))} · from feedback</div></span><span class="chip">${esc(x.kind)}</span></div>`).join('') : '<div class="empty">No candidates yet — reject a refusal in <strong>Ask</strong> to grow one.</div>';
       }
       $('#reloadEval').onclick = loadEval;
+
+      // ── Build an agent (no-code) ──
+      async function runAgent(instruction, query, out) {
+        const q = (query || $('#agQuery').value || '').trim() || (window.prompt('Ask this agent:') || '').trim();
+        if (!q) return;
+        busy(out);
+        const { body } = await api('/api/agents/run', { method: 'POST', body: JSON.stringify({ instruction, query: q }) });
+        renderAnswer(out, q, { answer: body.answer, sources: body.sources });
+      }
+      $('#agRun').onclick = () => {
+        const instr = $('#agInstr').value.trim(); if (!instr) { $('#agOut').innerHTML = '<div class="empty">Write an instruction first.</div>'; return; }
+        runAgent(instr, $('#agQuery').value.trim(), $('#agOut'));
+      };
+      $('#agSave').onclick = async () => {
+        const name = $('#agName').value.trim(), instruction = $('#agInstr').value.trim();
+        if (!name || !instruction) { $('#agOut').innerHTML = '<div class="empty">A name and an instruction are required to save.</div>'; return; }
+        await api('/api/agents', { method: 'POST', body: JSON.stringify({ name, instruction, query: $('#agQuery').value.trim() }) });
+        $('#agName').value = $('#agInstr').value = $('#agQuery').value = '';
+        $('#agOut').innerHTML = '<div class="answer"><div class="body"><span class="pill executed">saved</span> — it\'s in “Your agents” below, ready to run.</div></div>';
+        loadAgents();
+      };
+      async function loadAgents() {
+        const { body } = await api('/api/agents'); const list = body.agents || [];
+        const el = $('#agList');
+        el.innerHTML = list.length ? '' : '<div class="empty">No saved agents yet — name one and hit <strong>Save agent</strong>.</div>';
+        list.slice().reverse().forEach((a) => {
+          const row = document.createElement('div'); row.className = 'item';
+          row.innerHTML = `<span>✦ <strong>${esc(a.name)}</strong><div class="meta">${esc(a.instruction.slice(0, 90))}${a.instruction.length > 90 ? '…' : ''}</div></span><button class="btn coral sm">Run</button>`;
+          const out = document.createElement('div'); out.style.marginTop = '0';
+          row.querySelector('button').onclick = () => { if (!row.nextSibling || row.nextSibling !== out) row.after(out); runAgent(a.instruction, a.query, out); };
+          el.append(row);
+        });
+      }
 
       // boot: mode banner + live overview stats
       (async () => {

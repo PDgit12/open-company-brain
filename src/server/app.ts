@@ -14,6 +14,11 @@
  *   POST /api/feedback            { query, answer, verdict, sources? } → records a verdict
  *   GET  /api/eval/candidates     auto-grown regression cases (scope-gated review queue)
  *
+ * Custom agents (no-code):
+ *   POST /api/agents/run          { instruction, query }   → grounded, cited answer
+ *   GET  /api/agents              list saved agent definitions
+ *   POST /api/agents              { name, instruction, query? } → save a reusable agent
+ *
  * Write endpoints (action layer — human-approved):
  *   POST /api/actions/draft-email      { company, goal }            → proposed action
  *   POST /api/actions/log-engagement   { company, summary, ... }    → proposed action
@@ -32,6 +37,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { Brain } from '../brain/brain.js';
 import { ActionService } from '../actions/service.js';
+import { getCustomAgentStore } from '../agents/registry.js';
 import { config, describeMode } from '../config.js';
 import { logger } from '../observability/logger.js';
 
@@ -56,6 +62,15 @@ const FeedbackBody = z.object({
   // Echo back the `source` of each chunk from the answer so the reranker can
   // attribute the verdict to the records that grounded it.
   sources: z.array(z.string()).optional(),
+});
+const AgentRunBody = z.object({
+  instruction: z.string().trim().min(1),
+  query: z.string().trim().min(1),
+});
+const AgentSaveBody = z.object({
+  name: z.string().trim().min(1),
+  instruction: z.string().trim().min(1),
+  query: z.string().trim().optional(),
 });
 
 /**
@@ -99,6 +114,7 @@ export async function createApp(): Promise<express.Express> {
 
   const brain = await Brain.create();
   const actions = ActionService.create(brain);
+  const agents = getCustomAgentStore();
 
   app.get('/health', (_req, res) => res.json({ status: 'ok', mode: describeMode() }));
 
@@ -159,6 +175,28 @@ export async function createApp(): Promise<express.Express> {
   // (scope-gated). Promote good ones into the curated golden set.
   app.get('/api/eval/candidates', asyncRoute(async (req, res) => {
     return res.json({ candidates: await brain.evalCandidates(callerScopes(req)) });
+  }));
+
+  // ── Custom agents (no-code) ────────────────────────────────────────────────
+  // A read agent = an instruction + what to retrieve. Run it live (grounded +
+  // cited, access-scoped via brain.draft) or save the definition for reuse.
+
+  app.post('/api/agents/run', asyncRoute(async (req, res) => {
+    const parsed = AgentRunBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'instruction and query are required' });
+    const { instruction, query } = parsed.data;
+    const { text, sources } = await brain.draft(query, instruction, callerScopes(req));
+    return res.json({ answer: text, sources });
+  }));
+
+  app.get('/api/agents', asyncRoute(async (_req, res) => {
+    return res.json({ agents: await agents.list() });
+  }));
+
+  app.post('/api/agents', asyncRoute(async (req, res) => {
+    const parsed = AgentSaveBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'name and instruction are required' });
+    return res.status(201).json({ agent: await agents.save(parsed.data) });
   }));
 
   // ── Action layer ──────────────────────────────────────────────────────────
