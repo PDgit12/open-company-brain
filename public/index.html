@@ -6,136 +6,136 @@
     <title>Company Brain — Console</title>
     <style>
       :root {
-        --bg: oklch(97.5% 0.006 255);
-        --surface: oklch(100% 0 0);
-        --surface-2: oklch(98.5% 0.004 255);
-        --ink: oklch(20% 0.02 262);
-        --muted: oklch(52% 0.02 262);
-        --faint: oklch(68% 0.015 262);
-        --accent: oklch(54% 0.17 266);
-        --accent-ink: oklch(44% 0.18 266);
-        --accent-soft: oklch(96% 0.03 266);
-        --good: oklch(58% 0.14 150);
-        --bad: oklch(56% 0.18 25);
-        --warn: oklch(70% 0.15 75);
-        --border: oklch(91% 0.008 262);
-        --r: 12px;
-        --shadow: 0 1px 2px oklch(0% 0 0 / 0.04), 0 10px 30px oklch(0% 0 0 / 0.07);
+        --bg: oklch(87% 0.014 78);
+        --cream: oklch(96.5% 0.008 78);
+        --white: oklch(99.2% 0.003 78);
+        --dark: oklch(26% 0.014 285);
+        --dark-2: oklch(31% 0.014 285);
+        --ink: oklch(24% 0.012 285);
+        --muted: oklch(50% 0.015 285);
+        --faint: oklch(64% 0.012 285);
+        --on-dark: oklch(95% 0.01 78);
+        --on-dark-mut: oklch(72% 0.015 285);
+        --coral: oklch(76% 0.11 24);
+        --coral-deep: oklch(68% 0.15 24);
+        --butter: oklch(90% 0.11 101);
+        --good: oklch(64% 0.13 150);
+        --border: oklch(83% 0.012 78);
+        --r: 22px;
+        --r-sm: 13px;
+        --shadow: 0 1px 2px oklch(30% 0.02 80 / 0.05), 0 14px 36px oklch(30% 0.02 80 / 0.09);
       }
       * { box-sizing: border-box; }
       body {
-        margin: 0;
+        margin: 0; color: var(--ink); background: var(--bg); min-height: 100vh;
         font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        background: radial-gradient(130% 90% at 80% -20%, var(--accent-soft), var(--bg) 50%);
-        color: var(--ink);
-        min-height: 100vh;
       }
-      .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
-      /* ── Sidebar ── */
+      .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
       aside {
-        border-right: 1px solid var(--border);
-        padding: 26px 18px;
-        position: sticky; top: 0; height: 100vh;
-        background: linear-gradient(180deg, var(--surface), var(--surface-2));
-        display: flex; flex-direction: column; gap: 4px;
+        padding: 24px 16px; position: sticky; top: 0; height: 100vh;
+        display: flex; flex-direction: column; gap: 3px;
       }
-      .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
-      .brand .dot {
-        width: 30px; height: 30px; border-radius: 9px;
-        background: conic-gradient(from 210deg, var(--accent), oklch(62% 0.2 320), var(--accent));
-        box-shadow: 0 2px 10px oklch(54% 0.17 266 / 0.4);
-      }
+      .brand { display: flex; align-items: center; gap: 11px; margin-bottom: 24px; padding: 0 6px; }
+      .brand .dot { width: 34px; height: 34px; border-radius: 11px; background: var(--dark); display: grid; place-items: center; color: var(--butter); font-size: 17px; }
       .brand b { font-size: 16px; letter-spacing: -0.02em; }
       .brand small { display: block; color: var(--faint); font-size: 11px; font-weight: 400; }
       nav button {
-        all: unset; display: flex; align-items: center; gap: 10px;
-        padding: 9px 12px; border-radius: 9px; cursor: pointer;
-        color: var(--muted); font-weight: 500; font-size: 14px; transition: 120ms;
+        all: unset; display: flex; align-items: center; gap: 11px; padding: 10px 13px;
+        border-radius: 12px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 14px; transition: 130ms;
       }
-      nav button:hover { background: var(--surface-2); color: var(--ink); }
-      nav button.on { background: var(--accent-soft); color: var(--accent-ink); }
-      nav button .ic { width: 17px; text-align: center; opacity: 0.85; }
-      .mode {
-        margin-top: auto; font-size: 11px; color: var(--faint);
-        border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; background: var(--surface);
-      }
+      nav button:hover { background: oklch(92% 0.012 78); color: var(--ink); }
+      nav button.on { background: var(--dark); color: var(--on-dark); }
+      nav button.on .ic { color: var(--coral); }
+      nav button .ic { width: 18px; text-align: center; }
+      .mode { margin-top: auto; font-size: 11px; color: var(--muted); border-radius: 13px; padding: 11px 13px; background: var(--cream); border: 1px solid var(--border); }
       .mode .pip { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 6px; }
-      /* ── Main ── */
-      main { padding: 38px clamp(20px, 4vw, 56px); max-width: 1000px; }
-      .view { display: none; animation: fade 0.25s ease; }
-      .view.on { display: block; }
-      @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-      h2 { font-size: 1.45rem; letter-spacing: -0.02em; margin: 0 0 4px; }
-      .sub { color: var(--muted); margin: 0 0 24px; max-width: 60ch; }
-      /* ── Cards / controls ── */
-      .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 22px; }
-      .row { display: flex; gap: 10px; flex-wrap: wrap; }
-      input, select, textarea {
-        font: inherit; color: var(--ink); background: var(--surface);
-        border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; width: 100%;
-        transition: 120ms;
-      }
-      input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-      textarea { resize: vertical; min-height: 70px; }
-      label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-      .btn {
-        all: unset; cursor: pointer; padding: 11px 18px; border-radius: 10px; font-weight: 600; font-size: 14px;
-        background: var(--accent); color: white; text-align: center; transition: 120ms;
-        box-shadow: 0 2px 8px oklch(54% 0.17 266 / 0.3);
-      }
-      .btn:hover { filter: brightness(1.07); transform: translateY(-1px); }
-      .btn:active { transform: none; }
-      .btn.ghost { background: var(--surface-2); color: var(--ink); box-shadow: none; border: 1px solid var(--border); }
-      .btn.ghost:hover { background: var(--accent-soft); border-color: var(--accent); }
-      .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
-      .btn.sm { padding: 7px 12px; font-size: 13px; }
-      .scope { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
-      .scope input { width: 180px; padding: 7px 10px; }
-      /* ── Answer / output ── */
+      main { padding: 30px clamp(18px, 3vw, 40px); max-width: 1120px; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 24px; }
+      .topbar h2 { font-size: 1.5rem; letter-spacing: -0.025em; margin: 0; }
+      .topbar .scope { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); background: var(--cream); border: 1px solid var(--border); border-radius: 999px; padding: 6px 8px 6px 14px; }
+      .topbar .scope input { all: unset; width: 130px; font-size: 13px; color: var(--ink); }
+      .view { display: none; } .view.on { display: block; animation: fade 0.28s ease; }
+      @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      .sub { color: var(--muted); margin: 0 0 22px; max-width: 62ch; }
+      /* ── bento ── */
+      .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
+      .card { background: var(--white); border-radius: var(--r); box-shadow: var(--shadow); padding: 22px 24px; }
+      .card.cream { background: var(--cream); }
+      .card.dark { background: var(--dark); color: var(--on-dark); }
+      .card.dark .lbl, .card.dark .sub2 { color: var(--on-dark-mut); }
+      .col-6 { grid-column: span 6; } .col-4 { grid-column: span 4; } .col-3 { grid-column: span 3; } .col-2 { grid-column: span 2; }
+      .ctitle { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+      .ctitle .tile { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 18px; flex: none; }
+      .tile.coral { background: var(--coral); color: white; } .tile.dk { background: var(--dark); color: var(--butter); } .tile.butter { background: var(--butter); color: var(--dark); }
+      .ctitle h3 { margin: 0; font-size: 1.05rem; letter-spacing: -0.01em; }
+      .lbl { font-size: 12px; color: var(--muted); margin: 0 0 3px; }
+      .sub2 { font-size: 12.5px; color: var(--muted); margin: 0; }
+      .big { font-size: clamp(2.2rem, 1.4rem + 2.4vw, 3.2rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+      .progress { height: 16px; border-radius: 999px; background: oklch(88% 0.01 78); overflow: hidden; display: flex; margin-top: 12px; }
+      .card.dark .progress { background: var(--dark-2); }
+      .progress .y { background: var(--butter); } .progress .c { background: var(--coral); }
+      .bars { display: flex; align-items: flex-end; gap: 14px; height: 96px; margin-top: 14px; }
+      .bars .b { flex: 1; border-radius: 9px 9px 4px 4px; display: flex; flex-direction: column; justify-content: flex-end; }
+      .bars .b i { display: block; border-radius: 8px 8px 3px 3px; }
+      .barlabel { font-size: 10.5px; color: var(--on-dark-mut); text-align: center; margin-top: 7px; }
+      .timeline { display: flex; gap: 6px; margin: 8px 0 4px; }
+      .timeline .seg { flex: 1; height: 4px; border-radius: 2px; background: oklch(86% 0.01 78); }
+      .timeline .seg.on { background: var(--coral); }
+      /* ── controls ── */
+      .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      input.fld, select.fld, textarea.fld { font: inherit; color: var(--ink); background: var(--white); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px 14px; width: 100%; transition: 130ms; }
+      .fld:focus { outline: none; border-color: var(--coral-deep); box-shadow: 0 0 0 3px oklch(76% 0.11 24 / 0.18); }
+      textarea.fld { resize: vertical; min-height: 76px; }
+      label.l { font-size: 11px; font-weight: 700; color: var(--muted); display: block; margin: 0 0 7px; text-transform: uppercase; letter-spacing: 0.05em; }
+      .btn { all: unset; cursor: pointer; padding: 12px 22px; border-radius: 999px; font-weight: 650; font-size: 14px; background: var(--dark); color: var(--on-dark); text-align: center; transition: 130ms; }
+      .btn:hover { background: var(--dark-2); transform: translateY(-1px); }
+      .btn.coral { background: var(--coral); color: white; }
+      .btn.coral:hover { background: var(--coral-deep); }
+      .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--border); }
+      .btn.ghost:hover { background: var(--cream); }
+      .btn.sm { padding: 8px 16px; font-size: 13px; }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+      /* ── answer ── */
       .answer { margin-top: 18px; }
-      .answer .body { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 20px; white-space: pre-wrap; }
+      .answer .body { background: var(--cream); border-radius: var(--r-sm); padding: 18px 20px; white-space: pre-wrap; }
       .answer .body.refusal { color: var(--muted); font-style: italic; }
-      .cites { display: flex; gap: 7px; flex-wrap: wrap; margin: 14px 0 0; }
-      .chip { font-size: 12px; background: var(--accent-soft); color: var(--accent-ink); border-radius: 999px; padding: 4px 11px; font-weight: 600; cursor: default; }
-      .chip[title] { cursor: help; }
+      .cites { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 13px; }
+      .chip { font-size: 12px; background: oklch(76% 0.11 24 / 0.16); color: var(--coral-deep); border-radius: 999px; padding: 4px 12px; font-weight: 650; }
       .fb { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--muted); }
-      .fb button { all: unset; cursor: pointer; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border); transition: 120ms; }
-      .fb button:hover { background: var(--surface-2); }
+      .fb button { all: unset; cursor: pointer; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); transition: 130ms; }
+      .fb button:hover { background: var(--cream); }
       .fb button.up:hover { border-color: var(--good); color: var(--good); }
-      .fb button.down:hover { border-color: var(--bad); color: var(--bad); }
-      .fb .done { color: var(--good); font-weight: 600; }
-      .empty { color: var(--faint); font-size: 14px; padding: 14px 0; }
-      .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.7s linear infinite; vertical-align: -2px; }
+      .fb button.down:hover { border-color: var(--coral-deep); color: var(--coral-deep); }
+      .fb .done { color: var(--good); font-weight: 650; }
+      .empty { color: var(--faint); font-size: 14px; padding: 12px 0; }
+      .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid oklch(76% 0.11 24 / 0.3); border-top-color: var(--coral); border-radius: 50%; animation: sp 0.7s linear infinite; vertical-align: -2px; }
       @keyframes sp { to { transform: rotate(360deg); } }
-      /* ── Action / proposal cards ── */
-      .proposal { border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: var(--r); padding: 16px 18px; margin-top: 16px; background: var(--surface-2); }
+      .proposal { border-radius: var(--r-sm); padding: 16px 18px; margin-top: 16px; background: var(--cream); border-left: 3px solid var(--butter); }
       .proposal h4 { margin: 0 0 8px; font-size: 14px; }
-      .proposal pre { margin: 8px 0 14px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 12px; overflow-x: auto; white-space: pre-wrap; }
-      .pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
-      .pill.proposed { background: oklch(70% 0.15 75 / 0.18); color: oklch(50% 0.13 75); }
-      .pill.executed { background: oklch(58% 0.14 150 / 0.16); color: var(--good); }
-      .pill.rejected { background: oklch(56% 0.18 25 / 0.14); color: var(--bad); }
-      .list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-      .item { border: 1px solid var(--border); border-radius: 10px; padding: 12px 15px; font-size: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+      .proposal pre { margin: 8px 0 14px; font-size: 13px; background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px; overflow-x: auto; white-space: pre-wrap; }
+      .pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .pill.proposed { background: oklch(90% 0.11 101 / 0.5); color: oklch(48% 0.1 80); }
+      .pill.executed { background: oklch(64% 0.13 150 / 0.18); color: var(--good); }
+      .pill.rejected { background: oklch(68% 0.15 24 / 0.18); color: var(--coral-deep); }
+      .list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+      .item { background: var(--cream); border-radius: var(--r-sm); padding: 12px 15px; font-size: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
       .item .meta { color: var(--muted); font-size: 12px; }
-      /* ── Build-your-own ── */
-      .step h4 { margin: 2px 0 5px; font-size: 15px; }
-      .step p { margin: 0; color: var(--muted); font-size: 14px; }
-      pre.code { background: oklch(22% 0.02 262); color: oklch(92% 0.02 262); border-radius: var(--r); padding: 18px 20px; overflow-x: auto; font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace; margin: 18px 0; }
-      pre.code .k { color: oklch(78% 0.13 300); } pre.code .s { color: oklch(80% 0.12 150); } pre.code .c { color: oklch(60% 0.02 262); }
-      .note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 14px; margin: 18px 0; }
-      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-      code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 0.9em; }
-      @media (max-width: 780px) { .app { grid-template-columns: 1fr; } aside { position: static; height: auto; flex-direction: row; flex-wrap: wrap; } .mode { margin: 0; } nav { display: flex; flex-wrap: wrap; } .grid2 { grid-template-columns: 1fr; } }
+      pre.code { background: var(--dark); color: var(--on-dark); border-radius: var(--r-sm); padding: 18px 20px; overflow-x: auto; font: 12.5px/1.6 ui-monospace, "SF Mono", Menlo, monospace; margin: 16px 0; }
+      pre.code .k { color: oklch(82% 0.12 300); } pre.code .s { color: var(--butter); } pre.code .c { color: var(--on-dark-mut); }
+      .note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--coral); padding-left: 14px; margin: 16px 0; }
+      code { background: var(--cream); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 0.9em; }
+      h3.sec { font-size: 1rem; margin: 26px 0 0; }
+      @media (max-width: 860px) { .app { grid-template-columns: 1fr; } aside { position: static; height: auto; flex-flow: row wrap; } .mode { margin: 0; } nav { display: flex; flex-wrap: wrap; } .bento { grid-template-columns: 1fr 1fr; } .col-6,.col-4,.col-3,.col-2 { grid-column: span 2; } }
     </style>
   </head>
   <body>
     <div class="app">
       <aside>
-        <div class="brand"><div class="dot"></div><div><b>Company Brain</b><small>agent console</small></div></div>
+        <div class="brand"><div class="dot">◆</div><div><b>Company Brain</b><small>agent console</small></div></div>
         <nav id="nav">
-          <button data-v="ask" class="on"><span class="ic">✦</span> Ask</button>
-          <button data-v="brief"><span class="ic">▦</span> Brief</button>
+          <button data-v="home" class="on"><span class="ic">▦</span> Overview</button>
+          <button data-v="ask"><span class="ic">✦</span> Ask</button>
+          <button data-v="brief"><span class="ic">◳</span> Brief</button>
           <button data-v="health"><span class="ic">♥</span> Health</button>
           <button data-v="path"><span class="ic">⤳</span> Intro path</button>
           <button data-v="actions"><span class="ic">✎</span> Actions</button>
@@ -146,96 +146,124 @@
       </aside>
 
       <main>
-        <div class="scope">
-          <span>Access scopes</span>
-          <input id="scopes" value="default-team" title="Comma-separated; the brain only returns records in these scopes" />
+        <div class="topbar">
+          <h2 id="title">Overview</h2>
+          <div class="scope" title="Comma-separated; the brain only returns records in these scopes">
+            <span>scopes</span><input id="scopes" value="default-team" />
+          </div>
         </div>
 
+        <!-- HOME / OVERVIEW -->
+        <section class="view on" id="v-home">
+          <div class="bento">
+            <div class="card cream col-4">
+              <div class="ctitle"><div class="tile coral">◳</div><div><h3>The brain</h3><p class="sub2">grounded, cited, access-scoped</p></div></div>
+              <p class="lbl">Entities indexed</p>
+              <div class="big" id="statEntities">—</div>
+              <div class="timeline"><span class="seg on"></span><span class="seg on"></span><span class="seg on"></span><span class="seg"></span></div>
+              <p class="sub2">ingest → recall → graph → grounded agents</p>
+            </div>
+
+            <div class="card dark col-2">
+              <p class="lbl">Active mode</p>
+              <div style="font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;margin:6px 0 2px" id="statRecall">—</div>
+              <p class="sub2" id="statGen">generation</p>
+              <div class="progress"><i class="y" style="width:60%"></i><i class="c" style="width:25%"></i></div>
+              <p class="sub2" style="margin-top:8px">trust contract: cite-or-refuse</p>
+            </div>
+
+            <div class="card dark col-3">
+              <div class="ctitle"><div class="tile butter">▤</div><div><h3 style="color:var(--on-dark)">Knowledge sources</h3><p class="sub2">provenance of every answer</p></div></div>
+              <div class="bars" id="srcBars"></div>
+            </div>
+
+            <div class="card col-3">
+              <div class="ctitle"><div class="tile dk">↻</div><div><h3>Learning signal</h3><p class="sub2">feedback compounds with use</p></div></div>
+              <div class="row" style="justify-content:space-between;align-items:flex-end">
+                <div><p class="lbl">Eval candidates</p><div class="big" id="statEval">—</div></div>
+                <button class="btn coral sm" data-go="learning">Review queue →</button>
+              </div>
+            </div>
+
+            <div class="card dark col-4">
+              <h3 style="margin:0 0 6px;font-size:1.3rem;letter-spacing:-0.02em">Ask the brain anything</h3>
+              <p class="sub2" style="max-width:46ch">Every answer cites the records it came from — and refuses when it has no grounding. Try it.</p>
+              <div class="row" style="margin-top:16px"><button class="btn coral" data-go="ask">Open Ask →</button><button class="btn ghost" data-go="actions" style="color:var(--on-dark);border-color:var(--dark-2)">Action layer</button></div>
+            </div>
+          </div>
+        </section>
+
         <!-- ASK -->
-        <section class="view on" id="v-ask">
-          <h2>Ask the brain</h2>
-          <p class="sub">A grounded, cited answer over everything the brain knows — or an honest refusal when it has no grounding. That refuse-or-cite contract is the product.</p>
+        <section class="view" id="v-ask">
+          <p class="sub">A grounded, cited answer over everything the brain knows — or an honest refusal when it has no grounding.</p>
           <div class="card">
-            <label for="q">Question</label>
-            <textarea id="q" placeholder="e.g. What is our history with Aerodyne and what's still open?"></textarea>
-            <div class="row" style="margin-top:12px"><button class="btn" id="askBtn">Ask</button></div>
+            <label class="l" for="q">Question</label>
+            <textarea class="fld" id="q" placeholder="e.g. What is our history with Aerodyne and what's still open?"></textarea>
+            <div class="row" style="margin-top:12px"><button class="btn coral" id="askBtn">Ask</button></div>
             <div id="askOut"></div>
           </div>
         </section>
 
         <!-- BRIEF -->
         <section class="view" id="v-brief">
-          <h2>Prepare a briefing</h2>
-          <p class="sub">A conversation-ready snapshot of one entity: status, recent activity, open items, and grounded talking points.</p>
+          <p class="sub">A conversation-ready snapshot of one entity: status, recent activity, open items, grounded talking points.</p>
           <div class="card">
-            <label for="co">Entity</label>
-            <select id="co"></select>
-            <div class="row" style="margin-top:12px"><button class="btn" id="briefBtn">Brief me</button></div>
+            <label class="l" for="co">Entity</label>
+            <select class="fld" id="co"></select>
+            <div class="row" style="margin-top:12px"><button class="btn coral" id="briefBtn">Brief me</button></div>
             <div id="briefOut"></div>
           </div>
         </section>
 
         <!-- HEALTH -->
         <section class="view" id="v-health">
-          <h2>Relationship health</h2>
           <p class="sub">A standing agent that scans for what needs attention — stale relationships, overdue follow-ups, open actions.</p>
-          <div class="card">
-            <button class="btn" id="healthBtn">Scan the brain</button>
-            <div id="healthOut"></div>
-          </div>
+          <div class="card"><button class="btn coral" id="healthBtn">Scan the brain</button><div id="healthOut"></div></div>
         </section>
 
         <!-- PATH -->
         <section class="view" id="v-path">
-          <h2>Find a connection</h2>
           <p class="sub">Shortest path between two entities over the foreign-key knowledge graph — your warm-intro route.</p>
           <div class="card">
-            <div class="grid2">
-              <div><label>From</label><input id="pFrom" placeholder="Aerodyne Systems" /></div>
-              <div><label>To</label><input id="pTo" placeholder="Veridian Energy" /></div>
+            <div class="bento" style="grid-template-columns:1fr 1fr;gap:14px">
+              <div class="col-3" style="grid-column:auto"><label class="l">From</label><input class="fld" id="pFrom" placeholder="Aerodyne Systems" /></div>
+              <div class="col-3" style="grid-column:auto"><label class="l">To</label><input class="fld" id="pTo" placeholder="Veridian Energy" /></div>
             </div>
-            <div class="row" style="margin-top:12px"><button class="btn" id="pathBtn">Trace path</button></div>
+            <div class="row" style="margin-top:12px"><button class="btn coral" id="pathBtn">Trace path</button></div>
             <div id="pathOut"></div>
           </div>
         </section>
 
         <!-- ACTIONS -->
         <section class="view" id="v-actions">
-          <h2>Action layer</h2>
           <p class="sub">Agents <em>propose</em>; a human approves. Every action is grounded, idempotent, and audited — nothing is sent without a click.</p>
           <div class="card">
-            <label for="aco">Company</label>
-            <input id="aco" placeholder="Aerodyne Systems" />
-            <label for="agoal" style="margin-top:12px">Goal for the draft email</label>
-            <input id="agoal" placeholder="schedule a renewal call" />
-            <div class="row" style="margin-top:12px"><button class="btn" id="draftBtn">Draft email (propose)</button></div>
+            <label class="l" for="aco">Company</label>
+            <input class="fld" id="aco" placeholder="Aerodyne Systems" />
+            <label class="l" for="agoal" style="margin-top:12px">Goal for the draft email</label>
+            <input class="fld" id="agoal" placeholder="schedule a renewal call" />
+            <div class="row" style="margin-top:12px"><button class="btn coral" id="draftBtn">Draft email (propose)</button></div>
             <div id="draftOut"></div>
           </div>
-          <h3 style="margin:26px 0 0;font-size:1rem">Audit log</h3>
+          <h3 class="sec">Audit log</h3>
           <div class="list" id="auditList"><div class="empty">No actions yet.</div></div>
         </section>
 
         <!-- LEARNING -->
         <section class="view" id="v-learning">
-          <h2>Learning loop</h2>
-          <p class="sub">Every 👍/👎 reranks retrieval and seeds few-shot examples. Rejected refusals become regression cases here — promote good ones into your golden eval set.</p>
+          <p class="sub">Every 👍/👎 reranks retrieval and seeds few-shot examples. Rejected refusals become regression cases — promote good ones into your golden eval set.</p>
           <div class="card">
-            <div class="row" style="justify-content:space-between;align-items:center">
-              <strong>Auto-grown eval candidates</strong>
-              <button class="btn ghost sm" id="reloadEval">Reload</button>
-            </div>
+            <div class="row" style="justify-content:space-between;align-items:center"><strong>Auto-grown eval candidates</strong><button class="btn ghost sm" id="reloadEval">Reload</button></div>
             <div class="list" id="evalList"><div class="empty">Loading…</div></div>
           </div>
         </section>
 
         <!-- BUILD -->
         <section class="view" id="v-build">
-          <h2>Build your own agent</h2>
           <p class="sub">Two kinds of agent, both small and grounded by construction. No framework to learn — just a prompt or a recipe.</p>
-
           <div class="card">
-            <h3 style="margin:0 0 4px">1 · A read agent = a prompt</h3>
-            <p class="sub" style="margin-bottom:0">Retrieve grounded chunks, then ask the model to do something with them. Add a function in <code>src/agents/prompts.ts</code> and a method on the Brain that reuses <code>retrieve → generate</code> — it inherits citations and the refuse-or-cite contract for free.</p>
+            <div class="ctitle"><div class="tile coral">①</div><h3>A read agent = a prompt</h3></div>
+            <p class="sub2">Retrieve grounded chunks, then ask the model to do something. Add a function in <code>src/agents/prompts.ts</code> + a Brain method reusing <code>retrieve → generate</code> — it inherits citations and refuse-or-cite for free.</p>
             <pre class="code"><span class="c">// src/agents/prompts.ts</span>
 <span class="k">export function</span> buildRiskPrompt(company, context) {
   <span class="k">return</span> <span class="s">`Flag relationship risks for ${company}.
@@ -244,25 +272,21 @@ Use ONLY the context. Cite each fact. If nothing, say so.
 CONTEXT:
 ${context}`</span>;
 }
-
 <span class="c">// src/brain/brain.ts — reuse the grounded draft() helper</span>
 <span class="k">async</span> riskScan(company, scopes) {
   <span class="k">return this</span>.draft(company, buildRiskPrompt(company, <span class="s">''</span>), scopes);
 }</pre>
           </div>
-
           <div class="card" style="margin-top:16px">
-            <h3 style="margin:0 0 4px">2 · A write agent = an action recipe</h3>
-            <p class="sub" style="margin-bottom:0">Anything with a side effect is a <strong>recipe</strong>: a draft step + an executor. It’s automatically grounded, human-approved, idempotent, and audited. Copy <code>examples/custom-action.example.ts</code>.</p>
-            <pre class="code"><span class="c">// a recipe = propose (draft, grounded) + execute (the side effect)</span>
+            <div class="ctitle"><div class="tile dk">②</div><h3>A write agent = an action recipe</h3></div>
+            <p class="sub2">Anything with a side effect is a <strong>recipe</strong>: a draft step + an executor. Automatically grounded, human-approved, idempotent, audited. Copy <code>examples/custom-action.example.ts</code>.</p>
+            <pre class="code"><span class="c">// recipe = propose (draft, grounded) + execute (side effect)</span>
 <span class="k">const</span> recipe = {
   kind: <span class="s">'slack_nudge'</span>,
-  propose: (brain, company, scopes) =&gt;
-    brain.draft(company, <span class="s">'Draft a Slack nudge…'</span>, scopes),
+  propose: (brain, company, scopes) =&gt; brain.draft(company, <span class="s">'Draft a Slack nudge…'</span>, scopes),
   execute: <span class="k">async</span> (action) =&gt; slack.post(action.payload),
-};
-<span class="c">// → proposeAction() → human approves in this console → executor runs once</span></pre>
-            <div class="note">The console you’re using drives these over HTTP. Your front end, a Slack bot, or a cron job can call the same endpoints — the governance (grounding · approval · idempotency · audit) lives in the core, not the caller.</div>
+};</pre>
+            <div class="note">This console drives these over HTTP. A front end, a Slack bot, or a cron job can call the same endpoints — the governance (grounding · approval · idempotency · audit) lives in the core, not the caller.</div>
           </div>
         </section>
       </main>
@@ -277,22 +301,24 @@ ${context}`</span>;
       };
       const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
       const REFUSAL = "I don't have that in the brain yet.";
+      const TITLES = { home: 'Overview', ask: 'Ask the brain', brief: 'Prepare a briefing', health: 'Relationship health', path: 'Find a connection', actions: 'Action layer', learning: 'Learning loop', build: 'Build your own agent' };
 
-      document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => {
-        document.querySelectorAll('#nav button').forEach((x) => x.classList.toggle('on', x === b));
-        document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + b.dataset.v));
-        if (b.dataset.v === 'learning') loadEval();
-        if (b.dataset.v === 'actions') loadAudit();
-      }));
+      function go(v) {
+        document.querySelectorAll('#nav button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
+        document.querySelectorAll('.view').forEach((s) => s.classList.toggle('on', s.id === 'v-' + v));
+        $('#title').textContent = TITLES[v] || v;
+        if (v === 'learning') loadEval();
+        if (v === 'actions') loadAudit();
+      }
+      document.querySelectorAll('#nav button').forEach((b) => (b.onclick = () => go(b.dataset.v)));
+      document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => go(b.dataset.go)));
 
       function renderAnswer(el, query, r) {
         const refused = !r.sources?.length || (r.answer || '').includes(REFUSAL);
         const sources = [...new Set((r.sources || []).map((s) => s.source))];
-        el.innerHTML = `<div class="answer">
-          <div class="body ${refused ? 'refusal' : ''}">${esc(r.answer || REFUSAL)}</div>
+        el.innerHTML = `<div class="answer"><div class="body ${refused ? 'refusal' : ''}">${esc(r.answer || REFUSAL)}</div>
           ${sources.length ? `<div class="cites">${sources.map((s) => `<span class="chip">${esc(s)}</span>`).join('')}</div>` : ''}
-          <div class="fb"><span>Was this useful?</span><button class="up">👍 Yes</button><button class="down">👎 No</button></div>
-        </div>`;
+          <div class="fb"><span>Was this useful?</span><button class="up">👍 Yes</button><button class="down">👎 No</button></div></div>`;
         const fb = el.querySelector('.fb');
         const send = async (verdict) => {
           await api('/api/feedback', { method: 'POST', body: JSON.stringify({ query, answer: r.answer || REFUSAL, verdict, sources }) });
@@ -303,76 +329,53 @@ ${context}`</span>;
       }
       const busy = (el) => (el.innerHTML = '<div class="answer"><span class="spin"></span> <span style="color:var(--muted)">the brain is thinking…</span></div>');
 
-      $('#askBtn').onclick = async () => {
-        const q = $('#q').value.trim(); if (!q) return;
-        busy($('#askOut'));
-        const { body } = await api('/api/ask', { method: 'POST', body: JSON.stringify({ question: q }) });
-        renderAnswer($('#askOut'), q, body);
-      };
-      $('#briefBtn').onclick = async () => {
-        const co = $('#co').value; if (!co) return;
-        busy($('#briefOut'));
-        const { body } = await api('/api/brief', { method: 'POST', body: JSON.stringify({ company: co }) });
-        renderAnswer($('#briefOut'), 'briefing: ' + co, body);
-      };
-      $('#healthBtn').onclick = async () => {
-        busy($('#healthOut'));
-        const { body } = await api('/api/health-check');
-        renderAnswer($('#healthOut'), 'relationship health scan', body);
-      };
+      $('#askBtn').onclick = async () => { const q = $('#q').value.trim(); if (!q) return; busy($('#askOut')); const { body } = await api('/api/ask', { method: 'POST', body: JSON.stringify({ question: q }) }); renderAnswer($('#askOut'), q, body); };
+      $('#briefBtn').onclick = async () => { const co = $('#co').value; if (!co) return; busy($('#briefOut')); const { body } = await api('/api/brief', { method: 'POST', body: JSON.stringify({ company: co }) }); renderAnswer($('#briefOut'), 'briefing: ' + co, body); };
+      $('#healthBtn').onclick = async () => { busy($('#healthOut')); const { body } = await api('/api/health-check'); renderAnswer($('#healthOut'), 'relationship health scan', body); };
       $('#pathBtn').onclick = async () => {
         const from = $('#pFrom').value.trim(), to = $('#pTo').value.trim(); if (!from || !to) return;
-        busy($('#pathOut'));
-        const { body } = await api('/api/intro-path', { method: 'POST', body: JSON.stringify({ from, to }) });
-        $('#pathOut').innerHTML = body.path
-          ? `<div class="answer"><div class="body">${esc(body.path.description)}</div></div>`
-          : `<div class="answer"><div class="body refusal">No path found between those two.</div></div>`;
+        busy($('#pathOut')); const { body } = await api('/api/intro-path', { method: 'POST', body: JSON.stringify({ from, to }) });
+        $('#pathOut').innerHTML = `<div class="answer"><div class="body ${body.path ? '' : 'refusal'}">${body.path ? esc(body.path.description) : 'No path found between those two.'}</div></div>`;
       };
 
       $('#draftBtn').onclick = async () => {
-        const company = $('#aco').value.trim(), goal = $('#agoal').value.trim();
-        if (!company || !goal) return;
-        busy($('#draftOut'));
-        const { body } = await api('/api/actions/draft-email', { method: 'POST', body: JSON.stringify({ company, goal }) });
+        const company = $('#aco').value.trim(), goal = $('#agoal').value.trim(); if (!company || !goal) return;
+        busy($('#draftOut')); const { body } = await api('/api/actions/draft-email', { method: 'POST', body: JSON.stringify({ company, goal }) });
         if (!body.ok) { $('#draftOut').innerHTML = `<div class="answer"><div class="body refusal">${esc(body.reason || 'Could not draft.')}</div></div>`; return; }
         renderProposal(body.action);
       };
       function renderProposal(a) {
-        $('#draftOut').innerHTML = `<div class="proposal">
-          <h4>Proposed: ${esc(a.kind)} → ${esc(a.company)} <span class="pill proposed">${esc(a.status)}</span></h4>
+        $('#draftOut').innerHTML = `<div class="proposal"><h4>Proposed: ${esc(a.kind)} → ${esc(a.company)} <span class="pill proposed">${esc(a.status)}</span></h4>
           <pre>${esc(JSON.stringify(a.payload, null, 2))}</pre>
-          <div class="row"><button class="btn sm" id="appr">Approve & execute</button><button class="btn ghost sm" id="rej">Reject</button></div>
-        </div>`;
+          <div class="row"><button class="btn coral sm" id="appr">Approve & execute</button><button class="btn ghost sm" id="rej">Reject</button></div></div>`;
         $('#appr').onclick = async () => { await api('/api/actions/' + a.id + '/approve', { method: 'POST', body: '{}' }); $('#draftOut').innerHTML = `<div class="answer"><div class="body"><span class="pill executed">executed</span> — recorded to the outbox & audit log.</div></div>`; loadAudit(); };
         $('#rej').onclick = async () => { await api('/api/actions/' + a.id + '/reject', { method: 'POST', body: JSON.stringify({ reason: 'declined in console' }) }); $('#draftOut').innerHTML = `<div class="answer"><div class="body refusal"><span class="pill rejected">rejected</span> — nothing was sent.</div></div>`; loadAudit(); };
       }
       async function loadAudit() {
-        const { body } = await api('/api/actions/audit');
-        const log = body.audit || [];
-        $('#auditList').innerHTML = log.length ? log.slice().reverse().map((e) =>
-          `<div class="item"><span>${esc(e.kind || e.action || 'action')} <span class="meta">${esc(e.note || e.event || '')}</span></span><span class="meta">${esc((e.at || '').slice(0, 19).replace('T', ' '))}</span></div>`
-        ).join('') : '<div class="empty">No actions yet.</div>';
+        const { body } = await api('/api/actions/audit'); const log = body.audit || [];
+        $('#auditList').innerHTML = log.length ? log.slice().reverse().map((e) => `<div class="item"><span>${esc(e.kind || e.action || 'action')} <span class="meta">${esc(e.note || e.event || '')}</span></span><span class="meta">${esc((e.at || '').slice(0, 19).replace('T', ' '))}</span></div>`).join('') : '<div class="empty">No actions yet.</div>';
       }
-
       async function loadEval() {
         $('#evalList').innerHTML = '<div class="empty">Loading…</div>';
-        const { body } = await api('/api/eval/candidates');
-        const c = body.candidates || [];
-        $('#evalList').innerHTML = c.length ? c.map((x) =>
-          `<div class="item"><span>↻ <strong>${esc(x.input)}</strong><div class="meta">${esc((x.checks || []).map((k) => k.check).join(', '))} · from feedback</div></span><span class="chip">${esc(x.kind)}</span></div>`
-        ).join('') : '<div class="empty">No candidates yet — reject a refusal in <strong>Ask</strong> to grow one.</div>';
+        const { body } = await api('/api/eval/candidates'); const c = body.candidates || [];
+        $('#evalList').innerHTML = c.length ? c.map((x) => `<div class="item"><span>↻ <strong>${esc(x.input)}</strong><div class="meta">${esc((x.checks || []).map((k) => k.check).join(', '))} · from feedback</div></span><span class="chip">${esc(x.kind)}</span></div>`).join('') : '<div class="empty">No candidates yet — reject a refusal in <strong>Ask</strong> to grow one.</div>';
       }
       $('#reloadEval').onclick = loadEval;
 
+      // boot: mode banner + live overview stats
       (async () => {
+        try { const h = await (await fetch('/health')).json(); $('#mode').innerHTML = `<span class="pip"></span> ${esc(h.mode || 'ready')}`;
+          const m = (h.mode || '').match(/recall=(\S+)\s+generation=(\S+)/); if (m) { $('#statRecall').textContent = 'recall · ' + m[1]; $('#statGen').textContent = 'generation · ' + m[2]; }
+        } catch { $('#mode').innerHTML = '<span class="pip" style="background:var(--coral)"></span> offline'; }
         try {
-          const h = await (await fetch('/health')).json();
-          $('#mode').innerHTML = `<span class="pip"></span> ${esc(h.mode || 'ready')}`;
-        } catch { $('#mode').innerHTML = '<span class="pip" style="background:var(--bad)"></span> offline'; }
-        try {
-          const { body } = await api('/api/companies');
-          $('#co').innerHTML = (body.companies || []).map((c) => `<option>${esc(c)}</option>`).join('') || '<option>no entities</option>';
+          const { body } = await api('/api/companies'); const cos = body.companies || [];
+          $('#co').innerHTML = cos.map((c) => `<option>${esc(c)}</option>`).join('') || '<option>no entities</option>';
+          $('#statEntities').textContent = cos.length;
+          const palette = ['var(--coral)', 'var(--butter)', 'var(--coral)', 'var(--butter)'];
+          const hs = [80, 58, 92, 46];
+          $('#srcBars').innerHTML = ['companies', 'contacts', 'engagements', 'programs'].map((s, i) => `<div class="b"><i style="background:${palette[i]};height:${hs[i]}%"></i><div class="barlabel">${s}</div></div>`).join('');
         } catch {}
+        try { const { body } = await api('/api/eval/candidates'); $('#statEval').textContent = (body.candidates || []).length; } catch { $('#statEval').textContent = '0'; }
       })();
     </script>
   </body>
