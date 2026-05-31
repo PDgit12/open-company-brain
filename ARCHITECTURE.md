@@ -32,21 +32,45 @@ agents answer only from what those two layers return.
 
 | Layer | File | Swappable impls | Why the seam |
 |---|---|---|---|
-| Config / mode | `src/config.ts` | — | one place decides mock vs live |
+| Config / mode | `src/config.ts` | — | one place resolves the backend: mock / langbase / local |
 | Data source | `src/db/datasource.ts` | Postgres / Seed | demo without a DB; prod with one |
 | **Adapter** | `src/adapter/index.ts` | — | the only file you edit for *your* tables |
 | Templating | `src/brain/documents.ts` | pure | records → embeddable memory docs |
-| Recall | `src/brain/memory.ts` | Langbase / Mock | RAG in prod; keyword search in demo |
+| Recall | `src/brain/memory.ts` | Mock / Langbase / **PgVector** | keyword (demo) · managed RAG · local pgvector |
+| Embedding | `src/brain/embedding.ts` | Mock / **Ollama** | local vectors for the pgvector store ($0/call) |
 | Graph | `src/graph/relationships.ts` | in-memory (→ SQL/AGE) | FK traversal = warm-intro paths |
 | Prompts | `src/agents/prompts.ts` | pure | the trust contract lives here |
-| Generation | `src/agents/generator.ts` | Langbase Pipe / Mock | LLM in prod; deterministic in demo |
+| Generation | `src/agents/generator.ts` | Mock / Langbase Pipe / **Ollama** | deterministic (demo) · managed · local LLM |
 | Orchestration | `src/brain/brain.ts` | — | wires it all into `brief()` / `ask()` / `health()` |
+| Feedback | `src/feedback/feedback.ts` | InMemory (→ Postgres) | scope-gated verdicts → reranker + few-shot + eval growth |
 | Enrichment | `src/brain/enrichment.ts` | pure (→ LLM) | derive theme tags for sharper retrieval |
 | Graph backend | `src/graph/backend.ts` | InMemory / Postgres-CTE | scale traversal without changing callers |
 | Action layer | `src/actions/*` | InMemory / Postgres stores | propose → approve → execute (idempotent) + audit |
 | Observability | `src/observability/logger.ts` | — | one JSON line per request |
-| Eval | `src/eval/*` | — | golden behavioural set, also a CI gate |
-| API | `src/server/app.ts` | — | the surface your webapp calls |
+| Eval | `src/eval/*` | — | golden behavioural set (+ auto-grown candidates), a CI gate |
+| API | `src/server/app.ts` | — | the surface your webapp calls (errors → safe 500, never a crash) |
+
+### Three backends, one code path
+
+`LLM_BACKEND` (or `auto`) resolves to one of three, with **no brain-logic change** —
+only which impls the factories return:
+
+- **mock** — zero credentials, in-memory, deterministic. Demos + the test suite.
+- **langbase** — managed Memory + Pipes (set `LANGBASE_API_KEY`).
+- **local** — Ollama generation + Ollama embeddings + Postgres/pgvector recall.
+  `$0` per query, fully self-hosted. A `RETRIEVAL_MIN_SCORE` floor keeps the
+  cite-or-refuse contract intact under vector search (which always returns
+  nearest neighbours).
+
+### The self-improvement loop
+
+Every verdict (`POST /api/feedback`, and action approve/reject) becomes a
+scope-gated `FeedbackEvent`. From that one substrate: approved answers become
+few-shot exemplars in `ask()`; per-source reward **reranks** retrieval; and
+rejected refusals are auto-grown into `has_sources` regression candidates
+(`GET /api/eval/candidates`) for human promotion into the golden set. The same
+access gate (`kind='answer'`, no empty-scope bypass, `scopes ⊆ caller`) guards
+every read, so learning never leaks across scopes.
 
 ## The action layer — how "workflows" work here (and why it isn't n8n)
 

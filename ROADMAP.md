@@ -31,20 +31,24 @@ agent, streaming, observability, and evals — all verified in mock mode.
 
 ---
 
-## 🟡 Needs real usage data first
+## ✅ Shipped (v0.3.0)
 
-### Recursive learning (feedback loops)
-- **What:** the brain improves from outcomes over time.
-- **How (phased):**
-  1. Capture signal — the action audit log (approved/rejected) already exists; add a
-     `/api/feedback` endpoint + `feedback` store for thumbs up/down on answers.
-  2. Re-rank retrieval — boost sources marked useful, demote rejected (extend
-     `memory.retrieve`).
-  3. Grow the eval set — every bad answer becomes a new golden case.
-  4. Few-shot prompts with approved examples.
-- **Effort:** capture is cheap; learning is ~1–2 weeks.
-- **Trigger:** start *capturing* now; do the *learning* once weeks of real outcomes
-  have accrued (nothing to learn from on day one).
+### Recursive learning (feedback loops) — DONE
+The mechanism shipped; its *value* compounds once weeks of real verdicts accrue.
+- ✅ Capture signal — `POST /api/feedback` + a scope-gated `FeedbackStore`; action
+  approve/reject also records.
+- ✅ Re-rank retrieval — `rerankByReward` boosts useful sources, demotes rejected
+  (in the Brain layer, so it works for every backend; bounded + no-op on a cold brain).
+- ✅ Grow the eval set — rejected refusals become `has_sources` regression
+  candidates at `GET /api/eval/candidates` (human-review queue, not an auto CI gate).
+- ✅ Few-shot prompts — approved past answers injected as exemplars in `ask()`.
+
+Still genuinely deferred: a *trained* learning-to-rank model and longitudinal
+quality tracking — both need weeks of accrued outcomes before they're worth building.
+
+### Fully-local backend ($0/query) — DONE
+- ✅ `LLM_BACKEND=local`: Ollama generation + Ollama embeddings + pgvector recall,
+  behind the existing seams. `npm run setup:local`.
 
 ---
 

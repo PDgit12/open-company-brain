@@ -160,6 +160,13 @@ Read (grounded + cited, access-scoped):
 | `POST /api/intro-path` | `{ from, to }` | relationship path (graph) |
 | `GET /api/health-check` | — | what needs attention (health agent) |
 
+Learning loop (feedback → reranker + few-shot + auto-grown evals):
+
+| Endpoint | Body | Returns |
+|---|---|---|
+| `POST /api/feedback` | `{ query, answer, verdict, sources? }` | `{ ok }` — records a thumbs up/down |
+| `GET /api/eval/candidates` | — | scope-gated regression cases auto-grown from rejected answers |
+
 Write (action layer — human-approved, idempotent, audited):
 
 | Endpoint | Body | Returns |
@@ -204,7 +211,7 @@ const { answer, sources } = await res.json();
 - [`docs/GETTING_STARTED.md`](./docs/GETTING_STARTED.md) — the 5-minute path: scaffold → keys → your data → your workflow.
 - [`examples/custom-action.example.ts`](./examples/custom-action.example.ts) — copyable template for your own workflow.
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the layered design and the two contracts.
-- [`docs/STUDY_PLAYBOOK.md`](./docs/STUDY_PLAYBOOK.md) (+ `.docx`) — a full
+- [`docs/STUDY_PLAYBOOK.md`](./docs/STUDY_PLAYBOOK.md) — a full
   basics→mastery study guide explaining every concept and every file.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to set up and contribute.
 

@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.3.0] — 2026-05-30
+
+### Added — self-improvement loop + a fully-local backend
+- **Fully-local backend** (`LLM_BACKEND=local`) — $0 per query, self-hosted: local
+  generation (`OllamaGenerator`), local embeddings (`OllamaEmbedder`), and a
+  Postgres + **pgvector** recall store (`PgVectorMemoryStore`), all behind the
+  existing swappable seams. One-command `npm run setup:local`.
+- **Feedback substrate** (`src/feedback/feedback.ts`) — every thumbs up/down and
+  action approve/reject becomes a scope-gated, reward-normalized `FeedbackEvent`.
+  `POST /api/feedback` records verdicts.
+- **Few-shot learning loop** — `ask()` injects approved past answers (scope-gated)
+  as exemplars so style/rigor compounds with usage.
+- **Retrieval reranker** (`rerankByReward`) — boosts sources humans found useful,
+  demotes rejected ones (bounded, no-op on a cold brain).
+- **Auto-grown eval set** — rejected refusals become `has_sources` regression
+  candidates, surfaced as a scope-gated review queue at `GET /api/eval/candidates`.
+- **API resilience** — `asyncRoute` + a central error handler return a safe 500
+  instead of crashing the process when a provider is down.
+- **`RETRIEVAL_MIN_SCORE`** similarity floor preserves cite-or-refuse under vector
+  search (which always returns nearest neighbours).
+- Test suite grown to **56 tests**; typecheck clean.
+
 ## [0.2.0] — 2026-05-30
 
 ### Added — Tiers 1–3

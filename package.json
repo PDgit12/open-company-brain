@@ -1,7 +1,7 @@
 {
-  "name": "company-brain",
-  "version": "0.1.0",
-  "description": "An open-source, governed Company Brain: ingests structured records into a semantic recall layer (Langbase Memory) + a foreign-key knowledge graph, and serves grounded, cited briefing & Q&A agents. Bring your own domain, data, and deployment.",
+  "name": "open-company-brain",
+  "version": "0.3.0",
+  "description": "An open-source, governed Company Brain: ingests structured records into a semantic recall layer + a foreign-key knowledge graph, and serves grounded, cited briefing & Q&A agents with a human-approved action layer. Three backends — mock (no creds), managed (Langbase), and fully local (Ollama + pgvector, $0/query). Bring your own domain, data, and deployment.",
   "type": "module",
   "bin": {
     "company-brain": "bin/cli.mjs"
@@ -9,6 +9,27 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PDgit12/open-company-brain.git"
+  },
+  "homepage": "https://github.com/PDgit12/open-company-brain#readme",
+  "bugs": {
+    "url": "https://github.com/PDgit12/open-company-brain/issues"
+  },
+  "author": "PDgit12 (https://github.com/PDgit12)",
+  "keywords": [
+    "rag",
+    "knowledge-graph",
+    "ai-agents",
+    "langbase",
+    "ollama",
+    "pgvector",
+    "self-hosted",
+    "glean-alternative",
+    "company-knowledge",
+    "cite-or-refuse"
+  ],
   "scripts": {
     "init": "node bin/cli.mjs init",
     "doctor": "node bin/cli.mjs doctor",

@@ -13,15 +13,26 @@ npm run demo            # → http://localhost:4000
 You now have a working brain on synthetic data. Click around: **Brief me**, **Ask**,
 **relationship path**, **draft an action**.
 
-## 2. Add your keys (go live)
+## 2. Go live — pick a backend
 
+**Option A — managed (Langbase):**
 ```bash
 npm run init            # paste your Langbase key (Enter to skip), optional Postgres URL
+npm run setup:live      # provisions the Memory + Pipe, then syncs
 npm run doctor          # confirms the active mode
 ```
+> Managed recall needs an embedding-provider key (e.g. OpenAI/Google) set **in your
+> Langbase account** — separate from any LLM key. `doctor` reminds you.
 
-> Live recall needs an embedding-provider key (e.g. OpenAI) set **in your Langbase
-> account** — separate from any LLM/OpenRouter key. `doctor` reminds you.
+**Option B — fully local ($0 per query):** Ollama + pgvector, nothing hosted.
+```bash
+ollama serve & ollama pull llama3.2:1b nomic-embed-text
+docker compose up -d                 # Postgres + pgvector (host port 5433)
+export LLM_BACKEND=local
+export VECTOR_DATABASE_URL=postgres://brain:brain@localhost:5433/company_brain
+npm run setup:local                  # pulls models if needed + embeds your data
+npm run demo                         # /health → recall=local generation=local
+```
 
 ## 3. Point it at your data
 
@@ -55,7 +66,7 @@ The shape:
 ## 5. Verify
 
 ```bash
-npm test          # 31 tests
+npm test          # 56 tests
 npm run eval      # behavioural golden set (grounds when it should, refuses when it must)
 ```
 
@@ -63,6 +74,6 @@ That's it. Mock for development, live with your keys, your data, your workflows.
 
 ---
 
-**Where to go next:** `ARCHITECTURE.md` (the seams), `docs/STUDY_PLAYBOOK.docx`
+**Where to go next:** `ARCHITECTURE.md` (the seams), `docs/STUDY_PLAYBOOK.md`
 (every concept + file, basics→mastery), `ROADMAP.md` (what's deferred and when to
 build it).
