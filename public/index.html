@@ -74,9 +74,9 @@
       .progress { height: 16px; border-radius: 999px; background: oklch(88% 0.01 78); overflow: hidden; display: flex; margin-top: 12px; }
       .card.dark .progress { background: var(--dark-2); }
       .progress .y { background: var(--butter); } .progress .c { background: var(--coral); }
-      .bars { display: flex; align-items: flex-end; gap: 14px; height: 96px; margin-top: 14px; }
-      .bars .b { flex: 1; border-radius: 9px 9px 4px 4px; display: flex; flex-direction: column; justify-content: flex-end; }
-      .bars .b i { display: block; border-radius: 8px 8px 3px 3px; }
+      .bars { display: flex; align-items: stretch; gap: 14px; height: 110px; margin-top: 14px; }
+      .bars .b { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
+      .bars .b i { display: block; width: 100%; border-radius: 8px 8px 3px 3px; min-height: 6px; }
       .barlabel { font-size: 10.5px; color: var(--on-dark-mut); text-align: center; margin-top: 7px; }
       .timeline { display: flex; gap: 6px; margin: 8px 0 4px; }
       .timeline .seg { flex: 1; height: 4px; border-radius: 2px; background: oklch(86% 0.01 78); }
