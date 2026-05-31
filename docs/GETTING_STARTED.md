@@ -74,6 +74,5 @@ That's it. Mock for development, live with your keys, your data, your workflows.
 
 ---
 
-**Where to go next:** `ARCHITECTURE.md` (the seams), `docs/STUDY_PLAYBOOK.md`
-(every concept + file, basics→mastery), `ROADMAP.md` (what's deferred and when to
-build it).
+**Where to go next:** `ARCHITECTURE.md` (the seams and the two contracts),
+`ROADMAP.md` (what's deferred and when to build it).

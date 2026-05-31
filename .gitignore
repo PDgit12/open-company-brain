@@ -9,3 +9,4 @@ coverage/
 *.tsbuildinfo
 .brain-state.json
 outbox/
+docs/STUDY_PLAYBOOK.md

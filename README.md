@@ -59,7 +59,7 @@ yours; see *Make it yours* below.
 - **Three backends** — mock (no credentials), live (Langbase + Postgres), and
   fully local (Ollama + pgvector, $0/query), chosen from your `.env`.
 - **A clean adapter seam** — one file maps your tables onto the model.
-- **Batteries** — demo UI, HTTP API, tests, Docker, and a full study playbook.
+- **Batteries** — demo UI, HTTP API, tests, and Docker.
 
 ## Get started in one command
 
@@ -211,8 +211,6 @@ const { answer, sources } = await res.json();
 - [`docs/GETTING_STARTED.md`](./docs/GETTING_STARTED.md) — the 5-minute path: scaffold → keys → your data → your workflow.
 - [`examples/custom-action.example.ts`](./examples/custom-action.example.ts) — copyable template for your own workflow.
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the layered design and the two contracts.
-- [`docs/STUDY_PLAYBOOK.md`](./docs/STUDY_PLAYBOOK.md) — a full
-  basics→mastery study guide explaining every concept and every file.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to set up and contribute.
 
 ## Capabilities

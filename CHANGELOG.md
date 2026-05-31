@@ -57,7 +57,7 @@ Initial open-source release.
 - **Trust contract** — cite-or-refuse, enforced in prompts and asserted by tests.
 - **Adapter seam** (`src/adapter/index.ts`) — the single file to map your tables.
 - **Example domain** — a generic relationship/CRM model with synthetic seed data.
-- HTTP API, zero-setup demo page, Docker, and a full study playbook (`docs/`).
+- HTTP API, zero-setup demo page, Docker, and developer docs (`docs/`).
 - 14-test suite covering templating, graph, access filtering, and end-to-end seams.
 
 ### Scope held for later (documented in ARCHITECTURE.md)

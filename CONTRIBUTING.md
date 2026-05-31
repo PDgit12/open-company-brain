@@ -35,7 +35,7 @@ No API keys or database are needed to develop — mock mode covers everything.
   `domain/types.ts` + `adapter` + seed sets.
 - **A recursive-CTE or Apache AGE graph backend** behind the existing graph
   functions.
-- **Docs and the study playbook** — clarity improvements are real contributions.
+- **Docs** — clarity improvements are real contributions.
 
 ## Pull request checklist
 
