@@ -32,18 +32,42 @@ export async function setupLive(): Promise<void> {
     throw new Error('Not in live mode — set LANGBASE_API_KEY in .env first.');
   }
   const lb = new Langbase({ apiKey: config.langbase.apiKey });
+  const memoryName = config.langbase.memoryName;
+  const wantModel = config.langbase.embeddingModel;
 
-  // 1. Memory (idempotent: create, tolerate "already exists").
-  try {
-    await lb.memories.create({
-      name: config.langbase.memoryName,
-      description: 'Company Brain — semantic recall layer',
-      embedding_model: config.langbase.embeddingModel,
-    });
-    console.log(`✓ Memory "${config.langbase.memoryName}" ready (${config.langbase.embeddingModel}).`);
-  } catch (err) {
-    if (isProviderKeyError(err)) throw new Error(`Embedding provider key missing. ${PROVIDER_HINT}`);
-    console.log(`✓ Memory "${config.langbase.memoryName}" already exists.`);
+  const create = async (): Promise<void> => {
+    try {
+      await lb.memories.create({ name: memoryName, description: 'Company Brain — semantic recall layer', embedding_model: wantModel });
+    } catch (err) {
+      if (isProviderKeyError(err)) throw new Error(`Embedding provider key missing. ${PROVIDER_HINT}`);
+      throw err;
+    }
+  };
+
+  // 1. Memory. A memory's embedding model is fixed at creation, so if the
+  //    existing one uses a different provider we must recreate it — but ONLY
+  //    when it is empty, so real data is never silently destroyed.
+  const existing = (await lb.memories.list()).find((m) => m.name === memoryName) as
+    | { embeddingModel?: string }
+    | undefined;
+  if (!existing) {
+    await create();
+    console.log(`✓ Memory "${memoryName}" created (${wantModel}).`);
+  } else if (existing.embeddingModel === wantModel) {
+    console.log(`✓ Memory "${memoryName}" ready (${wantModel}).`);
+  } else {
+    const docs = await lb.memories.documents.list({ memoryName });
+    const count = Array.isArray(docs) ? docs.length : 0;
+    if (count > 0) {
+      throw new Error(
+        `Memory "${memoryName}" uses ${existing.embeddingModel} but config wants ${wantModel}, ` +
+          `and it holds ${count} document(s). Refusing to delete real data. ` +
+          `Either set LANGBASE_EMBEDDING_MODEL=${existing.embeddingModel}, or rename LANGBASE_MEMORY_NAME to provision a fresh one.`,
+      );
+    }
+    await lb.memories.delete({ name: memoryName });
+    await create();
+    console.log(`✓ Memory "${memoryName}" recreated for ${wantModel} (was ${existing.embeddingModel}, 0 docs).`);
   }
 
   // 2. Pipe (upsert keeps it idempotent and lets you re-run after prompt edits).

@@ -10,6 +10,10 @@
  *   POST /api/intro-path          { from, to }           → relationship path
  *   GET  /api/health-check        relationship-health agent (what needs attention)
  *
+ * Learning loop:
+ *   POST /api/feedback            { query, answer, verdict, sources? } → records a verdict
+ *   GET  /api/eval/candidates     auto-grown regression cases (scope-gated review queue)
+ *
  * Write endpoints (action layer — human-approved):
  *   POST /api/actions/draft-email      { company, goal }            → proposed action
  *   POST /api/actions/log-engagement   { company, summary, ... }    → proposed action

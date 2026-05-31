@@ -76,5 +76,3 @@ export interface BrainSnapshot {
   programs: Program[];
   companyPrograms: CompanyProgram[];
 }
-
-export type EntityKind = 'company' | 'contact' | 'engagement' | 'program';

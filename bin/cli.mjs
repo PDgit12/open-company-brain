@@ -49,17 +49,38 @@ async function ensureEnv() {
   }
 }
 
+// Mirror src/config.ts backend resolution so the CLI never lies about the mode.
+function resolveBackend(map) {
+  const lb = Boolean(map.LANGBASE_API_KEY && map.LANGBASE_API_KEY.trim());
+  const explicit = (map.LLM_BACKEND || 'auto').trim();
+  if (explicit && explicit !== 'auto') return explicit; // mock | langbase | local
+  return lb ? 'langbase' : 'mock';
+}
+
 function reportMode(map) {
+  const backend = resolveBackend(map);
   const lb = Boolean(map.LANGBASE_API_KEY && map.LANGBASE_API_KEY.trim());
   const db = Boolean(map.DATABASE_URL && map.DATABASE_URL.trim());
+  const vec = Boolean((map.VECTOR_DATABASE_URL && map.VECTOR_DATABASE_URL.trim()) || db);
   console.log('\n  Configuration');
-  console.log(`   ${lb ? '✓' : '○'} Langbase API key   ${lb ? 'set — live recall + generation' : 'blank → mock mode'}`);
-  console.log(`   ${db ? '✓' : '○'} DATABASE_URL       ${db ? 'set — your Postgres' : 'blank → in-memory seed data'}`);
-  if (lb) {
-    console.log('   ! Langbase Memory also needs an embedding-provider key (e.g. OpenAI)');
-    console.log('     configured in your Langbase account — separate from any LLM/OpenRouter key.');
+  console.log(`   • backend          ${backend}  (LLM_BACKEND=${map.LLM_BACKEND || 'auto'})`);
+
+  if (backend === 'local') {
+    console.log(`   ✓ Ollama           ${map.OLLAMA_BASE_URL || 'http://localhost:11434'}  (gen=${map.OLLAMA_GENERATION_MODEL || 'llama3.2:1b'}, embed=${map.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text'})`);
+    console.log(`   ${vec ? '✓' : '✗'} pgvector Postgres  ${vec ? 'set' : 'MISSING — set VECTOR_DATABASE_URL (or DATABASE_URL)'}`);
+    console.log('   ! needs `ollama serve` running and the models pulled — `npm run setup:local` does both.');
+    console.log('\n  Mode: recall=local  generation=local  ($0 per query)');
+    return;
   }
-  console.log(`\n  Mode: recall=${lb ? 'live' : 'mock'}  generation=${lb ? 'live' : 'mock'}  data=${db ? 'postgres' : 'seed'}`);
+
+  console.log(`   ${lb ? '✓' : '○'} Langbase API key   ${lb ? 'set — managed recall + generation' : 'blank → mock mode'}`);
+  console.log(`   ${db ? '✓' : '○'} DATABASE_URL       ${db ? 'set — your Postgres' : 'blank → in-memory seed data'}`);
+  if (backend === 'langbase') {
+    console.log('   ! Langbase Memory also needs an embedding-provider key (e.g. OpenAI/Google)');
+    console.log('     configured in your Langbase account — separate from any LLM key.');
+  }
+  const mode = backend === 'langbase' ? 'live' : 'mock';
+  console.log(`\n  Mode: recall=${mode}  generation=${mode}  data=${db ? 'postgres' : 'seed'}`);
 }
 
 async function init() {
@@ -82,8 +103,11 @@ async function init() {
 
   reportMode(parseEnv(text));
   console.log('\n  Next:');
-  console.log('   npm run sync     build the recall layer from your data');
-  console.log('   npm run demo     open the brain at http://localhost:4000\n');
+  console.log('   # managed (Langbase) or mock:');
+  console.log('   npm run sync         build the recall layer from your data');
+  console.log('   # fully local ($0/query): set LLM_BACKEND=local in .env, then:');
+  console.log('   npm run setup:local  pull models + embed your data into pgvector');
+  console.log('   npm run demo         open the brain at http://localhost:4000\n');
 }
 
 async function doctor() {

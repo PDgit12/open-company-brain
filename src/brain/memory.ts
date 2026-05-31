@@ -87,7 +87,7 @@ export class MockMemoryStore implements MemoryStore {
 
     return scored.map(({ d, score }) => ({
       text: d.text,
-      source: d.metadata['source'] ?? 'unknown',
+      source: d.metadata[META_SOURCE] ?? 'unknown',
       metadata: d.metadata,
       score: Math.min(1, score),
     }));
@@ -156,7 +156,7 @@ export class LangbaseMemoryStore implements MemoryStore {
         const metadata = (r.meta ?? {}) as Record<string, string>;
         return {
           text: r.text ?? '',
-          source: metadata['source'] ?? 'unknown',
+          source: metadata[META_SOURCE] ?? 'unknown',
           metadata,
           score: typeof r.similarity === 'number' ? r.similarity : 0,
         };

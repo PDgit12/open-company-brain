@@ -113,8 +113,6 @@ export const config = {
   },
 } as const;
 
-export type AppConfig = typeof config;
-
 /** Human-readable banner so it's never ambiguous which mode is live. */
 export function describeMode(): string {
   return [
