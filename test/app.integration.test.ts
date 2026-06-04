@@ -52,11 +52,11 @@ describe('HTTP API (mock backend)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('POST /api/brief grounded → 200 with sources', async () => {
-    const res = await fetch(`${base}/api/brief`, {
+  it('POST /api/ask grounded → 200 with sources', async () => {
+    const res = await fetch(`${base}/api/ask`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-access-scopes': 'default-team' },
-      body: JSON.stringify({ company: 'Aerodyne Systems' }),
+      body: JSON.stringify({ question: 'Project Atlas migration plan' }),
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -68,7 +68,7 @@ describe('HTTP API (mock backend)', () => {
     const res = await fetch(`${base}/api/ask`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-access-scopes': 'no-such-team' },
-      body: JSON.stringify({ question: 'Tell me about Aerodyne' }),
+      body: JSON.stringify({ question: 'Project Atlas migration plan' }),
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -109,5 +109,68 @@ describe('HTTP API (mock backend)', () => {
       headers: { 'x-access-scopes': 'some-other-team' },
     });
     expect((await other.json()).candidates).toHaveLength(0);
+  });
+
+  it('data-in: POST /api/ingest text → /api/ask grounds + cites it', async () => {
+    const ingest = await fetch(`${base}/api/ingest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-scopes': 'default-team' },
+      body: JSON.stringify({
+        format: 'text',
+        source: 'field-notes',
+        content: 'Zephyr Robotics signed a pilot for warehouse automation in Q2.',
+      }),
+    });
+    expect(ingest.status).toBe(200);
+    const ir = await ingest.json();
+    expect(ir.ok).toBe(true);
+    expect(ir.ingested).toBe(1);
+    expect(ir.source).toBe('field-notes');
+
+    // The freshly ingested note is now retrievable + cited by the ask agent.
+    const ask = await fetch(`${base}/api/ask`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-scopes': 'default-team' },
+      body: JSON.stringify({ question: 'Zephyr Robotics warehouse pilot' }),
+    });
+    const answer = await ask.json();
+    expect(answer.sources.some((s: { source: string }) => s.source === 'field-notes')).toBe(true);
+  });
+
+  it('ingest is scope-gated: a note ingested in one scope is invisible to another', async () => {
+    await fetch(`${base}/api/ingest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-scopes': 'team-a' },
+      body: JSON.stringify({ format: 'text', source: 'secret', content: 'Project Halcyon budget is confidential.' }),
+    });
+    const leak = await fetch(`${base}/api/ask`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-scopes': 'team-b' },
+      body: JSON.stringify({ question: 'Project Halcyon budget' }),
+    });
+    const { sources } = await leak.json();
+    expect(sources.some((s: { source: string }) => s.source === 'secret')).toBe(false);
+  });
+
+  it('GET /api/stats returns real per-source counts after ingest', async () => {
+    await fetch(`${base}/api/ingest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-scopes': 'stats-team' },
+      body: JSON.stringify({ format: 'text', source: 'memo', content: 'one\n\ntwo\n\nthree' }),
+    });
+    const res = await fetch(`${base}/api/stats`, { headers: { 'x-access-scopes': 'stats-team' } });
+    expect(res.status).toBe(200);
+    const { sources, total } = await res.json();
+    expect(total).toBe(3);
+    expect(sources.find((s: { source: string }) => s.source === 'memo')?.count).toBe(3);
+  });
+
+  it('POST /api/ingest with malformed body → 400', async () => {
+    const res = await fetch(`${base}/api/ingest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-scopes': 'default-team' },
+      body: JSON.stringify({ format: 'text' }), // no content
+    });
+    expect(res.status).toBe(400);
   });
 });

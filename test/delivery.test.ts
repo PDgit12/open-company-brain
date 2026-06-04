@@ -6,10 +6,8 @@ import type { ProposedAction } from '../src/actions/types.js';
 
 const action: ProposedAction = {
   id: 'a1',
-  kind: 'draft_email',
-  company: 'Orbital Robotics',
-  companyId: 'c1',
-  payload: { to: null, subject: 'Follow-up', body: 'Hi' },
+  title: 'Follow-up note',
+  body: 'Hi — quick follow-up on the migration plan.',
   sources: [],
   status: 'proposed',
   idempotencyKey: 'k',
@@ -28,10 +26,10 @@ describe('delivery sinks', () => {
     const effect = await new FileSink(dir).deliver(action);
     expect(effect).toContain('Delivered');
 
-    const written = await readFile(path.join(dir, 'draft_email.jsonl'), 'utf8');
+    const written = await readFile(path.join(dir, 'actions.jsonl'), 'utf8');
     const record = JSON.parse(written.trim());
     expect(record.id).toBe('a1');
-    expect(record.company).toBe('Orbital Robotics');
+    expect(record.title).toBe('Follow-up note');
     await rm(dir, { recursive: true, force: true });
   });
 });

@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { Brain } from '../src/brain/brain.js';
-import { ActionService, splitEmail } from '../src/actions/service.js';
+import { ActionService } from '../src/actions/service.js';
 import { InMemoryActionStore } from '../src/actions/store.js';
 import type { ActionExecutor } from '../src/actions/executor.js';
 import type { ProposedAction, ExecutionOutcome } from '../src/actions/types.js';
 
 const SCOPES = ['default-team'];
+const GROUNDED = { title: 'Follow-up', instruction: 'Draft a short follow-up note.', query: 'Project Atlas migration plan' };
 
 /** Executor that counts how many times it actually ran (to prove idempotency). */
 class CountingExecutor implements ActionExecutor {
@@ -23,20 +24,23 @@ async function makeService(): Promise<{ svc: ActionService; exec: CountingExecut
 }
 
 describe('action layer — propose', () => {
-  it('drafts a grounded email proposal for a known company (not executed yet)', async () => {
+  it('drafts a grounded proposal (not executed yet)', async () => {
     const { svc } = await makeService();
-    const r = await svc.proposeEmail('Aerodyne', 'follow up on the renewal', SCOPES);
+    const r = await svc.propose(GROUNDED, SCOPES);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.action.status).toBe('proposed');
       expect(r.action.sources.length).toBeGreaterThan(0); // grounded
-      expect(r.action.kind).toBe('draft_email');
+      expect(r.action.title).toBe('Follow-up');
     }
   });
 
   it('refuses to draft when there is no grounding (trust contract)', async () => {
     const { svc } = await makeService();
-    const r = await svc.proposeEmail('Foobar Industries', 'anything', SCOPES);
+    const r = await svc.propose(
+      { title: 'X', instruction: 'Draft anything.', query: 'Foobar Industries unknown topic' },
+      SCOPES,
+    );
     expect(r.ok).toBe(false);
   });
 });
@@ -44,7 +48,7 @@ describe('action layer — propose', () => {
 describe('action layer — approve / idempotency / audit', () => {
   it('executes only after approval, exactly once even if approved twice', async () => {
     const { svc, exec } = await makeService();
-    const proposed = await svc.proposeEmail('Aerodyne', 'renewal follow-up', SCOPES);
+    const proposed = await svc.propose(GROUNDED, SCOPES);
     expect(proposed.ok).toBe(true);
     if (!proposed.ok) return;
 
@@ -61,7 +65,7 @@ describe('action layer — approve / idempotency / audit', () => {
 
   it('rejecting prevents execution', async () => {
     const { svc, exec } = await makeService();
-    const proposed = await svc.proposeEmail('Aerodyne', 'x', SCOPES);
+    const proposed = await svc.propose(GROUNDED, SCOPES);
     if (!proposed.ok) throw new Error('expected proposal');
     await svc.reject(proposed.action.id, 'not now');
     const approved = await svc.approve(proposed.action.id);
@@ -71,7 +75,7 @@ describe('action layer — approve / idempotency / audit', () => {
 
   it('writes an audit trail of every transition', async () => {
     const { svc } = await makeService();
-    const proposed = await svc.proposeEmail('Aerodyne', 'x', SCOPES);
+    const proposed = await svc.propose(GROUNDED, SCOPES);
     if (!proposed.ok) throw new Error('expected proposal');
     await svc.approve(proposed.action.id);
     const audit = await svc.auditLog();
@@ -79,17 +83,5 @@ describe('action layer — approve / idempotency / audit', () => {
     expect(events).toContain('proposed');
     expect(events).toContain('approved');
     expect(events).toContain('executed');
-  });
-});
-
-describe('splitEmail', () => {
-  it('extracts a Subject line when present', () => {
-    expect(splitEmail('Subject: Renewal\n\nHi there', 'Acme')).toEqual({
-      subject: 'Renewal',
-      body: 'Hi there',
-    });
-  });
-  it('falls back to a default subject when absent', () => {
-    expect(splitEmail('Hi there', 'Acme').subject).toBe('Follow-up: Acme');
   });
 });

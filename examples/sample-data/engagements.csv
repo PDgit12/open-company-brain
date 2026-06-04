@@ -1,4 +1,0 @@
-id,company_id,kind,date,summary,open_actions
-e1,c1,research-funding,2026-04-20,"Discussed funding a computer-vision project.","Send proposal by June 1."
-e2,c2,sponsorship,2026-03-10,"Renewed the data science fellowship.",
-e3,c3,intro,2026-04-30,"Intro call about a logistics pilot.","Share integration scope."

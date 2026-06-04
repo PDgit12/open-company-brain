@@ -13,7 +13,6 @@ export type Check = 'has_sources' | 'no_sources' | 'answer_includes' | 'answer_r
 
 export interface GoldenCase {
   name: string;
-  kind: 'brief' | 'ask';
   input: string;
   scopes: string[];
   checks: Array<{ check: Check; value?: string }>;
@@ -21,31 +20,32 @@ export interface GoldenCase {
   source?: 'curated' | 'feedback';
 }
 
+/**
+ * Behavioural expectations, asserted against the generic demo seed (seed-data.ts).
+ * They check the properties that matter most regardless of domain: the brain
+ * grounds when it should, REFUSES when it has nothing, and never crosses scopes.
+ */
 export const GOLDEN_SET: GoldenCase[] = [
   {
-    name: 'briefs a known partner with grounded sources',
-    kind: 'brief',
-    input: 'Aerodyne',
+    name: 'grounds a question that has supporting knowledge',
+    input: 'Project Atlas migration plan',
     scopes: ['default-team'],
-    checks: [{ check: 'has_sources' }, { check: 'answer_includes', value: 'Aerodyne' }],
+    checks: [{ check: 'has_sources' }, { check: 'answer_includes', value: 'Atlas' }],
   },
   {
-    name: 'refuses for an unknown partner',
-    kind: 'ask',
+    name: 'refuses for a topic the brain has never seen',
     input: 'What is our history with Foobar Industries?',
     scopes: ['default-team'],
     checks: [{ check: 'no_sources' }, { check: 'answer_refuses' }],
   },
   {
-    name: 'answers a thematic question across partners',
-    kind: 'ask',
-    input: 'Which partners care about ML research?',
+    name: 'answers across sources',
+    input: 'Northwind subscription renewal roadmap',
     scopes: ['default-team'],
     checks: [{ check: 'has_sources' }],
   },
   {
     name: 'hides leadership-only records from a default-team caller',
-    kind: 'ask',
     input: 'confidential mandate sensitive figures',
     scopes: ['default-team'],
     checks: [{ check: 'no_sources' }],
@@ -83,7 +83,6 @@ export function candidateCasesFromFeedback(
     seen.add(input.toLowerCase());
     cases.push({
       name: `regression: brain refused but a human expected an answer — "${input}"`,
-      kind: 'ask',
       input,
       scopes: e.scopes,
       checks: [{ check: 'has_sources' }],

@@ -17,7 +17,8 @@
 import { Langbase } from 'langbase';
 import { config, describeMode } from '../config.js';
 import { SYSTEM_PROMPT } from '../agents/prompts.js';
-import { runSync } from './sync.js';
+import { createMemoryStore } from './memory.js';
+import { demoDocuments } from '../seed/seed-data.js';
 
 const PROVIDER_HINT =
   'Your Langbase workspace has no key for this model provider yet. ' +
@@ -79,16 +80,18 @@ export async function setupLive(): Promise<void> {
   });
   console.log(`✓ Pipe "${config.langbase.pipeName}" ready (${config.langbase.generationModel}).`);
 
-  // 3. Sync the source of truth into recall (full rebuild).
-  const { documents } = await runSync({ full: true });
-  console.log(`✓ Synced ${documents} document(s) into recall.`);
+  // 3. Seed the recall layer with the generic demo notes so a fresh workspace
+  //    isn't empty. In real use you replace these by ingesting your own data
+  //    (dashboard / upload / the ingest webhook).
+  const seeded = await createMemoryStore().upsert(demoDocuments());
+  console.log(`✓ Seeded ${seeded} demo document(s) into recall (replace with your data via ingest).`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`▸ Live setup starting  (${describeMode()})`);
   setupLive()
     .then(() => {
-      console.log('\n✓ Live setup complete. Try: curl -s localhost:4000/api/ask -H "content-type: application/json" -d \'{"question":"history with Aerodyne?"}\'\n');
+      console.log('\n✓ Live setup complete. Try: curl -s localhost:4000/api/ask -H "content-type: application/json" -d \'{"question":"What is Project Atlas?"}\'\n');
       process.exit(0);
     })
     .catch((err: unknown) => {

@@ -36,11 +36,19 @@ export interface RetrieveOptions {
   topK?: number;
 }
 
+/** A real count of stored documents per provenance source (scope-filtered). */
+export interface SourceCount {
+  source: string;
+  count: number;
+}
+
 export interface MemoryStore {
   /** Idempotent upsert of the full document set into the brain. */
   upsert(docs: MemoryDocument[]): Promise<number>;
   /** Semantic retrieval, filtered by access. */
   retrieve(opts: RetrieveOptions): Promise<RetrievedChunk[]>;
+  /** Real per-source document counts the caller can see — powers honest viz. */
+  stats(accessScopes: string[]): Promise<SourceCount[]>;
 }
 
 // ─── Mock implementation ─────────────────────────────────────────────────────
@@ -91,6 +99,19 @@ export class MockMemoryStore implements MemoryStore {
       metadata: d.metadata,
       score: Math.min(1, score),
     }));
+  }
+
+  async stats(accessScopes: string[]): Promise<SourceCount[]> {
+    const allowed = new Set(accessScopes);
+    const counts = new Map<string, number>();
+    for (const d of this.docs) {
+      if (!allowed.has(d.metadata[META_ACCESS] ?? '')) continue;
+      const src = d.metadata[META_SOURCE] ?? 'unknown';
+      counts.set(src, (counts.get(src) ?? 0) + 1);
+    }
+    return [...counts]
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count);
   }
 }
 
@@ -163,6 +184,13 @@ export class LangbaseMemoryStore implements MemoryStore {
       })
       // Enforce access AFTER retrieval as a hard backstop, using the seam key.
       .filter((c) => opts.accessScopes.includes(c.metadata[META_ACCESS] ?? ''));
+  }
+
+  // Langbase Memory has no documented count/aggregate API, so per-source stats
+  // are not available here. The dashboard treats an empty result as "unknown"
+  // rather than showing a fabricated number. (Local/mock report real counts.)
+  async stats(_accessScopes: string[]): Promise<SourceCount[]> {
+    return [];
   }
 }
 
@@ -242,6 +270,22 @@ export class PgVectorMemoryStore implements MemoryStore {
       source: r.source ?? 'unknown',
       metadata: r.metadata,
       score: Math.max(0, Math.min(1, Number(r.score))),
+    }));
+  }
+
+  async stats(accessScopes: string[]): Promise<SourceCount[]> {
+    await this.ensure();
+    const { rows } = await this.pool.query(
+      `SELECT COALESCE(source, 'unknown') AS source, count(*)::int AS count
+         FROM ${this.table}
+        WHERE access = ANY($1::text[])
+        GROUP BY source
+        ORDER BY count DESC`,
+      [accessScopes],
+    );
+    return rows.map((r: { source: string; count: number }) => ({
+      source: r.source,
+      count: Number(r.count),
     }));
   }
 }

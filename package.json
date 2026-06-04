@@ -1,7 +1,7 @@
 {
   "name": "open-company-brain",
   "version": "0.3.0",
-  "description": "An open-source, governed Company Brain: ingests structured records into a semantic recall layer + a foreign-key knowledge graph, and serves grounded, cited briefing & Q&A agents with a human-approved action layer. Three backends — mock (no creds), managed (Langbase), and fully local (Ollama + pgvector, $0/query). Bring your own domain, data, and deployment.",
+  "description": "An open-source, governed AI brain framework: pipe ANY data in (paste, upload, or a workflow webhook like n8n), it becomes scoped, embedded, cited, retrievable knowledge — then ask grounded questions, build no-code agents, and fan agents out automatically over new data, all cite-or-refuse with a human-approved action layer. Embeddable as a library or run as a server. Three backends — mock (no creds), managed (Langbase), and fully local (Ollama + pgvector, $0/query).",
   "type": "module",
   "bin": {
     "company-brain": "bin/cli.mjs"
@@ -39,10 +39,7 @@
     "demo": "tsx src/server/index.ts",
     "setup:live": "tsx src/brain/setup-live.ts",
     "setup:local": "tsx src/brain/setup-local.ts",
-    "sync": "tsx src/brain/sync.ts",
-    "sync:full": "tsx src/brain/sync.ts -- --full",
     "eval": "tsx src/eval/run.ts",
-    "seed:db": "tsx src/seed/seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",

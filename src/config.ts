@@ -43,10 +43,6 @@ const EnvSchema = z.object({
   VECTOR_DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DEMO_USER_ACCESS_SCOPE: z.string().trim().default('default-team'),
-  // Data connector: auto | seed | postgres | csv | json. `auto` picks postgres
-  // when DATABASE_URL is set, else seed.
-  DATA_CONNECTOR: z.enum(['auto', 'seed', 'postgres', 'csv', 'json']).default('auto'),
-  CONNECTOR_PATH: z.string().trim().default(''),
   // Action delivery: outbox | file | webhook. `outbox` = record only (default,
   // safe). `file` writes approved actions to a real file. `webhook` POSTs them.
   ACTION_DELIVERY: z.enum(['outbox', 'file', 'webhook']).default('outbox'),
@@ -63,7 +59,6 @@ if (!parsed.success) {
 const env = parsed.data;
 
 const hasLangbase = Boolean(env.LANGBASE_API_KEY);
-const hasPostgres = Boolean(env.DATABASE_URL);
 
 // Resolve the backend: explicit wins; `auto` picks langbase-if-keyed, else mock.
 const backend: 'mock' | 'langbase' | 'local' =
@@ -99,13 +94,7 @@ export const config = {
   memoryMode: backend === 'langbase' ? ('live' as const) : backend === 'local' ? ('local' as const) : ('mock' as const),
   /** Generation layer mode (for the banner). */
   pipeMode: backend === 'langbase' ? ('live' as const) : backend === 'local' ? ('local' as const) : ('mock' as const),
-  /** Data source: Postgres when DATABASE_URL set, else in-memory seed data. */
-  dataMode: hasPostgres ? ('postgres' as const) : ('seed' as const),
 
-  connector: {
-    kind: env.DATA_CONNECTOR,
-    path: env.CONNECTOR_PATH,
-  },
   delivery: {
     kind: env.ACTION_DELIVERY,
     outboxPath: env.ACTION_OUTBOX_PATH,
@@ -118,6 +107,5 @@ export function describeMode(): string {
   return [
     `recall=${config.memoryMode}`,
     `generation=${config.pipeMode}`,
-    `data=${config.dataMode}`,
   ].join('  ');
 }

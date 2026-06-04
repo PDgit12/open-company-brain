@@ -9,11 +9,13 @@
  *     no-op that returns the original outcome (no double-send).
  *   • Every transition is written to the audit log.
  *   • A draft is only proposed if it can be grounded (trust contract).
+ *
+ * The action itself is universal: any agent can propose a grounded `title` +
+ * `body` and a human approves it before the configured delivery sink runs.
  */
 
 import { randomUUID } from 'node:crypto';
 import type { Brain } from '../brain/brain.js';
-import { buildEmailDraftPrompt } from '../agents/prompts.js';
 import { createActionStore, type ActionStore } from './store.js';
 import { createActionExecutor, type ActionExecutor } from './executor.js';
 import { getFeedbackStore } from '../feedback/feedback.js';
@@ -21,18 +23,30 @@ import type {
   ProposedAction,
   ProposeResult,
   DecisionResult,
-  EmailPayload,
-  EngagementPayload,
   AuditEvent,
 } from './types.js';
 
 const nowIso = (): string => new Date().toISOString();
 
-export interface EngagementInput {
-  summary: string;
-  kind?: string;
-  date?: string;
-  openActions?: string | null;
+export interface ProposeInput {
+  /** Short human label for the action. */
+  title: string;
+  /** What to draft — the agent instruction (the trust contract still applies). */
+  instruction: string;
+  /** What to retrieve from the brain to ground the draft. */
+  query: string;
+  /** Optional stable idempotency key; derived from title+query when absent. */
+  idempotencyKey?: string;
+}
+
+/** Deterministic FNV-1a hash → stable idempotency suffix. */
+function hash(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
 }
 
 export class ActionService {
@@ -50,67 +64,28 @@ export class ActionService {
     await this.store.appendAudit({ at: nowIso(), actionId: action.id, event, detail });
   }
 
-  async proposeEmail(company: string, goal: string, scopes: string[]): Promise<ProposeResult> {
-    // You can't draft to a partner the brain doesn't know — refuse up front.
-    const companyId = this.brain.resolveCompanyId(company);
-    if (!companyId) {
-      return { ok: false, reason: `Unknown company "${company}" — refusing to draft.` };
-    }
-    const { text, sources } = await this.brain.draft(
-      `${company} recent engagements open actions contacts`,
-      buildEmailDraftPrompt(company, goal),
-      scopes,
-    );
+  /**
+   * Propose a grounded action. The draft is generated from retrieved context via
+   * the same trust contract as ask/brief: if nothing grounds it, we refuse rather
+   * than invent. Nothing is delivered until a human approves.
+   */
+  async propose(input: ProposeInput, scopes: string[]): Promise<ProposeResult> {
+    const title = input.title.trim() || 'Untitled action';
+    const { text, sources } = await this.brain.draft(input.query, input.instruction, scopes);
     if (sources.length === 0) {
-      return { ok: false, reason: `No grounded information about "${company}" — refusing to draft.` };
+      return { ok: false, reason: `No grounded information for "${input.query}" — refusing to draft.` };
     }
-    const { subject, body } = splitEmail(text, company);
-    const payload: EmailPayload = { to: null, subject, body };
     const action: ProposedAction = {
       id: randomUUID(),
-      kind: 'draft_email',
-      company,
-      companyId,
-      payload,
+      title,
+      body: text,
       sources: sources.map((s) => ({ text: s.text, source: s.source })),
       status: 'proposed',
-      idempotencyKey: `email:${companyId ?? company}:${subject}`,
+      idempotencyKey: input.idempotencyKey?.trim() || `${title}:${hash(input.query + text)}`,
       createdAt: nowIso(),
     };
     await this.store.save(action);
-    await this.log(action, 'proposed', `draft_email for ${company}`);
-    return { ok: true, action };
-  }
-
-  async proposeEngagement(
-    company: string,
-    input: EngagementInput,
-    _scopes: string[],
-  ): Promise<ProposeResult> {
-    const companyId = this.brain.resolveCompanyId(company);
-    if (!companyId) return { ok: false, reason: `Unknown company "${company}".` };
-    if (!input.summary?.trim()) return { ok: false, reason: 'A summary is required.' };
-
-    const payload: EngagementPayload = {
-      companyId,
-      kind: input.kind?.trim() || 'note',
-      date: input.date?.trim() || nowIso().slice(0, 10),
-      summary: input.summary.trim(),
-      openActions: input.openActions?.trim() || null,
-    };
-    const action: ProposedAction = {
-      id: randomUUID(),
-      kind: 'log_engagement',
-      company,
-      companyId,
-      payload,
-      sources: [],
-      status: 'proposed',
-      idempotencyKey: `engagement:${companyId}:${payload.date}:${payload.summary.slice(0, 40)}`,
-      createdAt: nowIso(),
-    };
-    await this.store.save(action);
-    await this.log(action, 'proposed', `log_engagement for ${company}`);
+    await this.log(action, 'proposed', `proposed: ${title}`);
     return { ok: true, action };
   }
 
@@ -130,8 +105,8 @@ export class ActionService {
     // Feedback fuel: an approved action is a positive signal on its draft.
     await getFeedbackStore().record({
       kind: 'action',
-      query: `${action.kind} for ${action.company}`,
-      answer: JSON.stringify(action.payload),
+      query: action.title,
+      answer: action.body,
       verdict: 'approved',
       scopes: [],
     });
@@ -164,8 +139,8 @@ export class ActionService {
     await this.log(rejected, 'rejected', reason ?? 'human rejected');
     await getFeedbackStore().record({
       kind: 'action',
-      query: `${action.kind} for ${action.company}`,
-      answer: JSON.stringify(action.payload),
+      query: action.title,
+      answer: action.body,
       verdict: 'rejected',
       scopes: [],
     });
@@ -178,15 +153,4 @@ export class ActionService {
   auditLog(): ReturnType<ActionStore['audit']> {
     return this.store.audit();
   }
-}
-
-/** Split a drafted email into subject + body, tolerating a missing Subject line. */
-export function splitEmail(text: string, company: string): { subject: string; body: string } {
-  const match = text.match(/^\s*subject:\s*(.+)$/im);
-  if (match && match[1]) {
-    const subject = match[1].trim();
-    const body = text.replace(match[0], '').trim();
-    return { subject, body };
-  }
-  return { subject: `Follow-up: ${company}`, body: text.trim() };
 }

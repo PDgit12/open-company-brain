@@ -1,23 +1,28 @@
 /**
  * The Brain service — the orchestration layer the API and CLI call.
  *
- * It wires together the four pieces we designed:
- *   data source → recall (memory) + graph → generation
+ * It wires together the universal pieces:
+ *   data-in (ingest) → recall (memory) → generation, with a feedback loop.
  *
- * Two public agents:
- *   • brief(companyName)  — a partner briefing (read-only, the v0 wedge).
- *   • ask(question)       — grounded Q&A over the whole brain.
+ * The brain is domain-agnostic. It boots EMPTY and is fed entirely through
+ * `ingest` — a person pasting in the dashboard, an upload, or a workflow (n8n,
+ * Zapier, cron) POSTing to the ingest webhook. Whatever the data, agents ground
+ * every answer on it and cite their sources, or refuse.
  *
- * Both are access-scoped: a caller only ever sees chunks their scopes allow.
+ * Public agents:
+ *   • ask(question)            — grounded Q&A over the whole brain.
+ *   • draft(query, instruction)— generic grounded generation (the no-code agent
+ *                                seam + the action layer reuse this).
+ *   • health()                 — what needs attention across recent knowledge.
+ *
+ * All are access-scoped: a caller only ever sees chunks their scopes allow.
  */
 
 import { config } from '../config.js';
-import { createDataSource } from '../db/datasource.js';
-import { createMemoryStore, type MemoryStore, type RetrievedChunk } from './memory.js';
+import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCount } from './memory.js';
 import { createGenerator, type Generator } from '../agents/generator.js';
-import { snapshotToDocuments } from './documents.js';
-import { type Path } from '../graph/relationships.js';
-import { createGraphBackend, type GraphBackend } from '../graph/backend.js';
+import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
+import { demoDocuments } from '../seed/seed-data.js';
 import { candidateCasesFromFeedback, type GoldenCase } from '../eval/golden.js';
 import {
   getFeedbackStore,
@@ -27,25 +32,20 @@ import {
 } from '../feedback/feedback.js';
 import {
   buildContextBlock,
-  buildBriefingPrompt,
   buildAskPrompt,
   buildHealthPrompt,
 } from '../agents/prompts.js';
-import type { BrainSnapshot } from '../domain/types.js';
 
 export interface BrainAnswer {
   answer: string;
   /** The records that grounded the answer — for the "show your sources" UI. */
   sources: RetrievedChunk[];
-  introPath?: Path | null;
 }
 
 export class Brain {
   private constructor(
     private readonly memory: MemoryStore,
     private readonly generator: Generator,
-    private readonly snapshot: BrainSnapshot,
-    private readonly graph: GraphBackend,
     private readonly feedback: FeedbackStore,
   ) {}
 
@@ -72,44 +72,19 @@ export class Brain {
     return rewards.size ? rerankByReward(chunks, rewards) : chunks;
   }
 
-  /** Build the brain: load source-of-truth, sync it into recall, build the graph. */
+  /**
+   * Build the brain. It starts EMPTY — there is no domain snapshot to load. On
+   * the ephemeral mock backend we seed a few generic demo notes so the console
+   * isn't blank; persistent backends (Langbase, pgvector) are populated by
+   * ingestion (dashboard / webhook / `npm run setup:*`), so we never re-embed on
+   * boot.
+   */
   static async create(): Promise<Brain> {
-    const dataSource = createDataSource();
-    try {
-      const snapshot = await dataSource.loadSnapshot();
-      const memory = createMemoryStore();
-      // The mock store is in-memory, so it MUST be populated on every boot.
-      // Persistent stores (Langbase, pgvector) are populated once by
-      // `npm run setup:live` / `setup:local` / `sync`, so re-embedding on every
-      // boot would be slow and wasteful — skip it and start instantly.
-      if (config.backend === 'mock') {
-        await memory.upsert(snapshotToDocuments(snapshot));
-      }
-      const graph = createGraphBackend(snapshot);
-      return new Brain(memory, createGenerator(), snapshot, graph, getFeedbackStore());
-    } finally {
-      await dataSource.close();
+    const memory = createMemoryStore();
+    if (config.backend === 'mock') {
+      await memory.upsert(demoDocuments());
     }
-  }
-
-  private findCompanyId(name: string): string | undefined {
-    const lower = name.toLowerCase();
-    return this.snapshot.companies.find(
-      (c) => c.name.toLowerCase() === lower || c.name.toLowerCase().includes(lower),
-    )?.id;
-  }
-
-  async brief(companyName: string, accessScopes: string[]): Promise<BrainAnswer> {
-    const retrieved = await this.memory.retrieve({
-      query: `${companyName} partnership history recent engagements open actions contacts`,
-      accessScopes,
-      topK: 10,
-    });
-    const chunks = await this.rerank(retrieved, accessScopes);
-    const context = buildContextBlock(chunks);
-    const prompt = buildBriefingPrompt(companyName, context);
-    const answer = await this.generator.generate({ prompt, chunks });
-    return { answer, sources: chunks };
+    return new Brain(memory, createGenerator(), getFeedbackStore());
   }
 
   async ask(question: string, accessScopes: string[]): Promise<BrainAnswer> {
@@ -127,8 +102,8 @@ export class Brain {
 
   /**
    * Generic grounded draft: retrieve for `query`, then generate using a custom
-   * `instruction`. Used by the action layer and the health agent so they reuse
-   * the same recall + generation (and the same trust contract) as brief/ask.
+   * `instruction`. The no-code custom agents, the fan-out reaction agents, and
+   * the action layer all reuse this — same recall + generation + trust contract.
    */
   async draft(
     query: string,
@@ -144,10 +119,10 @@ export class Brain {
     return { text, sources: chunks };
   }
 
-  /** Relationship-health agent: what needs attention across the brain. */
+  /** Attention agent: what needs follow-up across the brain's recent knowledge. */
   async health(accessScopes: string[]): Promise<BrainAnswer> {
     const retrieved = await this.memory.retrieve({
-      query: 'open actions follow up stale renewal overdue next steps engagements',
+      query: 'open action items follow ups deadlines risks unresolved questions next steps pending tasks attention overdue',
       accessScopes,
       topK: 12,
     });
@@ -157,22 +132,29 @@ export class Brain {
     return { answer, sources: chunks };
   }
 
-  /** Resolve a company name to its id (public for the action layer). */
-  resolveCompanyId(name: string): string | null {
-    return this.findCompanyId(name) ?? null;
+  /**
+   * Ingest text/CSV/JSON into the recall layer so agents can ground answers on
+   * it immediately. The write scope is forced to one the caller actually holds —
+   * ingestion can never create data in a scope you can't read. This is the
+   * universal data-in path the dashboard, uploads, and the workflow webhook share.
+   */
+  async ingest(
+    input: { format: IngestFormat; content: string; source?: string; scope?: string },
+    callerScopes: string[],
+  ): Promise<{ ingested: number; source: string; scope: string }> {
+    const access =
+      input.scope && callerScopes.includes(input.scope)
+        ? input.scope
+        : (callerScopes[0] ?? config.demoUserAccessScope);
+    const source = normalizeSource(input.source ?? 'notes');
+    const docs = buildDocuments({ format: input.format, content: input.content, source, access });
+    const ingested = docs.length ? await this.memory.upsert(docs) : 0;
+    return { ingested, source, scope: access };
   }
 
-  /** Graph query exposed directly: warm-intro path between two companies. */
-  async introPath(fromCompany: string, toCompany: string): Promise<Path | null> {
-    const from = this.findCompanyId(fromCompany);
-    const to = this.findCompanyId(toCompany);
-    if (!from || !to) return null;
-    return this.graph.introPath(from, to);
-  }
-
-  /** Names the brain knows about — handy for demo UIs and autocomplete. */
-  companyNames(): string[] {
-    return this.snapshot.companies.map((c) => c.name);
+  /** Real per-source document counts the caller can see — for honest viz. */
+  async knowledgeStats(scopes: string[]): Promise<SourceCount[]> {
+    return this.memory.stats(scopes);
   }
 
   /**

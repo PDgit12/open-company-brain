@@ -26,14 +26,11 @@ export interface Generator {
 }
 
 export class MockGenerator implements Generator {
-  async generate({ prompt, chunks }: GenerateInput): Promise<string> {
+  async generate({ chunks }: GenerateInput): Promise<string> {
     // Trust contract: no grounding → refuse, exactly like the real prompt demands.
     if (chunks.length === 0) return NO_CONTEXT_REPLY;
 
-    const isBriefing = prompt.startsWith('Prepare a briefing');
-    const header = isBriefing
-      ? '## Briefing (generated from the brain)\n'
-      : '## Answer (grounded in the brain)\n';
+    const header = '## Answer (grounded in the brain)\n';
 
     const facts = chunks
       .map((c, i) => `- ${c.text.split('\n').join(' · ')}  _[${c.source} · #${i + 1}]_`)

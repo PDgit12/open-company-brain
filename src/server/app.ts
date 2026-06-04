@@ -1,14 +1,15 @@
 /**
  * HTTP API — the surface your webapp calls.
  *
- * Read endpoints (v0):
+ * Read endpoints:
  *   GET  /health                  status + active mode
- *   GET  /api/companies           known entity names
- *   POST /api/brief               { company }            → grounded briefing + sources
  *   POST /api/ask                 { question }           → grounded answer + sources
  *   POST /api/ask/stream          { question }           → SSE token stream
- *   POST /api/intro-path          { from, to }           → relationship path
- *   GET  /api/health-check        relationship-health agent (what needs attention)
+ *   GET  /api/health-check        attention agent (what needs follow-up)
+ *   GET  /api/stats               real per-source document counts (scope-filtered)
+ *
+ * Data in (dashboard "Connect data" + the workflow webhook):
+ *   POST /api/ingest              { format, content, source?, scope? } → embeds into recall
  *
  * Learning loop:
  *   POST /api/feedback            { query, answer, verdict, sources? } → records a verdict
@@ -20,8 +21,7 @@
  *   POST /api/agents              { name, instruction, query? } → save a reusable agent
  *
  * Write endpoints (action layer — human-approved):
- *   POST /api/actions/draft-email      { company, goal }            → proposed action
- *   POST /api/actions/log-engagement   { company, summary, ... }    → proposed action
+ *   POST /api/actions/propose          { title, instruction, query } → proposed action
  *   POST /api/actions/:id/approve      → executes (idempotent)
  *   POST /api/actions/:id/reject       { reason? }
  *   GET  /api/actions                  list proposed/executed actions
@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { z } from 'zod';
 import { Brain } from '../brain/brain.js';
+import { IngestBodySchema } from '../brain/ingest.js';
 import { ActionService } from '../actions/service.js';
 import { getCustomAgentStore } from '../agents/registry.js';
 import { config, describeMode } from '../config.js';
@@ -44,16 +45,12 @@ import { logger } from '../observability/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 
-const BriefBody = z.object({ company: z.string().trim().min(1) });
 const AskBody = z.object({ question: z.string().trim().min(1) });
-const PathBody = z.object({ from: z.string().trim().min(1), to: z.string().trim().min(1) });
-const EmailBody = z.object({ company: z.string().trim().min(1), goal: z.string().trim().min(1) });
-const EngagementBody = z.object({
-  company: z.string().trim().min(1),
-  summary: z.string().trim().min(1),
-  kind: z.string().trim().optional(),
-  date: z.string().trim().optional(),
-  openActions: z.string().trim().optional(),
+const ActionProposeBody = z.object({
+  title: z.string().trim().min(1),
+  instruction: z.string().trim().min(1),
+  query: z.string().trim().min(1),
+  idempotencyKey: z.string().trim().optional(),
 });
 const FeedbackBody = z.object({
   query: z.string().trim().min(1),
@@ -118,14 +115,6 @@ export async function createApp(): Promise<express.Express> {
 
   app.get('/health', (_req, res) => res.json({ status: 'ok', mode: describeMode() }));
 
-  app.get('/api/companies', (_req, res) => res.json({ companies: brain.companyNames() }));
-
-  app.post('/api/brief', asyncRoute(async (req, res) => {
-    const parsed = BriefBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'company is required' });
-    return res.json(await brain.brief(parsed.data.company, callerScopes(req)));
-  }));
-
   app.post('/api/ask', asyncRoute(async (req, res) => {
     const parsed = AskBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'question is required' });
@@ -151,15 +140,31 @@ export async function createApp(): Promise<express.Express> {
     return res.end();
   }));
 
-  app.post('/api/intro-path', asyncRoute(async (req, res) => {
-    const parsed = PathBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'from and to are required' });
-    const introPath = await brain.introPath(parsed.data.from, parsed.data.to);
-    return res.json({ path: introPath });
-  }));
-
   app.get('/api/health-check', asyncRoute(async (req, res) => {
     return res.json(await brain.health(callerScopes(req)));
+  }));
+
+  // Real per-source counts the caller can see — the dashboard renders these
+  // directly so the knowledge viz reflects the brain, never a fabricated number.
+  app.get('/api/stats', asyncRoute(async (req, res) => {
+    const sources = await brain.knowledgeStats(callerScopes(req));
+    const total = sources.reduce((n, s) => n + s.count, 0);
+    return res.json({ sources, total });
+  }));
+
+  // Data in: paste/upload/push text · CSV · JSON → embedded into recall, scoped
+  // to a scope the caller holds. Agents (ask/draft) ground on it instantly.
+  app.post('/api/ingest', asyncRoute(async (req, res) => {
+    const parsed = IngestBodySchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'format and content are required' });
+    try {
+      const result = await brain.ingest(parsed.data, callerScopes(req));
+      return res.json({ ok: true, ...result });
+    } catch (err) {
+      // A malformed CSV/JSON paste or an over-size payload is a 400, not a 500 —
+      // the brain itself is fine; the input could not be parsed/accepted.
+      return res.status(400).json({ ok: false, error: err instanceof Error ? err.message : 'Could not ingest.' });
+    }
   }));
 
   // Feedback: a thumbs up/down on an answer. Fuels the few-shot + reranker loops.
@@ -201,18 +206,12 @@ export async function createApp(): Promise<express.Express> {
 
   // ── Action layer ──────────────────────────────────────────────────────────
 
-  app.post('/api/actions/draft-email', asyncRoute(async (req, res) => {
-    const parsed = EmailBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'company and goal are required' });
-    const result = await actions.proposeEmail(parsed.data.company, parsed.data.goal, callerScopes(req));
-    return res.status(result.ok ? 200 : 422).json(result);
-  }));
-
-  app.post('/api/actions/log-engagement', asyncRoute(async (req, res) => {
-    const parsed = EngagementBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'company and summary are required' });
-    const { company, ...input } = parsed.data;
-    const result = await actions.proposeEngagement(company, input, callerScopes(req));
+  // Propose a grounded action (a drafted message/summary/payload). Nothing is
+  // delivered until a human approves; if the brain can't ground it, it refuses.
+  app.post('/api/actions/propose', asyncRoute(async (req, res) => {
+    const parsed = ActionProposeBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'title, instruction and query are required' });
+    const result = await actions.propose(parsed.data, callerScopes(req));
     return res.status(result.ok ? 200 : 422).json(result);
   }));
 

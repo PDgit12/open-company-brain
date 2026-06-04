@@ -19,8 +19,7 @@ export interface CaseResult {
 }
 
 export async function evaluateCase(brain: Brain, c: GoldenCase): Promise<CaseResult> {
-  const res: BrainAnswer =
-    c.kind === 'brief' ? await brain.brief(c.input, c.scopes) : await brain.ask(c.input, c.scopes);
+  const res: BrainAnswer = await brain.ask(c.input, c.scopes);
   const failures: string[] = [];
 
   for (const { check, value } of c.checks) {

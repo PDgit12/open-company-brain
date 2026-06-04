@@ -13,7 +13,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { config, describeMode } from '../config.js';
-import { runSync } from './sync.js';
+import { createMemoryStore } from './memory.js';
+import { demoDocuments } from '../seed/seed-data.js';
 
 async function ollamaTags(): Promise<string[]> {
   const res = await fetch(`${config.ollama.baseUrl}/api/tags`);
@@ -53,11 +54,12 @@ export async function setupLocal(): Promise<void> {
     else pull(model);
   }
 
-  // 2 + 3. Embed the source of truth into pgvector (the store provisions the
-  //        extension + table on first write; throws clearly if PG is down).
+  // 2 + 3. Embed the generic demo notes into pgvector (the store provisions the
+  //        extension + table on first write; throws clearly if PG is down). In
+  //        real use you replace these by ingesting your own data.
   try {
-    const { documents } = await runSync({ full: true });
-    console.log(`✓ Synced ${documents} document(s) into pgvector (local embeddings).`);
+    const seeded = await createMemoryStore().upsert(demoDocuments());
+    console.log(`✓ Seeded ${seeded} demo document(s) into pgvector (local embeddings).`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/ECONNREFUSED|connect|password|database .* does not exist/i.test(msg)) {

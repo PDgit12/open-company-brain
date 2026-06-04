@@ -1,39 +1,24 @@
 /**
  * The action layer — types.
  *
- * v0 was read-only. The action layer lets agents *propose* actions that a human
- * *approves* before anything happens. Three safety properties are baked in:
+ * The brain is read-first, but agents can *propose* an action that a human
+ * *approves* before anything leaves the system. Three safety properties are
+ * baked in:
  *   • human-in-the-loop  — nothing executes without an explicit approve()
  *   • idempotency        — approving the same action twice executes it once
  *   • audit log          — every proposal/decision/execution is recorded
  *
- * An action is only ever *drafted* from grounded context (the trust contract still
- * holds): if the brain has nothing to ground a draft on, no action is proposed.
+ * An action is universal: it is just a grounded `title` + `body` (e.g. a drafted
+ * message, a summary to post, a webhook payload) with the records that grounded
+ * it. It is only ever *drafted* from grounded context — if the brain has nothing
+ * to ground it on, no action is proposed (the trust contract still holds).
  */
-
-export type ActionKind = 'draft_email' | 'log_engagement';
 
 export type ActionStatus =
   | 'proposed' // drafted, awaiting human decision
   | 'executed' // approved and carried out
   | 'rejected' // a human declined it
   | 'failed'; // execution threw
-
-export interface EmailPayload {
-  to: string | null;
-  subject: string;
-  body: string;
-}
-
-export interface EngagementPayload {
-  companyId: string;
-  kind: string;
-  date: string; // ISO yyyy-mm-dd
-  summary: string;
-  openActions: string | null;
-}
-
-export type ActionPayload = EmailPayload | EngagementPayload;
 
 export interface ActionSourceRef {
   text: string;
@@ -42,10 +27,10 @@ export interface ActionSourceRef {
 
 export interface ProposedAction {
   id: string;
-  kind: ActionKind;
-  company: string;
-  companyId: string | null;
-  payload: ActionPayload;
+  /** Short human label, e.g. "Follow-up email" or "Post incident summary". */
+  title: string;
+  /** The grounded draft a human reviews before approving. */
+  body: string;
   /** The grounded records the draft was based on (for the "show your work" UI). */
   sources: ActionSourceRef[];
   status: ActionStatus;

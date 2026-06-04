@@ -22,7 +22,7 @@ export interface DeliverySink {
 
 export class OutboxSink implements DeliverySink {
   async deliver(action: ProposedAction): Promise<string> {
-    return `Recorded to outbox (no delivery configured): ${action.kind} for ${action.company}`;
+    return `Recorded to outbox (no delivery configured): ${action.title}`;
   }
 }
 
@@ -30,12 +30,12 @@ export class FileSink implements DeliverySink {
   constructor(private readonly dir: string) {}
   async deliver(action: ProposedAction): Promise<string> {
     await mkdir(this.dir, { recursive: true });
-    const file = path.join(this.dir, `${action.kind}.jsonl`);
+    const file = path.join(this.dir, 'actions.jsonl');
     const record = {
       at: new Date().toISOString(),
       id: action.id,
-      company: action.company,
-      payload: action.payload,
+      title: action.title,
+      body: action.body,
     };
     await appendFile(file, JSON.stringify(record) + '\n', 'utf8');
     return `Delivered: appended to ${file}`;
@@ -48,7 +48,12 @@ export class WebhookSink implements DeliverySink {
     const res = await fetch(this.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: action.kind, company: action.company, payload: action.payload }),
+      body: JSON.stringify({
+        id: action.id,
+        title: action.title,
+        body: action.body,
+        sources: action.sources,
+      }),
     });
     if (!res.ok) throw new Error(`Webhook returned ${res.status}`);
     return `Delivered: POST ${this.url} → ${res.status}`;
