@@ -3,6 +3,23 @@
   "version": "0.3.0",
   "description": "An open-source, governed AI brain framework: pipe ANY data in (paste, upload, or a workflow webhook like n8n), it becomes scoped, embedded, cited, retrievable knowledge — then ask grounded questions, build no-code agents, and fan agents out automatically over new data, all cite-or-refuse with a human-approved action layer. Embeddable as a library or run as a server. Three backends — mock (no creds), managed (Langbase), and fully local (Ollama + pgvector, $0/query).",
   "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "public",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "company-brain": "bin/cli.mjs"
   },
