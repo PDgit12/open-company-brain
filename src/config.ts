@@ -43,6 +43,14 @@ const EnvSchema = z.object({
   VECTOR_DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DEMO_USER_ACCESS_SCOPE: z.string().trim().default('default-team'),
+  // Ingest webhook auth. When INGEST_API_KEY is set, POST /api/ingest and the
+  // fan-out config routes require it (Authorization: Bearer <key> or x-api-key),
+  // and the authenticated caller is granted INGEST_SCOPES. When UNSET, the write
+  // path is open — fine for local/mock dev, but set a key for any shared brain.
+  INGEST_API_KEY: z.string().trim().optional().or(z.literal('').transform(() => undefined)),
+  INGEST_SCOPES: z.string().trim().default(''),
+  // Fixed-window-per-minute rate limit for the authenticated write path.
+  INGEST_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(120),
   // Action delivery: outbox | file | webhook. `outbox` = record only (default,
   // safe). `file` writes approved actions to a real file. `webhook` POSTs them.
   ACTION_DELIVERY: z.enum(['outbox', 'file', 'webhook']).default('outbox'),
@@ -95,6 +103,12 @@ export const config = {
   /** Generation layer mode (for the banner). */
   pipeMode: backend === 'langbase' ? ('live' as const) : backend === 'local' ? ('local' as const) : ('mock' as const),
 
+  ingest: {
+    apiKey: env.INGEST_API_KEY,
+    /** Scopes granted to an API-key-authenticated (e.g. workflow) caller. */
+    scopes: env.INGEST_SCOPES.split(',').map((s) => s.trim()).filter(Boolean),
+    rateLimitPerMin: env.INGEST_RATE_LIMIT_PER_MIN,
+  },
   delivery: {
     kind: env.ACTION_DELIVERY,
     outboxPath: env.ACTION_OUTBOX_PATH,

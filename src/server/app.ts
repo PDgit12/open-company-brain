@@ -34,6 +34,10 @@
  *
  * ACCESS SCOPES: callers send `x-access-scopes: scopeA,scopeB`. The brain only
  * ever returns chunks within those scopes. The demo falls back to one scope.
+ *
+ * WRITE AUTH: when INGEST_API_KEY is set, POST /api/ingest and POST
+ * /api/fanout/agents require it (Authorization: Bearer … or x-api-key) and the
+ * caller is granted INGEST_SCOPES (the workflow path). Unset = open (dev/mock).
  */
 
 import express, { type Request, type Response, type NextFunction } from 'express';
@@ -46,6 +50,7 @@ import { ActionService } from '../actions/service.js';
 import { getCustomAgentStore } from '../agents/registry.js';
 import { getReactionAgentStore } from '../fanout/registry.js';
 import { getFanoutResultStore } from '../fanout/engine.js';
+import { ingestAuth, type AuthedRequest } from './auth.js';
 import { config, describeMode } from '../config.js';
 import { logger } from '../observability/logger.js';
 
@@ -98,6 +103,10 @@ export function asyncRoute(
 
 /** Parse caller access scopes from the request (governance). */
 function callerScopes(req: Request): string[] {
+  // An API-key-authenticated (machine/workflow) caller is granted INGEST_SCOPES
+  // by the ingestAuth middleware; those win over a client-supplied header.
+  const injected = (req as AuthedRequest).ingestScopes;
+  if (injected && injected.length) return injected;
   const header = req.header('x-access-scopes');
   if (header) {
     const scopes = header.split(',').map((s) => s.trim()).filter(Boolean);
@@ -169,7 +178,7 @@ export async function createApp(): Promise<express.Express> {
 
   // Data in: paste/upload/push text · CSV · JSON → embedded into recall, scoped
   // to a scope the caller holds. Agents (ask/draft) ground on it instantly.
-  app.post('/api/ingest', asyncRoute(async (req, res) => {
+  app.post('/api/ingest', ingestAuth, asyncRoute(async (req, res) => {
     const parsed = IngestBodySchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'format and content are required' });
     try {
@@ -227,7 +236,7 @@ export async function createApp(): Promise<express.Express> {
     return res.json({ agents: await reactions.list() });
   }));
 
-  app.post('/api/fanout/agents', asyncRoute(async (req, res) => {
+  app.post('/api/fanout/agents', ingestAuth, asyncRoute(async (req, res) => {
     const parsed = ReactionSaveBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'name and instruction are required' });
     return res.status(201).json({ agent: await reactions.save(parsed.data) });

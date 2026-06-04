@@ -9,3 +9,7 @@ process.env.LANGBASE_API_KEY = '';
 process.env.DATABASE_URL = '';
 process.env.VECTOR_DATABASE_URL = '';
 process.env.LLM_BACKEND = 'mock';
+// Leave the write path open by default so the keyless ingest tests stay 200.
+// The auth-enabled path is tested in isolation (ingest-auth.test.ts) with
+// vi.resetModules + a fresh config import.
+process.env.INGEST_API_KEY = '';
