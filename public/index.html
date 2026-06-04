@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Company Brain — Console</title>
+    <title>Open Brain — Console</title>
     <style>
       :root {
         --bg: oklch(87% 0.014 78);
@@ -56,8 +56,7 @@
       .topbar .scope input { all: unset; width: 130px; font-size: 13px; color: var(--ink); }
       .view { display: none; } .view.on { display: block; animation: fade 0.28s ease; }
       @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-      .sub { color: var(--muted); margin: 0 0 22px; max-width: 62ch; }
-      /* ── bento ── */
+      .sub { color: var(--muted); margin: 0 0 22px; max-width: 64ch; }
       .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
       .card { background: var(--white); border-radius: var(--r); box-shadow: var(--shadow); padding: 22px 24px; }
       .card.cream { background: var(--cream); }
@@ -71,9 +70,6 @@
       .lbl { font-size: 12px; color: var(--muted); margin: 0 0 3px; }
       .sub2 { font-size: 12.5px; color: var(--muted); margin: 0; }
       .big { font-size: clamp(2.2rem, 1.4rem + 2.4vw, 3.2rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
-      .progress { height: 16px; border-radius: 999px; background: oklch(88% 0.01 78); overflow: hidden; display: flex; margin-top: 12px; }
-      .card.dark .progress { background: var(--dark-2); }
-      .progress .y { background: var(--butter); } .progress .c { background: var(--coral); }
       .bars { display: flex; align-items: stretch; gap: 14px; height: 110px; margin-top: 14px; }
       .bars .b { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
       .bars .b i { display: block; width: 100%; border-radius: 8px 8px 3px 3px; min-height: 6px; }
@@ -81,7 +77,6 @@
       .timeline { display: flex; gap: 6px; margin: 8px 0 4px; }
       .timeline .seg { flex: 1; height: 4px; border-radius: 2px; background: oklch(86% 0.01 78); }
       .timeline .seg.on { background: var(--coral); }
-      /* ── controls ── */
       .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
       input.fld, select.fld, textarea.fld { font: inherit; color: var(--ink); background: var(--white); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px 14px; width: 100%; transition: 130ms; }
       .fld:focus { outline: none; border-color: var(--coral-deep); box-shadow: 0 0 0 3px oklch(76% 0.11 24 / 0.18); }
@@ -95,7 +90,6 @@
       .btn.ghost:hover { background: var(--cream); }
       .btn.sm { padding: 8px 16px; font-size: 13px; }
       .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-      /* ── answer ── */
       .answer { margin-top: 18px; }
       .answer .body { background: var(--cream); border-radius: var(--r-sm); padding: 18px 20px; white-space: pre-wrap; }
       .answer .body.refusal { color: var(--muted); font-style: italic; }
@@ -120,10 +114,28 @@
       .list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
       .item { background: var(--cream); border-radius: var(--r-sm); padding: 12px 15px; font-size: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
       .item .meta { color: var(--muted); font-size: 12px; }
+      .result { background: var(--cream); border-radius: var(--r-sm); padding: 14px 16px; border-left: 3px solid var(--coral); }
+      .result h4 { margin: 0 0 6px; font-size: 13.5px; }
+      .result .body { white-space: pre-wrap; font-size: 13.5px; }
       pre.code { background: var(--dark); color: var(--on-dark); border-radius: var(--r-sm); padding: 18px 20px; overflow-x: auto; font: 12.5px/1.6 ui-monospace, "SF Mono", Menlo, monospace; margin: 16px 0; }
       pre.code .k { color: oklch(82% 0.12 300); } pre.code .s { color: var(--butter); } pre.code .c { color: var(--on-dark-mut); }
       .note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--coral); padding-left: 14px; margin: 16px 0; }
+      .flow { display: flex; align-items: stretch; gap: 8px; margin: 0 0 22px; flex-wrap: wrap; }
+      .flow .step { flex: 1; min-width: 130px; background: var(--cream); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+      .flow .step .n { width: 22px; height: 22px; border-radius: 999px; background: var(--coral); color: white; font-size: 12px; font-weight: 700; display: grid; place-items: center; margin-bottom: 7px; }
+      .flow .step b { font-size: 14px; }
+      .flow .step span:not(.n) { font-size: 12px; color: var(--muted); }
+      .flow .arrow { display: grid; place-items: center; color: var(--faint); font-size: 18px; }
+      .seg-btn { all: unset; cursor: pointer; padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); border: 1px solid var(--border); transition: 130ms; }
+      .seg-btn:hover { background: var(--cream); }
+      .seg-btn.on { background: var(--dark); color: var(--on-dark); border-color: var(--dark); }
+      @media (max-width: 720px) { .flow .arrow { display: none; } }
+      .act { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; }
+      .act .actbar { display: flex; align-items: center; gap: 12px; }
+      .act .actlbl { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
       code { background: var(--cream); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 0.9em; }
+      .link { color: var(--coral-deep); font-weight: 650; text-decoration: none; border-bottom: 1px solid oklch(76% 0.11 24 / 0.4); }
+      .link:hover { border-bottom-color: var(--coral-deep); }
       h3.sec { font-size: 1rem; margin: 26px 0 0; }
       @media (max-width: 860px) { .app { grid-template-columns: 1fr; } aside { position: static; height: auto; flex-flow: row wrap; } .mode { margin: 0; } nav { display: flex; flex-wrap: wrap; } .bento { grid-template-columns: 1fr 1fr; } .col-6,.col-4,.col-3,.col-2 { grid-column: span 2; } }
     </style>
@@ -131,13 +143,13 @@
   <body>
     <div class="app">
       <aside>
-        <div class="brand"><div class="dot">◆</div><div><b>Company Brain</b><small>agent console</small></div></div>
+        <div class="brand"><div class="dot">◆</div><div><b>Open Brain</b><small>universal agent console</small></div></div>
         <nav id="nav">
           <button data-v="home" class="on"><span class="ic">▦</span> Overview</button>
+          <button data-v="connect"><span class="ic">↥</span> Connect data</button>
           <button data-v="ask"><span class="ic">✦</span> Ask</button>
-          <button data-v="brief"><span class="ic">◳</span> Brief</button>
-          <button data-v="health"><span class="ic">♥</span> Health</button>
-          <button data-v="path"><span class="ic">⤳</span> Intro path</button>
+          <button data-v="fanout"><span class="ic">⚡</span> Fan-out</button>
+          <button data-v="health"><span class="ic">♥</span> Attention</button>
           <button data-v="actions"><span class="ic">✎</span> Actions</button>
           <button data-v="learning"><span class="ic">↻</span> Learning</button>
           <button data-v="build"><span class="ic">⚒</span> Build an agent</button>
@@ -157,19 +169,19 @@
         <section class="view on" id="v-home">
           <div class="bento">
             <div class="card cream col-4">
-              <div class="ctitle"><div class="tile coral">◳</div><div><h3>The brain</h3><p class="sub2">grounded, cited, access-scoped</p></div></div>
-              <p class="lbl">Entities indexed</p>
+              <div class="ctitle"><div class="tile coral">◆</div><div><h3>The brain</h3><p class="sub2">grounded, cited, access-scoped — for any data</p></div></div>
+              <p class="lbl">Knowledge indexed</p>
               <div class="big" id="statEntities">—</div>
               <div class="timeline"><span class="seg on"></span><span class="seg on"></span><span class="seg on"></span><span class="seg"></span></div>
-              <p class="sub2">ingest → recall → graph → grounded agents</p>
+              <p class="sub2">connect → recall → fan out agents → act</p>
             </div>
 
             <div class="card dark col-2">
               <p class="lbl">Active mode</p>
               <div style="font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;margin:6px 0 2px" id="statRecall">—</div>
               <p class="sub2" id="statGen">generation</p>
-              <div class="progress"><i class="y" style="width:60%"></i><i class="c" style="width:25%"></i></div>
-              <p class="sub2" style="margin-top:8px">trust contract: cite-or-refuse</p>
+              <p class="sub2" style="margin-top:14px">trust contract: cite-or-refuse</p>
+              <p class="sub2" id="statCost" style="margin-top:2px;color:var(--good)"></p>
             </div>
 
             <div class="card dark col-3">
@@ -186,10 +198,55 @@
             </div>
 
             <div class="card dark col-4">
-              <h3 style="margin:0 0 6px;font-size:1.3rem;letter-spacing:-0.02em">Ask the brain anything</h3>
-              <p class="sub2" style="max-width:46ch">Every answer cites the records it came from — and refuses when it has no grounding. Try it.</p>
-              <div class="row" style="margin-top:16px"><button class="btn coral" data-go="ask">Open Ask →</button><button class="btn ghost" data-go="actions" style="color:var(--on-dark);border-color:var(--dark-2)">Action layer</button></div>
+              <h3 style="margin:0 0 6px;font-size:1.3rem;letter-spacing:-0.02em">Pipe any data in → fan agents out</h3>
+              <p class="sub2" style="max-width:48ch">Paste it, upload it, or push it from a workflow (n8n). Every answer cites its sources and refuses when it has no grounding.</p>
+              <div class="row" style="margin-top:16px"><button class="btn coral" data-go="connect">Connect data →</button><button class="btn ghost" data-go="fanout" style="color:var(--on-dark);border-color:var(--dark-2)">Fan-out agents</button></div>
             </div>
+          </div>
+        </section>
+
+        <!-- CONNECT DATA -->
+        <section class="view" id="v-connect">
+          <p class="sub">This is how you feed the brain. Paste or upload what you have — notes, a CSV export, a JSON dump — or push data in continuously from a workflow. It becomes scoped, cited, retrievable knowledge that agents ground on. No schema, no terminal.</p>
+
+          <div class="flow">
+            <div class="step"><span class="n">1</span><b>Connect data</b><span>Paste · upload · workflow webhook</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><span class="n">2</span><b>Recall</b><span>Embedded + access-scoped</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><span class="n">3</span><b>Fan out</b><span>Agents react to new data</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><span class="n">4</span><b>Act</b><span>It proposes — you approve</span></div>
+          </div>
+
+          <div class="card">
+            <div class="ctitle"><div class="tile coral">↥</div><div><h3>Add to the brain</h3><p class="sub2">goes in under the scope above — only those who hold it can retrieve it</p></div></div>
+            <div class="row" style="gap:8px;margin-bottom:14px" id="fmtRow">
+              <button class="seg-btn on" data-fmt="text">Text / notes</button>
+              <button class="seg-btn" data-fmt="csv">CSV</button>
+              <button class="seg-btn" data-fmt="json">JSON</button>
+            </div>
+            <label class="l" for="inSource">Label <span style="text-transform:none;font-weight:400">(shows on every citation chip — e.g. meeting-notes, jira-export)</span></label>
+            <input class="fld" id="inSource" placeholder="meeting-notes" />
+            <label class="l" for="inContent" style="margin-top:12px">Content <span style="text-transform:none;font-weight:400" id="fmtHint">— paste notes; a blank line separates records</span></label>
+            <textarea class="fld" id="inContent" style="min-height:150px" placeholder="Project Atlas kicked off — migrating billing to the new platform. Open action: finalize the data migration plan by Friday."></textarea>
+            <div class="row" style="margin-top:14px;justify-content:space-between">
+              <label class="btn ghost sm" style="cursor:pointer">Upload a file<input type="file" id="inFile" accept=".txt,.csv,.json,.md" hidden /></label>
+              <button class="btn coral" id="ingestBtn">Add to the brain</button>
+            </div>
+            <div id="ingestOut"></div>
+          </div>
+
+          <div class="card" style="margin-top:22px">
+            <div class="ctitle"><div class="tile dk">⇄</div><div><h3>Connect a workflow (n8n, Zapier, cron)</h3><p class="sub2">push data in continuously — the brain updates in real time</p></div></div>
+            <p class="sub2" style="margin-bottom:10px">Point an HTTP Request node at the ingest webhook. Every record that lands becomes retrievable and triggers your fan-out agents.</p>
+            <pre class="code"><span class="c"># Ingest webhook (set INGEST_API_KEY to require the header)</span>
+<span class="k">POST</span> <span id="whUrl">http://localhost:4000/api/ingest</span>
+<span class="k">Authorization:</span> <span class="s">Bearer &lt;INGEST_API_KEY&gt;</span>
+<span class="k">Content-Type:</span> <span class="s">application/json</span>
+
+{ <span class="k">"format"</span>: <span class="s">"text"</span>, <span class="k">"source"</span>: <span class="s">"n8n"</span>, <span class="k">"content"</span>: <span class="s">"…the data from your workflow…"</span> }</pre>
+            <div class="note">A ready-to-import n8n workflow lives at <code>examples/n8n-workflow.json</code> — see <code>docs/N8N.md</code>.</div>
           </div>
         </section>
 
@@ -198,51 +255,52 @@
           <p class="sub">A grounded, cited answer over everything the brain knows — or an honest refusal when it has no grounding.</p>
           <div class="card">
             <label class="l" for="q">Question</label>
-            <textarea class="fld" id="q" placeholder="e.g. What is our history with Aerodyne and what's still open?"></textarea>
+            <textarea class="fld" id="q" placeholder="e.g. What's the status of Project Atlas and what's still open?"></textarea>
             <div class="row" style="margin-top:12px"><button class="btn coral" id="askBtn">Ask</button></div>
             <div id="askOut"></div>
           </div>
         </section>
 
-        <!-- BRIEF -->
-        <section class="view" id="v-brief">
-          <p class="sub">A conversation-ready snapshot of one entity: status, recent activity, open items, grounded talking points.</p>
+        <!-- FAN-OUT -->
+        <section class="view" id="v-fanout">
+          <p class="sub">Reaction agents run <strong>automatically</strong> over every new piece of data the moment it's ingested — summarize it, extract action items, flag risks. This is what makes the brain active: connect a workflow, and each record fans out to the agents you define here. Cited, scope-gated, and off by default.</p>
           <div class="card">
-            <label class="l" for="co">Entity</label>
-            <select class="fld" id="co"></select>
-            <div class="row" style="margin-top:12px"><button class="btn coral" id="briefBtn">Brief me</button></div>
-            <div id="briefOut"></div>
+            <div class="ctitle"><div class="tile coral">⚡</div><div><h3>New reaction agent</h3><p class="sub2">an instruction applied to each new item</p></div></div>
+            <label class="l" for="raName">Name</label>
+            <input class="fld" id="raName" placeholder="e.g. Action-item extractor" />
+            <label class="l" for="raInstr" style="margin-top:12px">Instruction</label>
+            <textarea class="fld" id="raInstr" placeholder="e.g. Extract any action items, owners, and deadlines from this. Cite the source."></textarea>
+            <label class="l" for="raScope" style="margin-top:12px">Scope <span style="text-transform:none;font-weight:400">(optional — only react to data in this scope; blank = react to all)</span></label>
+            <input class="fld" id="raScope" placeholder="leave blank to react to every ingest" />
+            <div class="row" style="margin-top:14px"><button class="btn coral" id="raSave">Add reaction agent</button></div>
+            <div id="raOut"></div>
           </div>
+
+          <h3 class="sec">Reaction agents</h3>
+          <div class="list" id="raList"><div class="empty">None yet — add one above, then ingest something to watch it fire.</div></div>
+
+          <h3 class="sec">Recent fan-out results</h3>
+          <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost sm" id="raReloadResults">Reload</button></div>
+          <div class="list" id="raResults"><div class="empty">No results yet.</div></div>
         </section>
 
-        <!-- HEALTH -->
+        <!-- ATTENTION / HEALTH -->
         <section class="view" id="v-health">
-          <p class="sub">A standing agent that scans for what needs attention — stale relationships, overdue follow-ups, open actions.</p>
+          <p class="sub">A standing agent that scans the brain for what needs attention — open action items, unanswered questions, upcoming deadlines, risks.</p>
           <div class="card"><button class="btn coral" id="healthBtn">Scan the brain</button><div id="healthOut"></div></div>
-        </section>
-
-        <!-- PATH -->
-        <section class="view" id="v-path">
-          <p class="sub">Shortest path between two entities over the foreign-key knowledge graph — your warm-intro route.</p>
-          <div class="card">
-            <div class="bento" style="grid-template-columns:1fr 1fr;gap:14px">
-              <div class="col-3" style="grid-column:auto"><label class="l">From</label><input class="fld" id="pFrom" placeholder="Aerodyne Systems" /></div>
-              <div class="col-3" style="grid-column:auto"><label class="l">To</label><input class="fld" id="pTo" placeholder="Veridian Energy" /></div>
-            </div>
-            <div class="row" style="margin-top:12px"><button class="btn coral" id="pathBtn">Trace path</button></div>
-            <div id="pathOut"></div>
-          </div>
         </section>
 
         <!-- ACTIONS -->
         <section class="view" id="v-actions">
-          <p class="sub">Agents <em>propose</em>; a human approves. Every action is grounded, idempotent, and audited — nothing is sent without a click.</p>
+          <p class="sub">Agents <em>propose</em>; a human approves. Every action is a grounded draft, idempotent, and audited — nothing is sent without a click.</p>
           <div class="card">
-            <label class="l" for="aco">Company</label>
-            <input class="fld" id="aco" placeholder="Aerodyne Systems" />
-            <label class="l" for="agoal" style="margin-top:12px">Goal for the draft email</label>
-            <input class="fld" id="agoal" placeholder="schedule a renewal call" />
-            <div class="row" style="margin-top:12px"><button class="btn coral" id="draftBtn">Draft email (propose)</button></div>
+            <label class="l" for="aTitle">Title</label>
+            <input class="fld" id="aTitle" placeholder="e.g. Follow-up email about the migration" />
+            <label class="l" for="aInstr" style="margin-top:12px">Instruction (what to draft)</label>
+            <textarea class="fld" id="aInstr" placeholder="e.g. Draft a short, professional update on Project Atlas. Use only grounded facts."></textarea>
+            <label class="l" for="aQuery" style="margin-top:12px">What to ground on (retrieval query)</label>
+            <input class="fld" id="aQuery" placeholder="e.g. Project Atlas migration status open actions" />
+            <div class="row" style="margin-top:12px"><button class="btn coral" id="proposeBtn">Propose (draft)</button></div>
             <div id="draftOut"></div>
           </div>
           <h3 class="sec">Audit log</h3>
@@ -260,15 +318,15 @@
 
         <!-- BUILD -->
         <section class="view" id="v-build">
-          <p class="sub">Give it a prompt — get a working agent. It retrieves from the brain, follows your instruction, and inherits citations + cite-or-refuse automatically. No code.</p>
+          <p class="sub">Give it a prompt — get a working agent. It retrieves whatever you've <a href="#" class="link" data-go="connect">connected</a>, follows your instruction, inherits citations + cite-or-refuse, and can propose an approval-gated action. No code.</p>
           <div class="card">
             <div class="ctitle"><div class="tile coral">✦</div><div><h3>New agent</h3><p class="sub2">an instruction + what it should look up</p></div></div>
             <label class="l" for="agName">Name</label>
             <input class="fld" id="agName" placeholder="e.g. Risk scanner" />
             <label class="l" for="agInstr" style="margin-top:12px">Instruction (the prompt it follows)</label>
-            <textarea class="fld" id="agInstr" placeholder="e.g. Flag relationship risks and overdue follow-ups. Be specific and cite each fact."></textarea>
+            <textarea class="fld" id="agInstr" placeholder="e.g. Flag risks and overdue follow-ups. Be specific and cite each fact."></textarea>
             <label class="l" for="agQuery" style="margin-top:12px">What it retrieves <span style="text-transform:none;font-weight:400">(a question/topic; leave blank to ask at run time)</span></label>
-            <input class="fld" id="agQuery" placeholder="e.g. open actions overdue renewals risks" />
+            <input class="fld" id="agQuery" placeholder="e.g. open actions overdue deadlines risks" />
             <div class="row" style="margin-top:14px"><button class="btn coral" id="agRun">Run now</button><button class="btn ghost" id="agSave">Save agent</button></div>
             <div id="agOut"></div>
           </div>
@@ -277,9 +335,9 @@
           <div class="list" id="agList"><div class="empty">No saved agents yet — name one and hit <strong>Save agent</strong>.</div></div>
 
           <div class="card" style="margin-top:22px">
-            <div class="ctitle"><div class="tile dk">⌥</div><div><h3>Prefer code? Two patterns</h3><p class="sub2">the same seams, in the repo</p></div></div>
-            <p class="sub2"><strong>Read agent</strong> = a prompt fn in <code>src/agents/prompts.ts</code> + a Brain method reusing <code>draft()</code>. <strong>Write agent</strong> = an action recipe (<code>propose</code> + <code>execute</code>) — copy <code>examples/custom-action.example.ts</code>; it inherits grounding · approval · idempotency · audit.</p>
-            <div class="note">Everything here runs over the same HTTP API — a front end, Slack bot, or cron job calls it identically. The governance lives in the core, not the caller.</div>
+            <div class="ctitle"><div class="tile dk">⌥</div><div><h3>Prefer code? Embed it</h3><p class="sub2">the same seams, as a library</p></div></div>
+            <p class="sub2"><code>import { Brain } from 'open-company-brain'</code> — call <code>brain.ingest()</code> / <code>brain.ask()</code> / <code>brain.draft()</code> directly, or <code>createApp()</code> to mount the whole API. A read agent is an instruction + a retrieval query through <code>draft()</code>; a reaction agent is the same, run automatically on ingest.</p>
+            <div class="note">Everything here runs over the same HTTP API — a front end, a Slack bot, an n8n workflow, or a cron job calls it identically. The governance lives in the core, not the caller.</div>
           </div>
         </section>
       </main>
@@ -294,18 +352,20 @@
       };
       const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
       const REFUSAL = "I don't have that in the brain yet.";
-      const TITLES = { home: 'Overview', ask: 'Ask the brain', brief: 'Prepare a briefing', health: 'Relationship health', path: 'Find a connection', actions: 'Action layer', learning: 'Learning loop', build: 'Build your own agent' };
+      const TITLES = { home: 'Overview', connect: 'Connect data', ask: 'Ask the brain', fanout: 'Fan-out agents', health: 'Needs attention', actions: 'Action layer', learning: 'Learning loop', build: 'Build your own agent' };
 
       function go(v) {
         document.querySelectorAll('#nav button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
         document.querySelectorAll('.view').forEach((s) => s.classList.toggle('on', s.id === 'v-' + v));
         $('#title').textContent = TITLES[v] || v;
+        if (v === 'home') loadStats();
         if (v === 'learning') loadEval();
         if (v === 'actions') loadAudit();
         if (v === 'build') loadAgents();
+        if (v === 'fanout') { loadReactions(); loadResults(); }
       }
       document.querySelectorAll('#nav button').forEach((b) => (b.onclick = () => go(b.dataset.v)));
-      document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => go(b.dataset.go)));
+      document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); go(b.dataset.go); }));
 
       function renderAnswer(el, query, r) {
         const refused = !r.sources?.length || (r.answer || '').includes(REFUSAL);
@@ -324,37 +384,54 @@
       const busy = (el) => (el.innerHTML = '<div class="answer"><span class="spin"></span> <span style="color:var(--muted)">the brain is thinking…</span></div>');
 
       $('#askBtn').onclick = async () => { const q = $('#q').value.trim(); if (!q) return; busy($('#askOut')); const { body } = await api('/api/ask', { method: 'POST', body: JSON.stringify({ question: q }) }); renderAnswer($('#askOut'), q, body); };
-      $('#briefBtn').onclick = async () => { const co = $('#co').value; if (!co) return; busy($('#briefOut')); const { body } = await api('/api/brief', { method: 'POST', body: JSON.stringify({ company: co }) }); renderAnswer($('#briefOut'), 'briefing: ' + co, body); };
-      $('#healthBtn').onclick = async () => { busy($('#healthOut')); const { body } = await api('/api/health-check'); renderAnswer($('#healthOut'), 'relationship health scan', body); };
-      $('#pathBtn').onclick = async () => {
-        const from = $('#pFrom').value.trim(), to = $('#pTo').value.trim(); if (!from || !to) return;
-        busy($('#pathOut')); const { body } = await api('/api/intro-path', { method: 'POST', body: JSON.stringify({ from, to }) });
-        $('#pathOut').innerHTML = `<div class="answer"><div class="body ${body.path ? '' : 'refusal'}">${body.path ? esc(body.path.description) : 'No path found between those two.'}</div></div>`;
-      };
+      $('#healthBtn').onclick = async () => { busy($('#healthOut')); const { body } = await api('/api/health-check'); renderAnswer($('#healthOut'), 'attention scan', body); };
 
-      $('#draftBtn').onclick = async () => {
-        const company = $('#aco').value.trim(), goal = $('#agoal').value.trim(); if (!company || !goal) return;
-        busy($('#draftOut')); const { body } = await api('/api/actions/draft-email', { method: 'POST', body: JSON.stringify({ company, goal }) });
+      // ── Actions (universal propose → approve) ──
+      $('#proposeBtn').onclick = async () => {
+        const title = $('#aTitle').value.trim(), instruction = $('#aInstr').value.trim(), query = $('#aQuery').value.trim();
+        if (!title || !instruction || !query) { $('#draftOut').innerHTML = '<div class="empty">Title, instruction and a retrieval query are required.</div>'; return; }
+        busy($('#draftOut')); const { body } = await api('/api/actions/propose', { method: 'POST', body: JSON.stringify({ title, instruction, query }) });
         if (!body.ok) { $('#draftOut').innerHTML = `<div class="answer"><div class="body refusal">${esc(body.reason || 'Could not draft.')}</div></div>`; return; }
-        renderProposal(body.action);
+        renderProposal(body.action, $('#draftOut'));
       };
-      function renderProposal(a) {
-        $('#draftOut').innerHTML = `<div class="proposal"><h4>Proposed: ${esc(a.kind)} → ${esc(a.company)} <span class="pill proposed">${esc(a.status)}</span></h4>
-          <pre>${esc(JSON.stringify(a.payload, null, 2))}</pre>
-          <div class="row"><button class="btn coral sm" id="appr">Approve & execute</button><button class="btn ghost sm" id="rej">Reject</button></div></div>`;
-        $('#appr').onclick = async () => { await api('/api/actions/' + a.id + '/approve', { method: 'POST', body: '{}' }); $('#draftOut').innerHTML = `<div class="answer"><div class="body"><span class="pill executed">executed</span> — recorded to the outbox & audit log.</div></div>`; loadAudit(); };
-        $('#rej').onclick = async () => { await api('/api/actions/' + a.id + '/reject', { method: 'POST', body: JSON.stringify({ reason: 'declined in console' }) }); $('#draftOut').innerHTML = `<div class="answer"><div class="body refusal"><span class="pill rejected">rejected</span> — nothing was sent.</div></div>`; loadAudit(); };
+      function renderProposal(a, out) {
+        out.innerHTML = `<div class="proposal"><h4>Proposed: ${esc(a.title)} <span class="pill proposed">${esc(a.status)}</span></h4>
+          <pre>${esc(a.body)}</pre>
+          <div class="row"><button class="btn coral sm appr">Approve & execute</button><button class="btn ghost sm rej">Reject</button></div></div>`;
+        out.querySelector('.appr').onclick = async () => { await api('/api/actions/' + a.id + '/approve', { method: 'POST', body: '{}' }); out.innerHTML = `<div class="answer"><div class="body"><span class="pill executed">executed</span> — recorded to the outbox & audit log.</div></div>`; loadAudit(); };
+        out.querySelector('.rej').onclick = async () => { await api('/api/actions/' + a.id + '/reject', { method: 'POST', body: JSON.stringify({ reason: 'declined in console' }) }); out.innerHTML = `<div class="answer"><div class="body refusal"><span class="pill rejected">rejected</span> — nothing was sent.</div></div>`; loadAudit(); };
       }
       async function loadAudit() {
         const { body } = await api('/api/actions/audit'); const log = body.audit || [];
-        $('#auditList').innerHTML = log.length ? log.slice().reverse().map((e) => `<div class="item"><span>${esc(e.kind || e.action || 'action')} <span class="meta">${esc(e.note || e.event || '')}</span></span><span class="meta">${esc((e.at || '').slice(0, 19).replace('T', ' '))}</span></div>`).join('') : '<div class="empty">No actions yet.</div>';
+        $('#auditList').innerHTML = log.length ? log.slice().reverse().map((e) => `<div class="item"><span>${esc(e.event || 'event')} <span class="meta">${esc(e.detail || '')}</span></span><span class="meta">${esc((e.at || '').slice(0, 19).replace('T', ' '))}</span></div>`).join('') : '<div class="empty">No actions yet.</div>';
       }
       async function loadEval() {
         $('#evalList').innerHTML = '<div class="empty">Loading…</div>';
         const { body } = await api('/api/eval/candidates'); const c = body.candidates || [];
-        $('#evalList').innerHTML = c.length ? c.map((x) => `<div class="item"><span>↻ <strong>${esc(x.input)}</strong><div class="meta">${esc((x.checks || []).map((k) => k.check).join(', '))} · from feedback</div></span><span class="chip">${esc(x.kind)}</span></div>`).join('') : '<div class="empty">No candidates yet — reject a refusal in <strong>Ask</strong> to grow one.</div>';
+        $('#evalList').innerHTML = c.length ? c.map((x) => `<div class="item"><span>↻ <strong>${esc(x.input)}</strong><div class="meta">${esc((x.checks || []).map((k) => k.check).join(', '))} · from feedback</div></span><span class="chip">regression</span></div>`).join('') : '<div class="empty">No candidates yet — reject a refusal in <strong>Ask</strong> to grow one.</div>';
       }
       $('#reloadEval').onclick = loadEval;
+
+      // ── Fan-out (reaction agents + results) ──
+      $('#raSave').onclick = async () => {
+        const name = $('#raName').value.trim(), instruction = $('#raInstr').value.trim(), scope = $('#raScope').value.trim();
+        if (!name || !instruction) { $('#raOut').innerHTML = '<div class="empty">A name and an instruction are required.</div>'; return; }
+        const { ok, status, body } = await api('/api/fanout/agents', { method: 'POST', body: JSON.stringify({ name, instruction, scope: scope || undefined }) });
+        if (!ok) { $('#raOut').innerHTML = `<div class="answer"><div class="body refusal">${status === 401 ? 'This brain requires an API key for write actions (INGEST_API_KEY is set).' : esc(body.error || 'Could not save.')}</div></div>`; return; }
+        $('#raName').value = $('#raInstr').value = $('#raScope').value = '';
+        $('#raOut').innerHTML = '<div class="answer"><div class="body"><span class="pill executed">added</span> — it will run on every new ingest. Try <a href="#" class="link" id="goConnect2">connecting data →</a>.</div></div>';
+        const g = $('#goConnect2'); if (g) g.onclick = (e) => { e.preventDefault(); go('connect'); };
+        loadReactions();
+      };
+      async function loadReactions() {
+        const { body } = await api('/api/fanout/agents'); const list = body.agents || [];
+        $('#raList').innerHTML = list.length ? list.map((a) => `<div class="item"><span>⚡ <strong>${esc(a.name)}</strong><div class="meta">${esc(a.instruction.slice(0, 90))}${a.instruction.length > 90 ? '…' : ''}</div></span><span class="chip">${esc(a.scope || 'all scopes')}</span></div>`).join('') : '<div class="empty">None yet — add one above, then ingest something to watch it fire.</div>';
+      }
+      async function loadResults() {
+        const { body } = await api('/api/fanout/results'); const list = body.results || [];
+        $('#raResults').innerHTML = list.length ? list.map((r) => `<div class="result"><h4>${esc(r.agentName)} <span class="chip">${esc(r.source)}</span></h4><div class="body">${esc(r.answer)}</div></div>`).join('') : '<div class="empty">No results yet — fan-out runs when data is ingested while a reaction agent is active.</div>';
+      }
+      $('#raReloadResults').onclick = loadResults;
 
       // ── Build an agent (no-code) ──
       async function runAgent(instruction, query, out) {
@@ -363,6 +440,29 @@
         busy(out);
         const { body } = await api('/api/agents/run', { method: 'POST', body: JSON.stringify({ instruction, query: q }) });
         renderAnswer(out, q, { answer: body.answer, sources: body.sources });
+        if (body.sources?.length) attachAct(out);
+      }
+      function attachAct(out) {
+        const wrap = document.createElement('div'); wrap.className = 'act';
+        wrap.innerHTML = `<div class="actbar"><span class="actlbl">↳ Read → act</span><button class="btn ghost sm actopen">⚡ Propose an action from this</button></div><div class="actbody"></div>`;
+        out.append(wrap);
+        const ab = wrap.querySelector('.actbody');
+        wrap.querySelector('.actopen').onclick = () => {
+          wrap.querySelector('.actopen').style.display = 'none';
+          ab.innerHTML = `<div class="row" style="margin-top:12px;gap:10px">
+              <input class="fld actTitle" placeholder="Title (e.g. Follow-up email)" style="flex:1;min-width:140px">
+              <input class="fld actQuery" placeholder="Ground on (e.g. Project Atlas status)" style="flex:1;min-width:140px"></div>
+            <textarea class="fld actInstr" style="margin-top:10px" placeholder="What to draft (e.g. Draft a short update using only grounded facts)"></textarea>
+            <div class="row" style="margin-top:10px"><button class="btn coral sm actdraft">Propose (draft)</button></div><div class="actout"></div>`;
+          const aout = ab.querySelector('.actout');
+          ab.querySelector('.actdraft').onclick = async () => {
+            const title = ab.querySelector('.actTitle').value.trim(), query = ab.querySelector('.actQuery').value.trim(), instruction = ab.querySelector('.actInstr').value.trim();
+            if (!title || !query || !instruction) return;
+            busy(aout); const { body: r } = await api('/api/actions/propose', { method: 'POST', body: JSON.stringify({ title, instruction, query }) });
+            if (!r.ok) { aout.innerHTML = `<div class="answer"><div class="body refusal">${esc(r.reason || 'Could not draft.')}</div></div>`; return; }
+            renderProposal(r.action, aout);
+          };
+        };
       }
       $('#agRun').onclick = () => {
         const instr = $('#agInstr').value.trim(); if (!instr) { $('#agOut').innerHTML = '<div class="empty">Write an instruction first.</div>'; return; }
@@ -389,19 +489,69 @@
         });
       }
 
-      // boot: mode banner + live overview stats
-      (async () => {
-        try { const h = await (await fetch('/health')).json(); $('#mode').innerHTML = `<span class="pip"></span> ${esc(h.mode || 'ready')}`;
-          const m = (h.mode || '').match(/recall=(\S+)\s+generation=(\S+)/); if (m) { $('#statRecall').textContent = 'recall · ' + m[1]; $('#statGen').textContent = 'generation · ' + m[2]; }
-        } catch { $('#mode').innerHTML = '<span class="pip" style="background:var(--coral)"></span> offline'; }
+      // ── Connect data (ingestion) ──
+      let ingestFmt = 'text';
+      const FMT_HINT = {
+        text: '— paste notes; a blank line separates records',
+        csv: '— first row is headers; any columns work',
+        json: '— an array of objects, or a single object',
+      };
+      document.querySelectorAll('#fmtRow .seg-btn').forEach((b) => (b.onclick = () => {
+        ingestFmt = b.dataset.fmt;
+        document.querySelectorAll('#fmtRow .seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+        $('#fmtHint').textContent = FMT_HINT[ingestFmt];
+      }));
+      $('#inFile').onchange = (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        if (/\.csv$/i.test(file.name)) document.querySelector('#fmtRow [data-fmt="csv"]').click();
+        else if (/\.json$/i.test(file.name)) document.querySelector('#fmtRow [data-fmt="json"]').click();
+        const r = new FileReader();
+        r.onload = () => { $('#inContent').value = r.result; if (!$('#inSource').value.trim()) $('#inSource').value = file.name.replace(/\.[^.]+$/, ''); };
+        r.readAsText(file);
+      };
+      $('#ingestBtn').onclick = async () => {
+        const content = $('#inContent').value.trim(); if (!content) { $('#ingestOut').innerHTML = '<div class="empty">Paste or upload something first.</div>'; return; }
+        busy($('#ingestOut'));
+        const { ok, status, body } = await api('/api/ingest', { method: 'POST', body: JSON.stringify({ format: ingestFmt, content, source: $('#inSource').value.trim() || undefined }) });
+        if (!ok || !body.ok) {
+          const msg = status === 401 ? 'This brain requires an API key to ingest (INGEST_API_KEY is set). Use the workflow webhook with the key.' : (body.error || 'Could not ingest.');
+          $('#ingestOut').innerHTML = `<div class="answer"><div class="body refusal">${esc(msg)}</div></div>`; return;
+        }
+        const fired = (body.reactions || []).length;
+        $('#ingestOut').innerHTML = `<div class="answer"><div class="body"><span class="pill executed">added</span> ${body.ingested} record(s) under <span class="chip">${esc(body.source)}</span> · scope <span class="chip">${esc(body.scope)}</span>${fired ? ` · <span class="chip">${fired} agent${fired > 1 ? 's' : ''} reacted</span>` : ''}<div class="fb" style="border:0"><span>Now <a href="#" class="link" id="goAsk">ask the brain →</a> or set up <a href="#" class="link" id="goFan">fan-out agents →</a>.</span></div></div></div>`;
+        $('#goAsk').onclick = (e) => { e.preventDefault(); go('ask'); };
+        $('#goFan').onclick = (e) => { e.preventDefault(); go('fanout'); };
+        $('#inContent').value = '';
+        loadStats();
+      };
+
+      // ── real overview stats (no fabricated numbers) ──
+      const PAL = ['var(--coral)', 'var(--butter)'];
+      async function loadStats() {
         try {
-          const { body } = await api('/api/companies'); const cos = body.companies || [];
-          $('#co').innerHTML = cos.map((c) => `<option>${esc(c)}</option>`).join('') || '<option>no entities</option>';
-          $('#statEntities').textContent = cos.length;
-          const palette = ['var(--coral)', 'var(--butter)', 'var(--coral)', 'var(--butter)'];
-          const hs = [80, 58, 92, 46];
-          $('#srcBars').innerHTML = ['companies', 'contacts', 'engagements', 'programs'].map((s, i) => `<div class="b"><i style="background:${palette[i]};height:${hs[i]}%"></i><div class="barlabel">${s}</div></div>`).join('');
+          const { body } = await api('/api/stats');
+          const sources = body.sources || [];
+          $('#statEntities').textContent = body.total ?? 0;
+          if (!sources.length) {
+            $('#srcBars').innerHTML = '<div class="empty" style="color:var(--on-dark-mut)">No data yet — <a href="#" class="link" id="bGo">connect some →</a></div>';
+            const g = $('#bGo'); if (g) g.onclick = (e) => { e.preventDefault(); go('connect'); };
+            return;
+          }
+          const max = Math.max(...sources.map((s) => s.count));
+          $('#srcBars').innerHTML = sources.slice(0, 5).map((s, i) =>
+            `<div class="b" title="${esc(s.source)}: ${s.count}"><i style="background:${PAL[i % 2]};height:${Math.max(8, Math.round((s.count / max) * 100))}%"></i><div class="barlabel">${esc(s.source)}<br>${s.count}</div></div>`).join('');
         } catch {}
+      }
+
+      // boot: mode banner + live overview stats (all numbers are real)
+      (async () => {
+        try {
+          $('#whUrl').textContent = location.origin + '/api/ingest';
+          const h = await (await fetch('/health')).json(); $('#mode').innerHTML = `<span class="pip"></span> ${esc(h.mode || 'ready')}`;
+          const m = (h.mode || '').match(/recall=(\S+)\s+generation=(\S+)/); if (m) { $('#statRecall').textContent = 'recall · ' + m[1]; $('#statGen').textContent = 'generation · ' + m[2]; }
+          const cost = $('#statCost'); if (cost) cost.textContent = /local/.test(h.mode || '') ? '$0 / query · self-hosted' : '';
+        } catch { $('#mode').innerHTML = '<span class="pip" style="background:var(--coral)"></span> offline'; }
+        await loadStats();
         try { const { body } = await api('/api/eval/candidates'); $('#statEval').textContent = (body.candidates || []).length; } catch { $('#statEval').textContent = '0'; }
       })();
     </script>
