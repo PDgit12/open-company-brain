@@ -22,6 +22,7 @@ import { config } from '../config.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCount } from './memory.js';
 import { createGenerator, type Generator } from '../agents/generator.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
+import { runReactions, type FanoutResult } from '../fanout/engine.js';
 import { demoDocuments } from '../seed/seed-data.js';
 import { candidateCasesFromFeedback, type GoldenCase } from '../eval/golden.js';
 import {
@@ -141,7 +142,7 @@ export class Brain {
   async ingest(
     input: { format: IngestFormat; content: string; source?: string; scope?: string },
     callerScopes: string[],
-  ): Promise<{ ingested: number; source: string; scope: string }> {
+  ): Promise<{ ingested: number; source: string; scope: string; reactions: FanoutResult[] }> {
     const access =
       input.scope && callerScopes.includes(input.scope)
         ? input.scope
@@ -149,7 +150,13 @@ export class Brain {
     const source = normalizeSource(input.source ?? 'notes');
     const docs = buildDocuments({ format: input.format, content: input.content, source, access });
     const ingested = docs.length ? await this.memory.upsert(docs) : 0;
-    return { ingested, source, scope: access };
+    // Fan-out: configured reaction agents run automatically over the new data
+    // (no-op + zero generations when none are configured). Both the library
+    // caller and the HTTP route reach fan-out through this one seam.
+    const reactions = ingested
+      ? await runReactions(this, { source, scope: access, query: input.content.slice(0, 500) })
+      : [];
+    return { ingested, source, scope: access, reactions };
   }
 
   /** Real per-source document counts the caller can see — for honest viz. */

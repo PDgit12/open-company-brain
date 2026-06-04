@@ -20,6 +20,11 @@
  *   GET  /api/agents              list saved agent definitions
  *   POST /api/agents              { name, instruction, query? } → save a reusable agent
  *
+ * Fan-out (event-driven agents — run automatically on each ingest):
+ *   GET  /api/fanout/agents       list reaction agents
+ *   POST /api/fanout/agents       { name, instruction, scope?, enabled? } → add one
+ *   GET  /api/fanout/results      cited outputs reactions produced (scope-filtered)
+ *
  * Write endpoints (action layer — human-approved):
  *   POST /api/actions/propose          { title, instruction, query } → proposed action
  *   POST /api/actions/:id/approve      → executes (idempotent)
@@ -39,6 +44,8 @@ import { Brain } from '../brain/brain.js';
 import { IngestBodySchema } from '../brain/ingest.js';
 import { ActionService } from '../actions/service.js';
 import { getCustomAgentStore } from '../agents/registry.js';
+import { getReactionAgentStore } from '../fanout/registry.js';
+import { getFanoutResultStore } from '../fanout/engine.js';
 import { config, describeMode } from '../config.js';
 import { logger } from '../observability/logger.js';
 
@@ -68,6 +75,12 @@ const AgentSaveBody = z.object({
   name: z.string().trim().min(1),
   instruction: z.string().trim().min(1),
   query: z.string().trim().optional(),
+});
+const ReactionSaveBody = z.object({
+  name: z.string().trim().min(1),
+  instruction: z.string().trim().min(1),
+  scope: z.string().trim().optional(),
+  enabled: z.boolean().optional(),
 });
 
 /**
@@ -112,6 +125,8 @@ export async function createApp(): Promise<express.Express> {
   const brain = await Brain.create();
   const actions = ActionService.create(brain);
   const agents = getCustomAgentStore();
+  const reactions = getReactionAgentStore();
+  const fanoutResults = getFanoutResultStore();
 
   app.get('/health', (_req, res) => res.json({ status: 'ok', mode: describeMode() }));
 
@@ -202,6 +217,24 @@ export async function createApp(): Promise<express.Express> {
     const parsed = AgentSaveBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'name and instruction are required' });
     return res.status(201).json({ agent: await agents.save(parsed.data) });
+  }));
+
+  // ── Fan-out (event-driven agents) ──────────────────────────────────────────
+  // Reaction agents run automatically over each newly ingested item (see
+  // brain.ingest → runReactions). Define them here; read their cited outputs.
+
+  app.get('/api/fanout/agents', asyncRoute(async (_req, res) => {
+    return res.json({ agents: await reactions.list() });
+  }));
+
+  app.post('/api/fanout/agents', asyncRoute(async (req, res) => {
+    const parsed = ReactionSaveBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'name and instruction are required' });
+    return res.status(201).json({ agent: await reactions.save(parsed.data) });
+  }));
+
+  app.get('/api/fanout/results', asyncRoute(async (req, res) => {
+    return res.json({ results: await fanoutResults.list(callerScopes(req)) });
   }));
 
   // ── Action layer ──────────────────────────────────────────────────────────

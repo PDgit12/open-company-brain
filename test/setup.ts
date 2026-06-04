@@ -7,4 +7,5 @@
  */
 process.env.LANGBASE_API_KEY = '';
 process.env.DATABASE_URL = '';
+process.env.VECTOR_DATABASE_URL = '';
 process.env.LLM_BACKEND = 'mock';

@@ -34,6 +34,19 @@ export {
   type SourceCount,
 } from './brain/memory.js';
 
+// Event-driven fan-out: agents that run automatically on each ingest.
+export {
+  getReactionAgentStore,
+  type ReactionAgent,
+  type ReactionAgentInput,
+} from './fanout/registry.js';
+export {
+  runReactions,
+  getFanoutResultStore,
+  type FanoutResult,
+  type IngestEvent,
+} from './fanout/engine.js';
+
 // No-code custom agents (define + run a grounded agent from a prompt).
 export { getCustomAgentStore, type CustomAgent } from './agents/registry.js';
 
