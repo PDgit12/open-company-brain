@@ -92,11 +92,11 @@ Ingest real data and ask:
 ```bash
 curl -s localhost:4000/api/ingest -H 'content-type: application/json' \
   -H 'x-access-scopes: my-team' \
-  -d '{"format":"text","source":"notes","content":"Rivian committed $250k in sponsored research for 2026. Open action: send the agreement by June 14."}'
+  -d '{"format":"text","source":"notes","content":"Acme signed a 2-year support contract. Open action: send the renewal terms by Friday."}'
 
 curl -s localhost:4000/api/ask -H 'content-type: application/json' \
   -H 'x-access-scopes: my-team' \
-  -d '{"question":"What did Rivian commit to?"}'      # → grounded, cited answer
+  -d '{"question":"What did Acme commit to?"}'      # → grounded, cited answer
 ```
 
 ## Connect a workflow (n8n) — the data driver
