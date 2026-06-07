@@ -9,4 +9,12 @@ coverage/
 *.tsbuildinfo
 .brain-state.json
 outbox/
+
+# Personal / internal — kept local, never shipped in the repo
 docs/STUDY_PLAYBOOK.md
+docs/LEARN.md
+docs/LEARN.docx
+handoff.md
+openbrain.mcp.json
+.claude/
+CLAUDE.md

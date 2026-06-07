@@ -186,6 +186,7 @@ npm run typecheck     tsc --noEmit
 
 ## Documentation
 
+- [docs/AGENTIC_OS.md](./docs/AGENTIC_OS.md) — the agentic-OS harness research & architecture
 - [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md) — full setup
 - [docs/N8N.md](./docs/N8N.md) — connect a workflow
 - [docs/MCP.md](./docs/MCP.md) — connect an AI agent
