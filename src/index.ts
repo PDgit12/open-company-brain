@@ -66,5 +66,16 @@ export { McpServerSource, mcpSources, type McpServerConfig } from './tools/mcp-h
 export { createFabric } from './tools/assemble.js';
 export { loadMcpServers, addMcpServer } from './tools/config.js';
 
+// Harness — bring any agent and run it on the governed kernel + tools.
+export {
+  BuiltinAgent,
+  ToolLoopAgent,
+  type Agent,
+  type AgentContext,
+  type AgentResult,
+  type AgentStep,
+} from './harness/agent.js';
+export { runAgent, pickAgent, type AgentKind } from './harness/run.js';
+
 // Config + mode banner.
 export { config, describeMode } from './config.js';

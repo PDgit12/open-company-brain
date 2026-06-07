@@ -151,12 +151,23 @@ async function toolsCmd(forwarded) {
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 
+/** Harness operator shell: `run "<task>"` and `chat` (forwarded to src/harness/cli.ts). */
+async function harnessCmd(forwarded) {
+  const dist = path.join(ROOT, 'dist', 'harness', 'cli.js');
+  const useDist = await exists(dist);
+  const [cmd, base] = useDist ? ['node', [dist]] : ['npx', ['-y', 'tsx', path.join(ROOT, 'src', 'harness', 'cli.ts')]];
+  const child = spawn(cmd, [...base, ...forwarded], { stdio: 'inherit', cwd: process.cwd() });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
+
 const cmd = process.argv[2] ?? 'init';
 const run = () => {
   if (cmd === 'doctor') return doctor();
   if (cmd === 'mcp') return mcp();
   if (cmd === 'tools') return toolsCmd([]);
   if (cmd === 'connect') return toolsCmd(['connect', ...process.argv.slice(3)]);
+  if (cmd === 'run') return harnessCmd(['run', ...process.argv.slice(3)]);
+  if (cmd === 'chat') return harnessCmd(['chat', ...process.argv.slice(3)]);
   return init();
 };
 run().catch((e) => {

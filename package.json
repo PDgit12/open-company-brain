@@ -57,6 +57,8 @@
     "setup:live": "tsx src/brain/setup-live.ts",
     "setup:local": "tsx src/brain/setup-local.ts",
     "mcp": "tsx src/mcp/server.ts",
+    "run:agent": "tsx src/harness/cli.ts run",
+    "chat": "tsx src/harness/cli.ts chat",
     "eval": "tsx src/eval/run.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
