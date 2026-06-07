@@ -1,11 +1,11 @@
 # Connect a workflow (n8n) — the data driver
 
-Open Brain's universal data-in path is one webhook: `POST /api/ingest`. Anything
+Comb's universal data-in path is one webhook: `POST /api/ingest`. Anything
 that can make an HTTP request — n8n, Zapier, Make, a cron job, your app — can feed
 the brain in real time. Each record that lands becomes scoped, embedded, cited,
 retrievable knowledge **and** triggers your fan-out agents.
 
-## 1. Run Open Brain
+## 1. Run Comb
 
 ```bash
 docker compose up -d          # pgvector (real, shared store)
@@ -24,7 +24,7 @@ It's a Manual Trigger → HTTP Request that POSTs to `/api/ingest`.
 
 Then:
 
-- **URL** — if n8n runs in Docker and Open Brain runs on your host, use
+- **URL** — if n8n runs in Docker and Comb runs on your host, use
   `http://host.docker.internal:4000/api/ingest` (already set in the example).
   Same host without Docker: `http://localhost:4000/api/ingest`.
 - **Authorization** — set the header to `Bearer <your INGEST_API_KEY>` (or remove

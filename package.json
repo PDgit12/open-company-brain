@@ -21,7 +21,7 @@
     "LICENSE"
   ],
   "bin": {
-    "company-brain": "bin/cli.mjs"
+    "comb": "bin/cli.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -11,7 +11,7 @@ process.on('unhandledRejection', (reason) => {
 async function main(): Promise<void> {
   const app = await createApp();
   app.listen(config.port, () => {
-    console.log(`\n  Company Brain running`);
+    console.log(`\n  Comb running`);
     console.log(`  ▸ http://localhost:${config.port}`);
     console.log(`  ▸ mode: ${describeMode()}`);
     if (config.memoryMode === 'mock') {

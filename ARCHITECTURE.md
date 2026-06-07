@@ -74,7 +74,7 @@ every read, so learning never leaks across scopes.
 
 ## The action layer — how "workflows" work here (and why it isn't n8n)
 
-A workflow in Company Brain is **not** a visual graph of nodes a user wires together.
+A workflow in Comb is **not** a visual graph of nodes a user wires together.
 It is a small, typed **action recipe** a developer adds in code:
 
 ```

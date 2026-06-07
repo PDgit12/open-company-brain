@@ -21,6 +21,9 @@ export interface AgentContext {
   brain: Brain;
   fabric: ToolFabric;
   scopes: string[];
+  /** Live progress hooks (the CLI uses these to render like a coding agent). */
+  onStatus?: (msg: string) => void;
+  onStep?: (step: AgentStep) => void;
 }
 
 export interface AgentStep {
@@ -43,6 +46,7 @@ export interface Agent {
 export class BuiltinAgent implements Agent {
   readonly name = 'builtin';
   async run(task: string, ctx: AgentContext): Promise<AgentResult> {
+    ctx.onStatus?.('thinking');
     const { answer, sources } = await ctx.brain.ask(task, ctx.scopes);
     const cites = [...new Set(sources.map((s) => s.source))];
     const output = cites.length ? `${answer}\n\nSources: ${cites.map((s) => `[${s}]`).join(' ')}` : answer;
@@ -102,6 +106,7 @@ export class ToolLoopAgent implements Agent {
     const steps: AgentStep[] = [];
 
     for (let i = 0; i < this.maxSteps; i++) {
+      ctx.onStatus?.('thinking');
       const msg = await this.chat(messages, tools);
       messages.push(msg);
       const calls = msg.tool_calls ?? [];
@@ -119,7 +124,9 @@ export class ToolLoopAgent implements Agent {
         } catch (err) {
           result = `Tool error: ${err instanceof Error ? err.message : String(err)}`;
         }
-        steps.push({ tool: id, args, result });
+        const step = { tool: id, args, result };
+        steps.push(step);
+        ctx.onStep?.(step);
         messages.push({ role: 'tool', content: result });
       }
     }

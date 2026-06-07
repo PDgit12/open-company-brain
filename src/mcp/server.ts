@@ -9,7 +9,7 @@
  *
  * Two ways an agent "runs" through here, both governed + cited:
  *   • search_brain — pure scoped retrieval; the HOST's model synthesizes (cheap).
- *   • ask_brain    — company-brain's own generator produces a grounded answer.
+ *   • ask_brain    — comb's own generator produces a grounded answer.
  * Plus ingest (write) and list_sources (provenance).
  *
  * Transport is stdio, so it registers exactly like knit/gbrain:
@@ -58,7 +58,7 @@ export async function createMcpServer(): Promise<McpServer> {
     },
   );
 
-  // ── ask_brain: company-brain's own grounded, cite-or-refuse agent ────────────
+  // ── ask_brain: comb's own grounded, cite-or-refuse agent ────────────
   server.tool(
     'ask_brain',
     "Ask the company brain a question and get a grounded, cited answer produced by the brain's own model. It cites the records it used and refuses if it has no grounding (it never invents).",
@@ -108,7 +108,7 @@ export async function createMcpServer(): Promise<McpServer> {
   return server;
 }
 
-/** Entry point for `company-brain mcp` (stdio). */
+/** Entry point for `comb mcp` (stdio). */
 export async function runMcpStdio(): Promise<void> {
   const server = await createMcpServer();
   // Status line on stderr so it never pollutes the stdio protocol channel.

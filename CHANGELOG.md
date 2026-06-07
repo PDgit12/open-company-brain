@@ -23,7 +23,7 @@ semantic versioning.
 - **Event-driven fan-out** — reaction agents that run automatically over each new
   ingest via `Brain.ingest` (so the library AND the HTTP route both get it);
   empty by default (cost guard); scope-gated. Routes: `/api/fanout/*`.
-- **MCP server** (`company-brain mcp`, `npm run mcp`) — the agent shell: stdio
+- **MCP server** (`comb mcp`, `npm run mcp`) — the agent shell: stdio
   server exposing `search_brain`, `ask_brain`, `ingest`, `list_sources` to any
   MCP host (Claude Code/Desktop, Cursor). `Brain.search()` added for pure
   scoped retrieval.

@@ -1,13 +1,13 @@
-# Contributing to Company Brain
+# Contributing to Comb
 
-Thanks for your interest! Company Brain is meant to be forked, adapted, and improved.
+Thanks for your interest! Comb is meant to be forked, adapted, and improved.
 Contributions of all sizes are welcome.
 
 ## Setup
 
 ```bash
 git clone <your-fork-url>
-cd company-brain
+cd comb
 npm install
 npm run demo      # http://localhost:4000 — runs on seed data, no credentials
 npm test          # must stay green

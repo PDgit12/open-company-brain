@@ -1,4 +1,4 @@
-# Open Brain as an Agentic OS Harness — research & architecture
+# Comb as an Agentic OS Harness — research & architecture
 
 > Research brief answering: *how do we build this as an agentic OS harness — bring
 > any agent, connect any MCP, build on top of it — and be genuinely better than
@@ -68,8 +68,8 @@ Mapping to the AIOS kernel managers (so we're principled, not ad-hoc):
 
 ## 4. Build roadmap (each phase shippable, kernel stays the contract)
 
-- **K1 — Tool Fabric / MCP host. ✅ DONE.** `src/tools/` (`fabric.ts`, `mcp-host.ts`, `config.ts`, `assemble.ts`, `cli.ts`): connect external MCP servers, list+namespace their tools, merge with kernel tools, scope-gate every call. CLI `company-brain tools` / `connect`. Verified aggregating an external MCP's tools.
-- **K2 — Agent adapter interface. ✅ DONE.** `src/harness/agent.ts` (`Agent.run`), `BuiltinAgent`, and `ToolLoopAgent` (tool-capable model + Tool Fabric). CLI `company-brain run` / `chat` (operator shell). Verified live: the tool loop autonomously called `brain.search` and answered grounded + scope-gated.
+- **K1 — Tool Fabric / MCP host. ✅ DONE.** `src/tools/` (`fabric.ts`, `mcp-host.ts`, `config.ts`, `assemble.ts`, `cli.ts`): connect external MCP servers, list+namespace their tools, merge with kernel tools, scope-gate every call. CLI `comb tools` / `connect`. Verified aggregating an external MCP's tools.
+- **K2 — Agent adapter interface. ✅ DONE.** `src/harness/agent.ts` (`Agent.run`), `BuiltinAgent`, and `ToolLoopAgent` (tool-capable model + Tool Fabric). CLI `comb run` / `chat` (operator shell). Verified live: the tool loop autonomously called `brain.search` and answered grounded + scope-gated.
 - **K3 — Harness governance wrapper.** Per-run scope/tool-allowlist/budget/approval/audit around every `Agent.run`. Reuse the action layer's approve+audit. (Today: step trace + scope threading + max-step budget exist; formalize allow-list + approval.)
 - **K4 — Scheduler.** Cron + event triggers feeding a run queue (generalize fan-out).
 - **K5 — External-runtime adapter.** Run a LangGraph/CrewAI/Hermes agent as a governed process on the OS (bring-your-own-agent, proven).

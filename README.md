@@ -1,4 +1,4 @@
-# Open Brain
+# Comb
 
 > **An agentic OS for companies and individuals.**
 > Pipe all your data in (paste, upload, or a workflow like n8n) → it becomes
@@ -29,11 +29,11 @@ agents to work on it, you hit three walls:
    do they react to new data, take actions safely, and stay reachable from a
    dashboard, an app, *and* a coding agent — without a different integration each?
 
-## What Open Brain is
+## What Comb is
 
 An **agentic operating system** you self-host. The OS metaphor is literal:
 
-| OS concept | In Open Brain |
+| OS concept | In Comb |
 |---|---|
 | **Kernel** | the governed brain — all your data, embedded, access-scoped, **cite-or-refuse** |
 | **Drivers** | connectors: data **in** (paste · upload · workflow webhook) and actions **out** (webhook · file), human-approved |
@@ -42,7 +42,7 @@ An **agentic operating system** you self-host. The OS metaphor is literal:
 | **Security** | access scopes + cite-or-refuse + audit log + a learning loop, baked into the kernel so every agent inherits them |
 
 > **The governance is the product.** An LLM with raw access has no scoping, no
-> cite-or-refuse, no provenance, no audit. Open Brain is the governed OS your
+> cite-or-refuse, no provenance, no audit. Comb is the governed OS your
 > data lives in and your agents run on.
 
 ## One kernel, three shells
@@ -64,9 +64,9 @@ and searchable from your IDE over MCP.
 
 | Who's calling | Shell | Who runs the LLM |
 |---|---|---|
-| a workflow (n8n), a dashboard, your app | **HTTP API / dashboard** | Open Brain (Langbase or Ollama) |
-| Claude Code / Cursor / Claude Desktop | **MCP server** | the host (via `search_brain`) — or Open Brain (via `ask_brain`) |
-| your own TypeScript code | **library** (`import { Brain }`) | Open Brain |
+| a workflow (n8n), a dashboard, your app | **HTTP API / dashboard** | Comb (Langbase or Ollama) |
+| Claude Code / Cursor / Claude Desktop | **MCP server** | the host (via `search_brain`) — or Comb (via `ask_brain`) |
+| your own TypeScript code | **library** (`import { Brain }`) | Comb |
 
 ## Quickstart
 
@@ -133,10 +133,10 @@ The harness is the operator shell: bring any agent, connect any MCP, run on the
 governed kernel — from your terminal.
 
 ```bash
-company-brain connect knit -- npx -y knit-mcp@latest   # be an MCP HOST: add any MCP
-company-brain tools                                    # kernel tools + every connected MCP's tools
-company-brain run "summarize what's open across the brain" --scopes my-team
-company-brain chat                                     # interactive agent REPL
+comb connect knit -- npx -y knit-mcp@latest   # be an MCP HOST: add any MCP
+comb tools                                    # kernel tools + every connected MCP's tools
+comb run "summarize what's open across the brain" --scopes my-team
+comb chat                                     # interactive agent REPL
 ```
 
 `run`/`chat` use a tool-loop agent on the local backend (it autonomously calls

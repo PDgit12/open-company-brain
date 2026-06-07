@@ -11,8 +11,8 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   LANGBASE_API_KEY: z.string().trim().optional(),
-  LANGBASE_MEMORY_NAME: z.string().trim().default('company-brain'),
-  LANGBASE_PIPE_NAME: z.string().trim().default('company-brain-agent'),
+  LANGBASE_MEMORY_NAME: z.string().trim().default('comb'),
+  LANGBASE_PIPE_NAME: z.string().trim().default('comb-agent'),
   // Embedding model for recall + generation model for the pipe. Both must match
   // a provider key configured in your Langbase workspace. OpenAI by default.
   LANGBASE_EMBEDDING_MODEL: z

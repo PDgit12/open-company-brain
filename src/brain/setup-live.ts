@@ -38,7 +38,7 @@ export async function setupLive(): Promise<void> {
 
   const create = async (): Promise<void> => {
     try {
-      await lb.memories.create({ name: memoryName, description: 'Company Brain — semantic recall layer', embedding_model: wantModel });
+      await lb.memories.create({ name: memoryName, description: 'Comb — semantic recall layer', embedding_model: wantModel });
     } catch (err) {
       if (isProviderKeyError(err)) throw new Error(`Embedding provider key missing. ${PROVIDER_HINT}`);
       throw err;

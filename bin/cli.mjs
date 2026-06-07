@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Company Brain CLI — the "just add your keys" setup experience.
+ * Comb CLI — the "just add your keys" setup experience.
  *
  *   npm run init      guided setup: creates .env and (interactively) takes your keys
  *   npm run doctor    report the current mode and what's still needed
@@ -88,7 +88,7 @@ function reportMode(map) {
 }
 
 async function init() {
-  console.log('\n  Company Brain — setup\n  ─────────────────────');
+  console.log('\n  Comb — setup\n  ─────────────────────');
   await ensureEnv();
   let text = await readFile(ENV, 'utf8');
 
@@ -110,7 +110,7 @@ async function init() {
   console.log('   npm run demo         open the brain at http://localhost:4000');
   console.log('   # fully local ($0/query): set LLM_BACKEND=local in .env, then:');
   console.log('   npm run setup:local  pull models + seed pgvector, then `npm run demo`');
-  console.log('   # connect an AI agent (Claude/Cursor): company-brain mcp\n');
+  console.log('   # connect an AI agent (Claude/Cursor): comb mcp\n');
 }
 
 async function doctor() {
@@ -162,26 +162,25 @@ async function harnessCmd(forwarded) {
 
 function help() {
   console.log(`
-  open-brain — an agentic OS for companies & individuals
+  comb — your company's agentic OS harness (Claude Code, for your own agents)
 
-  Usage: company-brain <command> [options]
+  Usage: comb <command> [options]
 
-  Setup
-    init                 guided setup — create .env and add your keys
-    doctor               report the active backend and what's still needed
-
-  Run the OS (shells)
-    demo                 (npm run demo) dashboard + HTTP API at :4000
-    mcp                  run as an MCP server (door 3) over stdio
-
-  Harness (operator shell)
-    run "<task>"         run an agent on the brain + connected tools
+  Build & run agents (the harness)
+    run "<task>"         run an agent over your governed brain + connected tools
                          [--agent auto|builtin|tools] [--scopes a,b]
     chat                 interactive agent REPL
-    tools                list every tool an agent can use (kernel + MCPs)
+    tools                list every tool an agent can use (brain + connected)
     connect <name> -- <cmd> [args…]
-                         connect an external MCP server (e.g. your knit MCP)
+                         connect a tool/MCP (e.g. your knit MCP) or an API
 
+  Setup & data
+    init                 guided setup — create .env and add your keys
+    doctor               report the active backend and what's still needed
+    demo                 (npm run demo) web console + HTTP API at :4000
+
+  Advanced
+    mcp                  also expose this brain to other agents over MCP (optional)
     help                 show this
 `);
 }

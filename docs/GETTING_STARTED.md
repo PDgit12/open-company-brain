@@ -1,6 +1,6 @@
 # Getting Started (5 minutes)
 
-Stand up your own Company Brain, then make it yours. Each step is copy-paste.
+Stand up your own Comb, then make it yours. Each step is copy-paste.
 
 ## 1. Scaffold + run (mock mode, no keys)
 

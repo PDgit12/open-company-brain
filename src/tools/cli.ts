@@ -1,12 +1,12 @@
 /**
  * Harness tool commands (operator shell):
  *
- *   company-brain tools                 list every tool an agent can use
+ *   comb tools                 list every tool an agent can use
  *                                       (kernel built-ins + connected MCP servers)
- *   company-brain connect <name> -- <command> [args…]
+ *   comb connect <name> -- <command> [args…]
  *                                       register an external MCP server (e.g. knit)
  *
- * These make Open Brain an MCP *host*: bring any MCP, its tools join the fabric.
+ * These make Comb an MCP *host*: bring any MCP, its tools join the fabric.
  */
 
 import { Brain } from '../brain/brain.js';
@@ -33,8 +33,8 @@ async function listTools(): Promise<void> {
 function parseConnect(argv: string[]): McpServerConfig {
   const sep = argv.indexOf('--');
   const name = argv[0];
-  if (!name || name === '--') throw new Error('usage: company-brain connect <name> -- <command> [args…]');
-  if (sep === -1 || !argv[sep + 1]) throw new Error('missing command: company-brain connect <name> -- <command> [args…]');
+  if (!name || name === '--') throw new Error('usage: comb connect <name> -- <command> [args…]');
+  if (sep === -1 || !argv[sep + 1]) throw new Error('missing command: comb connect <name> -- <command> [args…]');
   const [command, ...args] = argv.slice(sep + 1);
   return { name, command: command!, ...(args.length ? { args } : {}) };
 }
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   if (mode === 'connect') {
     const server = parseConnect(rest);
     const path = await addMcpServer(server);
-    process.stdout.write(`✓ Connected MCP server "${server.name}" → ${path}\n  Run \`company-brain tools\` to see its tools.\n`);
+    process.stdout.write(`✓ Connected MCP server "${server.name}" → ${path}\n  Run \`comb tools\` to see its tools.\n`);
   } else {
     await listTools();
   }

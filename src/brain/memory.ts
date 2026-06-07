@@ -138,7 +138,7 @@ export class LangbaseMemoryStore implements MemoryStore {
     try {
       await this.lb.memories.create({
         name: this.memoryName,
-        description: 'Company Brain — semantic recall layer',
+        description: 'Comb — semantic recall layer',
         embedding_model: config.langbase.embeddingModel,
       });
     } catch {

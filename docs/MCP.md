@@ -1,6 +1,6 @@
 # Connect an AI agent (MCP) — the agent shell
 
-Open Brain ships an [MCP](https://modelcontextprotocol.io) server so any agentic
+Comb ships an [MCP](https://modelcontextprotocol.io) server so any agentic
 environment — Claude Code, Claude Desktop, Cursor, and other MCP hosts — can use
 the brain as native tools. It's a thin shell over the **same kernel** the
 dashboard and HTTP API use: point them all at one store (pgvector/Langbase) and
@@ -45,7 +45,7 @@ All are access-scoped and obey the cite-or-refuse trust contract.
 | Tool | What it does | Who generates |
 |---|---|---|
 | `search_brain` | governed retrieval — returns the top records + provenance + score | the **host's** model synthesizes (cheap) |
-| `ask_brain` | a grounded, cited answer from the brain's own model | **Open Brain** |
+| `ask_brain` | a grounded, cited answer from the brain's own model | **Comb** |
 | `ingest` | add knowledge (also fires fan-out agents) | — |
 | `list_sources` | provenance sources the caller can see | — |
 
@@ -55,7 +55,7 @@ All are access-scoped and obey the cite-or-refuse trust contract.
   scope-filtered, cited slice exactly when its reasoning needs it, and writes the
   answer itself. Cheapest; ideal for coding/analysis tasks.
 - **The brain runs the agent (`ask_brain`).** The host delegates the whole
-  grounded answer to Open Brain's generator. Useful when you want the brain's
+  grounded answer to Comb's generator. Useful when you want the brain's
   governance and model to produce the result.
 
 ## Verify
