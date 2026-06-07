@@ -14,8 +14,12 @@
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 const ENV = '.env';
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXAMPLE = '.env.example';
 
 const exists = async (p) => {
@@ -103,11 +107,10 @@ async function init() {
 
   reportMode(parseEnv(text));
   console.log('\n  Next:');
-  console.log('   # managed (Langbase) or mock:');
-  console.log('   npm run sync         build the recall layer from your data');
+  console.log('   npm run demo         open the brain at http://localhost:4000');
   console.log('   # fully local ($0/query): set LLM_BACKEND=local in .env, then:');
-  console.log('   npm run setup:local  pull models + embed your data into pgvector');
-  console.log('   npm run demo         open the brain at http://localhost:4000\n');
+  console.log('   npm run setup:local  pull models + seed pgvector, then `npm run demo`');
+  console.log('   # connect an AI agent (Claude/Cursor): company-brain mcp\n');
 }
 
 async function doctor() {
@@ -119,8 +122,25 @@ async function doctor() {
   console.log('');
 }
 
+/**
+ * Start the stdio MCP server so any agentic environment (Claude, Cursor, …) can
+ * use the brain as a tool. Runs the compiled server when present (published /
+ * built), else falls back to tsx for source checkouts. stdio is passed straight
+ * through so the MCP host speaks to the server directly.
+ */
+async function mcp() {
+  const dist = path.join(ROOT, 'dist', 'mcp', 'server.js');
+  const useDist = await exists(dist);
+  const [cmd, args] = useDist
+    ? ['node', [dist]]
+    : ['npx', ['-y', 'tsx', path.join(ROOT, 'src', 'mcp', 'server.ts')]];
+  const child = spawn(cmd, args, { stdio: 'inherit', cwd: process.cwd() });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
+
 const cmd = process.argv[2] ?? 'init';
-(cmd === 'doctor' ? doctor : init)().catch((e) => {
+const route = cmd === 'doctor' ? doctor : cmd === 'mcp' ? mcp : init;
+route().catch((e) => {
   console.error(e);
   process.exit(1);
 });

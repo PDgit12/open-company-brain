@@ -88,6 +88,17 @@ export class Brain {
     return new Brain(memory, createGenerator(), getFeedbackStore());
   }
 
+  /**
+   * Pure scoped retrieval — no generation. The cheap path for callers that bring
+   * their own model (e.g. an agentic IDE via the MCP `search_brain` tool): hand
+   * back the governed, access-filtered, reranked chunks and let the host's agent
+   * synthesize. Same access boundary as every other read.
+   */
+  async search(query: string, accessScopes: string[], topK = 8): Promise<RetrievedChunk[]> {
+    const retrieved = await this.memory.retrieve({ query, accessScopes, topK });
+    return this.rerank(retrieved, accessScopes);
+  }
+
   async ask(question: string, accessScopes: string[]): Promise<BrainAnswer> {
     const retrieved = await this.memory.retrieve({ query: question, accessScopes, topK: 8 });
     // Reranking loop: boost sources humans found useful, demote rejected ones.

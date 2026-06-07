@@ -56,6 +56,7 @@
     "demo": "tsx src/server/index.ts",
     "setup:live": "tsx src/brain/setup-live.ts",
     "setup:local": "tsx src/brain/setup-local.ts",
+    "mcp": "tsx src/mcp/server.ts",
     "eval": "tsx src/eval/run.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
@@ -64,6 +65,7 @@
     "format": "prettier --write \"**/*.{ts,json,md}\""
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "langbase": "^1.1.49",

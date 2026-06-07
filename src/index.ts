@@ -57,5 +57,8 @@ export {
 } from './actions/service.js';
 export type { ProposedAction, ProposeResult } from './actions/types.js';
 
+// MCP server — expose the brain to agentic environments (Claude, Cursor, …).
+export { createMcpServer, runMcpStdio } from './mcp/server.js';
+
 // Config + mode banner.
 export { config, describeMode } from './config.js';
