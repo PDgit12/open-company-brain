@@ -1,256 +1,181 @@
-# Company Brain
+# Open Brain
 
-> **Open-source, self-hostable Glean / Dust alternative** — turn any organization's
-> scattered records into a **governed, grounded AI brain**: semantic recall + a
-> foreign-key knowledge graph + cited briefing & Q&A agents + a human-approved
-> **action layer**. Runs with **zero credentials** in mock mode; goes live on
-> [Langbase](https://langbase.com) + Postgres with no code change.
+> **An agentic OS for companies and individuals.**
+> Pipe all your data in (paste, upload, or a workflow like n8n) → it becomes
+> scoped, embedded, **cited** knowledge → then run a fleet of agents on it:
+> answer questions, react automatically to new data, and take human-approved
+> actions. Reach it through three shells — a **dashboard**, an **HTTP API**, and
+> an **MCP server** any AI agent can plug into. Everything grounded, cited, and
+> access-governed.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](./tsconfig.json)
-[![Runs with zero setup](https://img.shields.io/badge/demo-zero%20setup-brightgreen.svg)](#get-started-in-one-command)
-
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/PDgit12/open-company-brain)
-&nbsp;[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PDgit12/open-company-brain)
-
-Bring your own data, your own domain, your own deployment. Built to be **forked and
-adapted**: map your tables in one file, add your keys, ship.
-
-> **The trust contract is the product:** every answer cites the records it came from,
-> and the brain refuses when it has no grounding.
-
-## How it compares
-
-| | Company Brain | Glean / Dust / Thunai | Zapier / n8n + AI |
-|---|---|---|---|
-| Open-source & self-hostable | ✅ | ✗ | partial |
-| Runs with zero credentials (mock mode) | ✅ | ✗ | ✗ |
-| Grounded + **cite-or-refuse** trust contract | ✅ | partial | ✗ |
-| Knowledge graph from your real FKs (no AI-guessed edges) | ✅ | partial | ✗ |
-| Governed **action layer** (approve · idempotent · audited) | ✅ | partial (enterprise) | ✗ (ungoverned) |
-| Multi-scope access control, free | ✅ | enterprise tier | ✗ |
-| Every layer swappable (data / recall / graph / generation / actions) | ✅ | ✗ | partial |
-
-It is **not** a visual workflow builder — workflows are code-first *action recipes*
-that inherit grounding, approval, idempotency, and audit. Opinionated safe primitives,
-not a blank automation canvas.
+[![Runs with zero setup](https://img.shields.io/badge/demo-zero%20setup-brightgreen.svg)](#quickstart)
 
 ---
 
-## Why this exists
+## The problem
 
-Most teams' knowledge is scattered across a database, spreadsheets, chat logs, and
-people's heads. Generic "chat with your docs" tools either hallucinate or ignore who
-is allowed to see what. Company Brain is a small, auditable, **self-hostable** core
-that does the trustworthy version: grounded answers, citations, access scoping, and a
-real (foreign-key) knowledge graph — with nothing you can't read in an afternoon.
+A company (or one person) generates knowledge constantly — meeting notes, CRM
+updates, support threads, workflow runs — scattered across tools. To put AI
+agents to work on it, you hit three walls:
 
-The repo ships with a generic **relationship/CRM** example domain (companies,
-contacts, engagements, programs). That's just the reference domain — swap it for
-yours; see *Make it yours* below.
+1. **No governed place for the data to live.** Getting real, live data into a
+   form agents can ground on is bespoke and brittle, with no access control over
+   what an agent can then see.
+2. **Agents hallucinate.** A raw LLM with file access has no guarantee it's
+   answering *from your data* — no citations, no "I don't know", no provenance.
+3. **No operating layer for the agents themselves.** Where do agents live? How
+   do they react to new data, take actions safely, and stay reachable from a
+   dashboard, an app, *and* a coding agent — without a different integration each?
 
-## What you get
+## What Open Brain is
 
-- **Recall layer** — Langbase Memory (RAG) in production; an in-memory keyword engine
-  for zero-setup demos and tests.
-- **Knowledge graph** — built from your foreign keys (no AI-invented edges); answers
-  "how is X connected to Y?" with shortest-path search.
-- **Two agents** — grounded **briefing** and **Q&A**, both access-scoped and cited.
-- **Three backends** — mock (no credentials), live (Langbase + Postgres), and
-  fully local (Ollama + pgvector, $0/query), chosen from your `.env`.
-- **A clean adapter seam** — one file maps your tables onto the model.
-- **Agent console** — a built-in web dashboard to ask/brief/scan, see citations,
-  give 👍/👎 feedback, approve or reject actions, and learn to build your own agent.
-- **Batteries** — HTTP API, tests, and Docker.
+An **agentic operating system** you self-host. The OS metaphor is literal:
 
-## Get started in one command
+| OS concept | In Open Brain |
+|---|---|
+| **Kernel** | the governed brain — all your data, embedded, access-scoped, **cite-or-refuse** |
+| **Drivers** | connectors: data **in** (paste · upload · workflow webhook) and actions **out** (webhook · file), human-approved |
+| **Processes** | agents that run on the kernel: **on-demand** (ask / no-code agents), **reactive** (fan-out on each new record), **acting** (propose → approve → execute) |
+| **Shells** | three interfaces onto one kernel: a **dashboard**, an **HTTP API**, an **MCP server** |
+| **Security** | access scopes + cite-or-refuse + audit log + a learning loop, baked into the kernel so every agent inherits them |
 
-Scaffold your own instance, add your keys, run. That's the whole framework promise —
-you bring API keys; everything else is built in.
+> **The governance is the product.** An LLM with raw access has no scoping, no
+> cite-or-refuse, no provenance, no audit. Open Brain is the governed OS your
+> data lives in and your agents run on.
 
-```bash
-npx degit PDgit12/open-company-brain my-brain
-cd my-brain && npm install
-npm run init          # guided setup — paste your keys, or skip for mock mode
-npm run demo          # → http://localhost:4000
+## One kernel, three shells
+
+```
+   data in ── ingest ──▶  ┌──────────────────────────────────────┐
+  (paste / n8n / upload)  │  KERNEL (the governed brain)         │
+                          │  embed · access-scoped retrieval ·   │
+                          │  cite-or-refuse · feedback · agents  │
+                          └──────────────────────────────────────┘
+                            ▲                ▲                ▲
+              Dashboard (GUI)          HTTP API           MCP server
+              run agents, fan-out      apps & workflows   any AI agent IDE
 ```
 
-`npm run init` writes your `.env`; `npm run doctor` reports the active mode and
-what's still needed. With no keys it runs immediately in mock mode on synthetic seed
-data — pick an entity → **Brief me**, ask a question, find a **relationship path**.
+Point every shell at the **same store** (pgvector or Langbase) and it's one live
+OS: data a workflow ingests over HTTP is instantly answerable in the dashboard
+and searchable from your IDE over MCP.
 
-## Go live
+| Who's calling | Shell | Who runs the LLM |
+|---|---|---|
+| a workflow (n8n), a dashboard, your app | **HTTP API / dashboard** | Open Brain (Langbase or Ollama) |
+| Claude Code / Cursor / Claude Desktop | **MCP server** | the host (via `search_brain`) — or Open Brain (via `ask_brain`) |
+| your own TypeScript code | **library** (`import { Brain }`) | Open Brain |
+
+## Quickstart
+
+### Zero-setup demo (mock backend, no credentials)
 
 ```bash
-cp .env.example .env
-# 1) add your Langbase key:        LANGBASE_API_KEY=...
-# 2) add an LLM provider key in the Langbase dashboard → Settings → LLM API keys
-#    (OpenAI by default — powers BOTH embeddings and generation)
-# 3) (optional) point at Postgres:  DATABASE_URL=postgres://user:pass@localhost:5432/yourdb
-
-docker compose up -d   # optional: a local Postgres
-npm run seed:db        # optional: load schema + sample data
-npm run setup:live     # provisions the Langbase Memory + Pipe, then syncs your data
-npm run demo
+npm install
+npm run demo            # → http://localhost:4000  (deterministic, offline)
 ```
 
-`npm run setup:live` is idempotent and safe to re-run. If your workspace is missing
-the provider key it tells you exactly that — the key itself must be added in the
-Langbase dashboard (there is no API for it). Prefer a different provider? Set
-`LANGBASE_EMBEDDING_MODEL` / `LANGBASE_GENERATION_MODEL` in `.env`.
-
-`/health` will report `recall=live generation=live`. **No application code changes —
-only environment.**
-
-## Run it fully local — $0 per query
-
-For cost- or privacy-sensitive production, run with **zero API spend**: local LLM
-generation (Ollama), local embeddings (Ollama), and a pgvector recall store. The
-swappable seams mean no brain logic changes — only `LLM_BACKEND=local`.
+### Real, fully-local backend ($0 / query) — Ollama + pgvector
 
 ```bash
-ollama serve &                 # 1) local model server
-docker compose up -d           # 2) Postgres + pgvector (host port 5433)
-
-export LLM_BACKEND=local
-export VECTOR_DATABASE_URL=postgres://brain:brain@localhost:5433/company_brain
-npm run setup:local            # 3) pulls models if needed + embeds your data
-npm run demo                   # /health → recall=local generation=local
+docker compose up -d                         # pgvector on :5433
+ollama pull llama3.2:1b nomic-embed-text     # or qwen2.5:3b for sharper answers
+cp .env.example .env                         # set LLM_BACKEND=local + VECTOR_DATABASE_URL
+npm run setup:local                          # pull check + seed pgvector
+npm run demo                                 # real embeddings + real generation
 ```
 
-`npm run setup:local` is the one-command path: it checks Ollama is running, pulls
-`llama3.2:1b` + `nomic-embed-text` if missing, and embeds your data into pgvector.
-It's idempotent. (Host port is **5433** so it never collides with a system Postgres
-already on 5432.)
+Ingest real data and ask:
 
-The cite-or-refuse contract is preserved: `RETRIEVAL_MIN_SCORE` (default `0.5`) is a
-similarity floor so the brain still refuses when nothing is genuinely relevant — tune
-it to your embedding model. Mix and match freely (e.g. local embeddings + a hosted
-generator) since generation and recall are independent seams.
+```bash
+curl -s localhost:4000/api/ingest -H 'content-type: application/json' \
+  -H 'x-access-scopes: my-team' \
+  -d '{"format":"text","source":"notes","content":"Rivian committed $250k in sponsored research for 2026. Open action: send the agreement by June 14."}'
 
-> **Cost note:** in a RAG brain, generation dominates cost and embeddings are nearly
-> free. Cheapest→priciest: fully local (`$0`) · hosted embeddings + local generation ·
-> Gemini Flash / GPT-4o-mini / Claude Haiku · frontier models.
+curl -s localhost:4000/api/ask -H 'content-type: application/json' \
+  -H 'x-access-scopes: my-team' \
+  -d '{"question":"What did Rivian commit to?"}'      # → grounded, cited answer
+```
 
-## Make it yours (any domain, any stack)
+## Connect a workflow (n8n) — the data driver
 
-Company Brain is a template. To adapt it to your organization:
+Point an HTTP Request node at the ingest webhook; every record that lands becomes
+retrievable and triggers your fan-out agents. Set `INGEST_API_KEY` to require auth.
 
-1. **Your domain** — edit `src/domain/types.ts` to describe your entities (the example
-   uses companies/contacts/engagements/programs; yours might be patients/visits, or
-   clients/matters, or properties/leads).
-2. **Your data** — edit `src/adapter/index.ts`: the SQL that reads your tables and the
-   mappers that shape your rows. This is the *only* file you must change to use real
-   data.
-3. **Your access model** — entities carry an `access` scope; pass the caller's real
-   scopes from your auth layer into `brain.brief/ask`.
-4. **Your front end** — call the HTTP API from anything (Next.js, mobile, a Slack bot).
+```
+POST http://your-host:4000/api/ingest
+Authorization: Bearer <INGEST_API_KEY>
+{ "format": "text", "source": "n8n", "content": "…data from your workflow…" }
+```
 
-If you can map your tables in ten minutes, the integration is done.
+Ready-to-import workflow: [`examples/n8n-workflow.json`](./examples/n8n-workflow.json) · guide: **[docs/N8N.md](./docs/N8N.md)**.
 
-## HTTP API
+## Connect an AI agent (MCP) — the agent shell
 
-Read (grounded + cited, access-scoped):
+Register the OS in any agent IDE:
 
-| Endpoint | Body | Returns |
-|---|---|---|
-| `GET /health` | — | status + active mode |
-| `GET /api/companies` | — | known entity names |
-| `POST /api/brief` | `{ company }` | grounded briefing + sources |
-| `POST /api/ask` | `{ question }` | grounded answer + sources |
-| `POST /api/ask/stream` | `{ question }` | SSE token stream |
-| `POST /api/intro-path` | `{ from, to }` | relationship path (graph) |
-| `GET /api/health-check` | — | what needs attention (health agent) |
+```jsonc
+{
+  "mcpServers": {
+    "open-brain": { "command": "npx", "args": ["-y", "open-company-brain", "mcp"] }
+  }
+}
+```
 
-Learning loop (feedback → reranker + few-shot + auto-grown evals):
+Tools (all scope-gated, cite-or-refuse): `search_brain`, `ask_brain`, `ingest`,
+`list_sources`. See **[docs/MCP.md](./docs/MCP.md)**.
 
-| Endpoint | Body | Returns |
-|---|---|---|
-| `POST /api/feedback` | `{ query, answer, verdict, sources? }` | `{ ok }` — records a thumbs up/down |
-| `GET /api/eval/candidates` | — | scope-gated regression cases auto-grown from rejected answers |
-
-Write (action layer — human-approved, idempotent, audited):
-
-| Endpoint | Body | Returns |
-|---|---|---|
-| `POST /api/actions/draft-email` | `{ company, goal }` | a proposed action (not executed) |
-| `POST /api/actions/log-engagement` | `{ company, summary, ... }` | a proposed action |
-| `POST /api/actions/:id/approve` | — | executes (idempotent) |
-| `POST /api/actions/:id/reject` | `{ reason? }` | marks rejected |
-| `GET /api/actions` | — | list of actions |
-| `GET /api/actions/audit` | — | the audit log |
-
-**Access scopes:** send `x-access-scopes: scopeA,scopeB`; retrieval only ever
-returns chunks within those scopes.
+## Embed it as a library
 
 ```ts
-const res = await fetch('http://localhost:4000/api/ask', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ question: 'Which partners care about ML research?' }),
-});
-const { answer, sources } = await res.json();
+import { Brain } from 'open-company-brain';
+const brain = await Brain.create();
+await brain.ingest({ format: 'text', source: 'notes', content: '…' }, ['my-team']);
+const { answer, sources } = await brain.ask('…', ['my-team']);
+```
+
+## Three backends (no code change — set `LLM_BACKEND`)
+
+| Backend | What | Cost |
+|---|---|---|
+| `mock` | deterministic, offline — zero credentials | $0 |
+| `langbase` | managed Memory + Pipes | usage |
+| `local` | Ollama generation + Ollama embeddings + pgvector | **$0 / query** |
+
+## HTTP API (selected)
+
+```
+POST /api/ingest                { format, content, source?, scope? }   data in (auth-gated)
+POST /api/ask                   { question }                           grounded answer + sources
+GET  /api/health-check          attention agent (what needs follow-up)
+GET  /api/stats                 real per-source counts
+GET/POST /api/fanout/agents     reaction agents (run on each ingest)
+GET  /api/fanout/results        their cited outputs
+POST /api/actions/propose       { title, instruction, query }          human-approved action
+POST /api/agents/run            { instruction, query }                 no-code agent
 ```
 
 ## Scripts
 
-| Command | Does |
-|---|---|
-| `npm run demo` | run the API + agent console at http://localhost:4000 |
-| `npm run dev` | same, with hot reload |
-| `npm run setup:live` | provision the Langbase Memory + Pipe and sync data (idempotent) |
-| `npm run setup:local` | pull local models + embed data into pgvector ($0/query, idempotent) |
-| `npm run sync` | incremental rebuild of the recall layer (changed rows only) |
-| `npm run sync:full` | full rebuild of the recall layer |
-| `npm run eval` | run the golden behavioural eval set |
-| `npm run seed:db` | load schema + sample data into Postgres |
-| `npm test` | run the test suite (65 tests) |
-| `npm run typecheck` | strict type check |
-| `npm run build` | compile to `dist/` |
+```
+npm run demo          run the dashboard + API (http://localhost:4000)
+npm run mcp           run the MCP server (stdio)
+npm run setup:local   provision the fully-local backend
+npm run setup:live    provision the managed (Langbase) backend
+npm test              vitest
+npm run typecheck     tsc --noEmit
+```
 
 ## Documentation
 
-- [`docs/GETTING_STARTED.md`](./docs/GETTING_STARTED.md) — the 5-minute path: scaffold → keys → your data → your workflow.
-- [`examples/custom-action.example.ts`](./examples/custom-action.example.ts) — copyable template for your own workflow.
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the layered design and the two contracts.
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to set up and contribute.
-
-## Capabilities
-
-- **Connectors** — read from Postgres, CSV folders, or a JSON snapshot with no code
-  change (`DATA_CONNECTOR=csv CONNECTOR_PATH=examples/sample-data`). The connector
-  interface is the template for adding more sources.
-- **Real action delivery** — approved actions go to a record-only outbox (default),
-  a real **file** (`outbox/*.jsonl`), or a **webhook** — selected by env.
-- **Read core** — grounded, cited briefing & Q&A; FK knowledge graph.
-- **Action layer** — agents *draft* write-actions (email, log engagement); a human
-  *approves*; execution is **idempotent** and every step is **audited**. Email is
-  queued to an outbox by default (never silently sent).
-- **Multi-scope access control** — per-request scopes; cross-scope records stay
-  hidden (a company document never leaks a more-restricted child).
-- **Incremental sync** — only changed rows re-embed, tracked by a watermark.
-- **Graph backends** — in-memory (default) or a Postgres recursive-CTE backend;
-  Apache AGE / Neo4j drop in behind the same interface.
-- **Relation-enrichment** — deterministic theme tagging (LLM-swappable).
-- **Health agent** — flags stale relationships and open items.
-- **Streaming, observability, evals** — SSE answers, structured request logs, and a
-  golden eval set wired into CI.
-
-Still intentionally deferred: real email/calendar delivery providers, a visual
-relationship-map UI, and live LLM enrichment. See `ARCHITECTURE.md`.
-
-> **Not a visual workflow builder.** Company Brain is code-first: a "workflow" is a
-> small, typed *action recipe* (a prompt + an executor) a developer adds in a few
-> lines — grounded, governed, and audited by the framework. It is deliberately
-> **not** an n8n-style drag-and-drop canvas; it gives opinionated, safe agentic
-> primitives instead of a blank automation board.
-
-## Contributing
-
-PRs welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.md) and
-[`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md). Good first issues: new data-source
-adapters, additional example domains, a recursive-CTE graph backend.
+- [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md) — full setup
+- [docs/N8N.md](./docs/N8N.md) — connect a workflow
+- [docs/MCP.md](./docs/MCP.md) — connect an AI agent
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — how it's built
+- [CHANGELOG.md](./CHANGELOG.md)
 
 ## License
 
-[MIT](./LICENSE). All sample data is synthetic.
+MIT — see [LICENSE](./LICENSE).

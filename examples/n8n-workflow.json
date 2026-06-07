@@ -1,0 +1,45 @@
+{
+  "name": "Open Brain — ingest",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b1a1c0de-0001-4000-8000-000000000001",
+      "name": "When clicked",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:4000/api/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer YOUR_INGEST_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"format\": \"text\",\n  \"source\": \"n8n\",\n  \"scope\": \"my-team\",\n  \"content\": {{ JSON.stringify($json.content || \"Example record pushed from n8n at \" + $now.toISO()) }}\n}",
+        "options": {}
+      },
+      "id": "b1a1c0de-0002-4000-8000-000000000002",
+      "name": "Open Brain · ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    }
+  ],
+  "connections": {
+    "When clicked": {
+      "main": [[{ "node": "Open Brain · ingest", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Push any workflow data into Open Brain. Replace the HTTP node's upstream with your real source (a trigger, a DB query, an email node). Set YOUR_INGEST_API_KEY to match INGEST_API_KEY on the server (or remove the Authorization header when running open/local)."
+  }
+}

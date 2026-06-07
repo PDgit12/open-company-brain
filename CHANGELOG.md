@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.4.0] — 2026-06-07
+
+### Changed — reframed into a universal agentic OS (breaking)
+- **Removed the CRM domain entirely.** The brain is now domain-agnostic: it boots
+  empty and is fed only via `ingest`. Deleted the companies/contacts/engagements
+  model, the knowledge graph, the adapter/datasource/json-snapshot connectors,
+  `sync`, the CRM seed + `db/schema.sql`, and `brief` / `intro-path` /
+  `companyNames`. A generic demo seed keeps mock mode + the dashboard non-empty.
+- **Universal ingestion** is the single data-in path (text/CSV/JSON, no
+  privileged schema) with deterministic theme enrichment on every record.
+- **Generalized the action layer** to `propose({title,instruction,query})` →
+  approve → deliver (outbox/file/webhook); dropped the email/engagement specifics.
+
+### Added — three shells over one governed kernel
+- **Library export** — `import { Brain, createApp } from 'open-company-brain'`
+  (`exports`/`main`/`types`), so the OS is embeddable, not just runnable.
+- **Event-driven fan-out** — reaction agents that run automatically over each new
+  ingest via `Brain.ingest` (so the library AND the HTTP route both get it);
+  empty by default (cost guard); scope-gated. Routes: `/api/fanout/*`.
+- **MCP server** (`company-brain mcp`, `npm run mcp`) — the agent shell: stdio
+  server exposing `search_brain`, `ask_brain`, `ingest`, `list_sources` to any
+  MCP host (Claude Code/Desktop, Cursor). `Brain.search()` added for pure
+  scoped retrieval.
+- **Ingest webhook auth + rate limit** — `INGEST_API_KEY` (Bearer/x-api-key)
+  grants `INGEST_SCOPES`, with a per-minute limiter; open when unset (dev).
+- **Dashboard reframed** to the universal model with a Fan-out tab and an n8n
+  webhook card; **n8n example** (`examples/n8n-workflow.json`) + `docs/N8N.md` +
+  `docs/MCP.md`.
+- **Real eslint flat config** so `npm run lint` is a real gate (passes clean).
+
+### Verified
+- 78 tests (75 pass, 3 skipped); typecheck + lint clean.
+- Real end-to-end on the local backend (Ollama + pgvector): real embeddings,
+  real generation, cite-or-refuse, fan-out, and all three shells sharing one
+  pgvector store (HTTP ingest → MCP `search_brain` reads it).
+
 ## [0.3.0] — 2026-05-30
 
 ### Added — self-improvement loop + a fully-local backend
