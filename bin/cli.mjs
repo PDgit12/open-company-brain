@@ -160,15 +160,43 @@ async function harnessCmd(forwarded) {
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 
-const cmd = process.argv[2] ?? 'init';
+function help() {
+  console.log(`
+  open-brain — an agentic OS for companies & individuals
+
+  Usage: company-brain <command> [options]
+
+  Setup
+    init                 guided setup — create .env and add your keys
+    doctor               report the active backend and what's still needed
+
+  Run the OS (shells)
+    demo                 (npm run demo) dashboard + HTTP API at :4000
+    mcp                  run as an MCP server (door 3) over stdio
+
+  Harness (operator shell)
+    run "<task>"         run an agent on the brain + connected tools
+                         [--agent auto|builtin|tools] [--scopes a,b]
+    chat                 interactive agent REPL
+    tools                list every tool an agent can use (kernel + MCPs)
+    connect <name> -- <cmd> [args…]
+                         connect an external MCP server (e.g. your knit MCP)
+
+    help                 show this
+`);
+}
+
+const cmd = process.argv[2] ?? 'help';
 const run = () => {
+  if (cmd === 'init') return init();
   if (cmd === 'doctor') return doctor();
   if (cmd === 'mcp') return mcp();
   if (cmd === 'tools') return toolsCmd([]);
   if (cmd === 'connect') return toolsCmd(['connect', ...process.argv.slice(3)]);
   if (cmd === 'run') return harnessCmd(['run', ...process.argv.slice(3)]);
   if (cmd === 'chat') return harnessCmd(['chat', ...process.argv.slice(3)]);
-  return init();
+  help();
+  return Promise.resolve();
 };
 run().catch((e) => {
   console.error(e);

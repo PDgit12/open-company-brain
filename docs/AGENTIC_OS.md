@@ -68,9 +68,9 @@ Mapping to the AIOS kernel managers (so we're principled, not ad-hoc):
 
 ## 4. Build roadmap (each phase shippable, kernel stays the contract)
 
-- **K1 — Tool Fabric / MCP host.** `src/tools/` registry + an MCP client that connects configured external MCP servers, lists+namespaces their tools, and a `call_tool` path. Expose the merged toolset to agents; scope-gate every call. (Highest-leverage: this is "connect any MCP incl. knit".)
-- **K2 — Agent adapter interface.** `src/harness/agent.ts` (`Agent.run`), a Builtin adapter (today's brain), and an MCP-host tool-loop adapter (model + Tool Fabric). One registry of agents.
-- **K3 — Harness governance wrapper.** Per-run scope/tool-allowlist/budget/approval/audit around every `Agent.run`. Reuse the action layer's approve+audit.
+- **K1 — Tool Fabric / MCP host. ✅ DONE.** `src/tools/` (`fabric.ts`, `mcp-host.ts`, `config.ts`, `assemble.ts`, `cli.ts`): connect external MCP servers, list+namespace their tools, merge with kernel tools, scope-gate every call. CLI `company-brain tools` / `connect`. Verified aggregating an external MCP's tools.
+- **K2 — Agent adapter interface. ✅ DONE.** `src/harness/agent.ts` (`Agent.run`), `BuiltinAgent`, and `ToolLoopAgent` (tool-capable model + Tool Fabric). CLI `company-brain run` / `chat` (operator shell). Verified live: the tool loop autonomously called `brain.search` and answered grounded + scope-gated.
+- **K3 — Harness governance wrapper.** Per-run scope/tool-allowlist/budget/approval/audit around every `Agent.run`. Reuse the action layer's approve+audit. (Today: step trace + scope threading + max-step budget exist; formalize allow-list + approval.)
 - **K4 — Scheduler.** Cron + event triggers feeding a run queue (generalize fan-out).
 - **K5 — External-runtime adapter.** Run a LangGraph/CrewAI/Hermes agent as a governed process on the OS (bring-your-own-agent, proven).
 - **K6 — Agents + runs UI.** Installed-agents home + run/observability log in the dashboard.

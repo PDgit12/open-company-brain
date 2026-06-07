@@ -127,6 +127,22 @@ Register the OS in any agent IDE:
 Tools (all scope-gated, cite-or-refuse): `search_brain`, `ask_brain`, `ingest`,
 `list_sources`. See **[docs/MCP.md](./docs/MCP.md)**.
 
+## Operate it from the CLI (the harness)
+
+The harness is the operator shell: bring any agent, connect any MCP, run on the
+governed kernel — from your terminal.
+
+```bash
+company-brain connect knit -- npx -y knit-mcp@latest   # be an MCP HOST: add any MCP
+company-brain tools                                    # kernel tools + every connected MCP's tools
+company-brain run "summarize what's open across the brain" --scopes my-team
+company-brain chat                                     # interactive agent REPL
+```
+
+`run`/`chat` use a tool-loop agent on the local backend (it autonomously calls
+`brain.search` and any connected MCP tool, scope-gated) and the built-in grounded
+agent elsewhere. `--agent builtin|tools` forces one.
+
 ## Embed it as a library
 
 ```ts
