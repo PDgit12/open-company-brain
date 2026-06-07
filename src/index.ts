@@ -60,5 +60,11 @@ export type { ProposedAction, ProposeResult } from './actions/types.js';
 // MCP server — expose the brain to agentic environments (Claude, Cursor, …).
 export { createMcpServer, runMcpStdio } from './mcp/server.js';
 
+// Tool Fabric — the harness's MCP host: aggregate kernel + external MCP tools.
+export { ToolFabric, BuiltinToolSource, type ToolSpec, type ToolSource } from './tools/fabric.js';
+export { McpServerSource, mcpSources, type McpServerConfig } from './tools/mcp-host.js';
+export { createFabric } from './tools/assemble.js';
+export { loadMcpServers, addMcpServer } from './tools/config.js';
+
 // Config + mode banner.
 export { config, describeMode } from './config.js';

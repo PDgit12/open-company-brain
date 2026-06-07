@@ -138,9 +138,28 @@ async function mcp() {
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 
+/**
+ * Harness tool commands: `tools` (list the fabric) and `connect` (register an
+ * external MCP server). Routes to the compiled entry when built, else tsx.
+ * Forwards the subcommand + its args so the entry can parse them.
+ */
+async function toolsCmd(forwarded) {
+  const dist = path.join(ROOT, 'dist', 'tools', 'cli.js');
+  const useDist = await exists(dist);
+  const [cmd, base] = useDist ? ['node', [dist]] : ['npx', ['-y', 'tsx', path.join(ROOT, 'src', 'tools', 'cli.ts')]];
+  const child = spawn(cmd, [...base, ...forwarded], { stdio: 'inherit', cwd: process.cwd() });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
+
 const cmd = process.argv[2] ?? 'init';
-const route = cmd === 'doctor' ? doctor : cmd === 'mcp' ? mcp : init;
-route().catch((e) => {
+const run = () => {
+  if (cmd === 'doctor') return doctor();
+  if (cmd === 'mcp') return mcp();
+  if (cmd === 'tools') return toolsCmd([]);
+  if (cmd === 'connect') return toolsCmd(['connect', ...process.argv.slice(3)]);
+  return init();
+};
+run().catch((e) => {
   console.error(e);
   process.exit(1);
 });
