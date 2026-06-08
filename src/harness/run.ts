@@ -9,6 +9,7 @@
 import { Brain } from '../brain/brain.js';
 import { config } from '../config.js';
 import { createFabric } from '../tools/assemble.js';
+import { tracedRun } from '../observability/runs.js';
 import { BuiltinAgent, ToolLoopAgent, type Agent, type AgentResult } from './agent.js';
 
 export type AgentKind = 'auto' | 'builtin' | 'tools';
@@ -30,7 +31,9 @@ export async function runAgent(
   const agent = pickAgent(opts.agent);
   const scopes = opts.scopes ?? [config.demoUserAccessScope];
   try {
-    return await agent.run(task, { brain, fabric, scopes });
+    // tracedRun persists a trace (best-effort) so library callers get the same
+    // observability as the CLI.
+    return await tracedRun(agent, task, { brain, fabric, scopes });
   } finally {
     await fabric.close();
   }

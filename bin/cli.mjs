@@ -185,6 +185,8 @@ function help() {
                          [--agent auto|builtin|tools] [--saved <name>] [--fresh] [--scopes a,b]
     chat                 interactive agent REPL   [--saved <name>]
     budget               show token usage against the per-scope cap  [--scopes a,b]
+    runs                 recent agent runs with token + latency metrics  [--limit N]
+    trace <id>           full tool-call trace + metrics for one run
     eval                 run the agentic eval suite (grounding, refusal, tools,
                          budget, scope, recall)   [--suite file.json]
     tools                list every tool an agent can use (brain + connected)
@@ -215,6 +217,8 @@ const run = () => {
   if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
   if (cmd === 'forget') return harnessCmd(['forget', ...process.argv.slice(3)]);
   if (cmd === 'budget') return harnessCmd(['budget', ...process.argv.slice(3)]);
+  if (cmd === 'runs') return harnessCmd(['runs', ...process.argv.slice(3)]);
+  if (cmd === 'trace') return harnessCmd(['trace', ...process.argv.slice(3)]);
   if (cmd === 'eval') return evalCmd(process.argv.slice(3));
   help();
   return Promise.resolve();

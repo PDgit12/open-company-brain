@@ -19,6 +19,7 @@ import { bindMemory, getConversationStore } from '../agents/conversation.js';
 import { getResponseCache } from './cache.js';
 import { getTokenBudget, scopeKey } from './tokens.js';
 import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
+import { getRunStore, tracedRun } from '../observability/runs.js';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
 
@@ -68,7 +69,7 @@ function makeCtx(brain: Brain, fabric: ToolFabric, scopes: string[], spin: Spinn
 
 async function runOnce(agent: Agent, ctx: AgentContext, task: string, spin: Spinner): Promise<void> {
   try {
-    const r = await agent.run(task, ctx);
+    const r = await tracedRun(agent, task, ctx);
     spin.stop();
     renderResult(r);
   } catch (err) {
@@ -142,6 +143,51 @@ async function showBudget(scopes: string[]): Promise<void> {
   stdout.write(`  ${dim('used')}   ${bold(String(used))} tokens\n`);
   stdout.write(`  ${dim('limit')}  ${limit > 0 ? `${limit} tokens` : gray('unlimited (set COMB_TOKEN_BUDGET_PER_SCOPE)')}\n`);
   if (limit > 0) stdout.write(`  ${dim('left')}   ${bold(String(Math.max(0, limit - used)))} tokens\n`);
+}
+
+/** `comb runs [--limit N]` — recent agent runs with token + latency metrics. */
+async function listRuns(limit: number): Promise<void> {
+  const runs = await getRunStore().list(limit);
+  if (!runs.length) {
+    stdout.write(`${dim('No runs recorded yet.')} Run an agent, then check back.\n`);
+    return;
+  }
+  stdout.write(`\n${butter('◆')} ${bold('Recent runs')} ${dim(`· ${runs.length}`)}\n`);
+  for (const r of runs) {
+    const when = r.at.replace('T', ' ').slice(0, 19);
+    stdout.write(`  ${coral('•')} ${bold(r.id)}  ${dim(when)}  ${gray(r.agent)}\n`);
+    stdout.write(`    ${dim('in')} ${gray(r.input.replace(/\s+/g, ' ').slice(0, 56))}\n`);
+    stdout.write(`    ${dim('tokens')} ${r.promptTokens}+${r.outputTokens}  ${dim('· tools')} ${r.steps.length}  ${dim('·')} ${r.latencyMs}ms\n`);
+  }
+  stdout.write(`\n${dim('Inspect one:')} ${bold('comb trace <run id>')}\n`);
+}
+
+/** `comb trace <id>` — the full tool-call trace + metrics for one run. */
+async function showTrace(id: string | undefined): Promise<void> {
+  const needle = (id ?? '').trim();
+  if (!needle) {
+    stdout.write(gray('usage: comb trace <run id>   (see ' + bold('comb runs') + ')\n'));
+    process.exit(1);
+  }
+  const r = await getRunStore().get(needle);
+  if (!r) {
+    stdout.write(`${coral('✗')} no run ${bold(needle)} — see ${bold('comb runs')}.\n`);
+    process.exit(1);
+  }
+  const line = '─'.repeat(54);
+  stdout.write(`\n${butter('◆')} ${bold('Run')} ${r.id}\n${dim(line)}\n`);
+  stdout.write(`${dim('agent')}    ${r.agent}\n${dim('backend')}  ${r.backend}\n${dim('scopes')}   ${r.scopes.join(', ')}\n`);
+  stdout.write(`${dim('tokens')}   ${r.promptTokens} in / ${r.outputTokens} out  ${dim('· latency')} ${r.latencyMs}ms  ${dim('· at')} ${r.at}\n`);
+  stdout.write(`${dim(line)}\n${dim('input')}\n  ${r.input}\n`);
+  if (r.steps.length) {
+    stdout.write(`${dim('steps')}\n`);
+    for (const s of r.steps) {
+      const arg = Object.values(s.args)[0];
+      stdout.write(`  ${coral('→')} ${bold(s.tool)} ${gray(arg ? String(arg).slice(0, 48) : '')}\n`);
+      stdout.write(`    ${gray(s.result.replace(/\s+/g, ' ').slice(0, 80))}\n`);
+    }
+  }
+  stdout.write(`${dim('output')}\n  ${r.output.replace(/\n/g, '\n  ')}\n`);
 }
 
 /** `comb forget <id|name>` — wipe a saved agent's conversation memory. */
@@ -264,6 +310,11 @@ async function main(): Promise<void> {
   if (mode === 'agents') return listAgents();
   if (mode === 'forget') return forgetAgent(rest[0]);
   if (mode === 'budget') return showBudget(scopes);
+  if (mode === 'runs') {
+    const li = argv.indexOf('--limit');
+    return listRuns(li !== -1 ? Math.max(1, Number(argv[li + 1]) || 20) : 20);
+  }
+  if (mode === 'trace') return showTrace(rest[0]);
 
   const brain = await Brain.create();
   const fabric = await createFabric(brain);
