@@ -65,6 +65,13 @@ const EnvSchema = z.object({
   COMB_TOKEN_BUDGET_PER_SCOPE: z.coerce.number().int().min(0).default(0),
   // Response-cache time-to-live (seconds) for deterministic saved-agent runs.
   COMB_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).default(86400),
+  // The model's usable context window, in tokens. The harness packs system +
+  // conversation memory + retrieved context + the request to fit inside it,
+  // trimming oldest memory first. Default suits small local models (Ollama).
+  COMB_CONTEXT_WINDOW_TOKENS: z.coerce.number().int().positive().default(8192),
+  // Fraction of the window conversation memory may occupy before older turns are
+  // dropped — the rest is reserved for retrieved grounding + the answer.
+  COMB_MEMORY_WINDOW_FRACTION: z.coerce.number().min(0).max(1).default(0.35),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -128,6 +135,12 @@ export const config = {
     dataDir: env.COMB_DATA_DIR,
     tokenBudgetPerScope: env.COMB_TOKEN_BUDGET_PER_SCOPE,
     cacheTtlSeconds: env.COMB_CACHE_TTL_SECONDS,
+    contextWindowTokens: env.COMB_CONTEXT_WINDOW_TOKENS,
+    memoryWindowFraction: env.COMB_MEMORY_WINDOW_FRACTION,
+    /** Tokens conversation memory may occupy before oldest turns are trimmed. */
+    get memoryTokenBudget(): number {
+      return Math.floor(env.COMB_CONTEXT_WINDOW_TOKENS * env.COMB_MEMORY_WINDOW_FRACTION);
+    },
   },
 } as const;
 

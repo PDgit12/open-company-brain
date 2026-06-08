@@ -16,6 +16,7 @@ import path from 'node:path';
 import pg from 'pg';
 import { config } from '../config.js';
 import { JsonFileCollection } from '../storage/json-file.js';
+import { estimateTokens } from '../harness/tokens.js';
 
 export type Role = 'user' | 'assistant';
 
@@ -177,9 +178,33 @@ export function bindMemory(store: ConversationStore, agentId: string): AgentMemo
   };
 }
 
-/** Render prior turns as a compact prompt block (empty string when none). */
-export function formatMemory(turns: ConversationTurn[]): string {
-  if (!turns.length) return '';
-  const lines = turns.map((t) => `${t.role === 'user' ? 'User' : 'Agent'}: ${t.content}`);
+/**
+ * Context-window packing: keep the MOST RECENT turns whose cumulative estimated
+ * tokens fit `maxTokens`, dropping oldest first. This is what makes the harness
+ * safe on a small context window — memory never grows unbounded into the prompt.
+ * Returns turns oldest-first (ready to render), preserving conversational order.
+ */
+export function fitTurns(turns: ConversationTurn[], maxTokens: number): ConversationTurn[] {
+  if (maxTokens <= 0) return [];
+  const kept: ConversationTurn[] = [];
+  let used = 0;
+  // Walk newest → oldest, accumulating until the next turn would overflow.
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const cost = estimateTokens(turns[i]!.content) + 8; // +role/label overhead
+    if (used + cost > maxTokens) break;
+    used += cost;
+    kept.push(turns[i]!);
+  }
+  return kept.reverse();
+}
+
+/**
+ * Render prior turns as a compact prompt block, trimmed to fit `maxTokens` of
+ * the context window (0 = no trim). Empty string when there's nothing to show.
+ */
+export function formatMemory(turns: ConversationTurn[], maxTokens = 0): string {
+  const fitted = maxTokens > 0 ? fitTurns(turns, maxTokens) : turns;
+  if (!fitted.length) return '';
+  const lines = fitted.map((t) => `${t.role === 'user' ? 'User' : 'Agent'}: ${t.content}`);
   return `CONVERSATION SO FAR:\n${lines.join('\n')}`;
 }

@@ -6,9 +6,12 @@ import {
   FileConversationStore,
   InMemoryConversationStore,
   bindMemory,
+  fitTurns,
   formatMemory,
   type ConversationTurn,
 } from '../src/agents/conversation.js';
+import { InMemoryResponseCache } from '../src/harness/cache.js';
+import { InMemoryTokenBudget } from '../src/harness/tokens.js';
 import { SavedAgent } from '../src/harness/saved-agent.js';
 import type { CustomAgent } from '../src/agents/registry.js';
 import type { AgentContext } from '../src/harness/agent.js';
@@ -89,6 +92,52 @@ describe('bindMemory + formatMemory', () => {
     expect(block).toContain('CONVERSATION SO FAR:');
     expect(block).toContain('User: hi');
     expect(block).toContain('Agent: yo');
+  });
+});
+
+describe('fitTurns — context-window packing', () => {
+  const turns = Array.from({ length: 6 }, () => turn('user', 'x'.repeat(40))); // ~10 tok + 8 each
+  it('keeps only the most recent turns that fit the budget, in order', () => {
+    const fitted = fitTurns(turns, 40); // room for ~2 turns (~18 tok each)
+    expect(fitted.length).toBeLessThan(turns.length);
+    expect(fitted.length).toBeGreaterThan(0);
+    // It keeps the TAIL (most recent), still oldest-first.
+    expect(fitted).toEqual(turns.slice(turns.length - fitted.length));
+  });
+  it('returns [] for a zero/negative budget and all turns for a huge budget', () => {
+    expect(fitTurns(turns, 0)).toEqual([]);
+    expect(fitTurns(turns, 100_000)).toHaveLength(6);
+  });
+  it('formatMemory(maxTokens) trims the rendered block', () => {
+    const full = formatMemory(turns);
+    const trimmed = formatMemory(turns, 40);
+    expect(trimmed.length).toBeLessThan(full.length);
+    expect(trimmed).toContain('CONVERSATION SO FAR:');
+  });
+});
+
+describe('SavedAgent — token budget + response cache', () => {
+  it('refuses to generate when the scope budget is exhausted', async () => {
+    const budget = new InMemoryTokenBudget();
+    await budget.record('default-team', 1000); // already spent
+    const agent = new SavedAgent(def, { budget, budgetLimit: 500 });
+    const { brain } = spyBrain();
+    const ctx = { brain, fabric: { list: () => [] }, scopes: ['default-team'] } as unknown as AgentContext;
+    const r = await agent.run('anything', ctx);
+    expect(r.output).toContain('budget');
+    expect((brain as unknown as { draft: { mock: { calls: unknown[] } } }).draft.mock.calls).toHaveLength(0);
+  });
+
+  it('serves a cached answer on the deterministic (memory-less) path without re-generating', async () => {
+    const cache = new InMemoryResponseCache(3600);
+    const agent = new SavedAgent(def, { cache, cacheModel: 'm' });
+    const { brain, seen } = spyBrain();
+    const ctx = { brain, fabric: { list: () => [] }, scopes: ['default-team'] } as unknown as AgentContext;
+
+    const first = await agent.run('same question', ctx); // miss → generates
+    const second = await agent.run('same question', ctx); // hit → no generation
+    expect(seen).toHaveLength(1); // brain.draft called exactly once
+    expect(second.output).toBe(first.output);
   });
 });
 

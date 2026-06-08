@@ -14,6 +14,8 @@
 
 import type { CustomAgent } from '../agents/registry.js';
 import { formatMemory, type AgentMemory } from '../agents/conversation.js';
+import { cacheKey, type ResponseCache } from './cache.js';
+import { estimateTokens, scopeKey, type TokenBudget } from './tokens.js';
 import type { Agent, AgentContext, AgentResult } from './agent.js';
 
 /** Stitch the cited sources onto generated text, matching BuiltinAgent's shape. */
@@ -43,6 +45,16 @@ export function runInstruction(def: CustomAgent, task: string, memoryBlock = '')
 export interface SavedAgentOptions {
   /** Per-agent memory binding. When present, the run is context-retaining. */
   memory?: AgentMemory;
+  /** Response cache for the deterministic (memory-less) path. */
+  cache?: ResponseCache;
+  /** Model id mixed into the cache key (so a model swap doesn't reuse answers). */
+  cacheModel?: string;
+  /** Per-scope token budget meter. */
+  budget?: TokenBudget;
+  /** Token cap per scope (0 = unlimited). */
+  budgetLimit?: number;
+  /** Tokens conversation memory may occupy in the prompt (0 = no trim). */
+  memoryTokenBudget?: number;
 }
 
 export class SavedAgent implements Agent {
@@ -56,18 +68,47 @@ export class SavedAgent implements Agent {
 
   async run(task: string, ctx: AgentContext): Promise<AgentResult> {
     ctx.onStatus?.('thinking');
-    const priorTurns = this.opts.memory ? await this.opts.memory.recent() : [];
-    const { text, sources } = await ctx.brain.draft(
-      runQuery(this.def, task),
-      runInstruction(this.def, task, formatMemory(priorTurns)),
-      ctx.scopes,
-    );
-    const output = withSources(text, sources);
-    // Persist the exchange so the next run remembers it. Store the raw answer
-    // (without the Sources footer) to keep the memory block clean.
-    if (this.opts.memory && task.trim()) {
-      await this.opts.memory.remember(task.trim(), text);
+    const { memory, cache, budget } = this.opts;
+    const priorTurns = memory ? await memory.recent() : [];
+    const query = runQuery(this.def, task);
+    // Pack memory to fit the context window — oldest turns drop first.
+    const memoryBlock = formatMemory(priorTurns, this.opts.memoryTokenBudget ?? 0);
+    const instruction = runInstruction(this.def, task, memoryBlock);
+    const key = scopeKey(ctx.scopes);
+
+    // Budget gate — refuse (don't generate) when the scope's cap is exhausted.
+    if (budget) {
+      const need = estimateTokens(`${query}\n${instruction}`);
+      const chk = await budget.check(key, need, this.opts.budgetLimit ?? 0);
+      if (!chk.ok) {
+        return {
+          output:
+            `Token budget for scope "${key}" is exhausted (${chk.used}/${chk.limit} tokens). ` +
+            `Run \`comb budget\` to review, or raise COMB_TOKEN_BUDGET_PER_SCOPE.`,
+          steps: [],
+        };
+      }
     }
+
+    // Deterministic path (no conversation memory): cacheable. A memory-carrying
+    // run embeds prior dialogue, so its prompt is unique — never cached.
+    const cacheable = !memory && cache;
+    if (cacheable) {
+      const k = cacheKey({ model: this.opts.cacheModel ?? '', scopes: ctx.scopes, query, instruction });
+      const hit = await cache.get(k);
+      if (hit !== undefined) return { output: hit, steps: [] }; // cache hit: zero token spend
+      const { text, sources } = await ctx.brain.draft(query, instruction, ctx.scopes);
+      const output = withSources(text, sources);
+      await cache.set(k, output);
+      if (budget) await budget.record(key, estimateTokens(`${query}\n${instruction}\n${text}`));
+      return { output, steps: [] };
+    }
+
+    // Context-retaining path: generate, persist the exchange, meter usage.
+    const { text, sources } = await ctx.brain.draft(query, instruction, ctx.scopes);
+    const output = withSources(text, sources);
+    if (memory && task.trim()) await memory.remember(task.trim(), text);
+    if (budget) await budget.record(key, estimateTokens(`${query}\n${instruction}\n${text}`));
     return { output, steps: [] };
   }
 }

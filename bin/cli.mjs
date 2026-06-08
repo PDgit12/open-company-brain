@@ -171,8 +171,9 @@ function help() {
     agents               list your saved agents
     forget <name>        wipe a saved agent's conversation memory
     run "<task>"         run an agent over your governed brain + connected tools
-                         [--agent auto|builtin|tools] [--saved <name>] [--scopes a,b]
+                         [--agent auto|builtin|tools] [--saved <name>] [--fresh] [--scopes a,b]
     chat                 interactive agent REPL   [--saved <name>]
+    budget               show token usage against the per-scope cap  [--scopes a,b]
     tools                list every tool an agent can use (brain + connected)
     connect <name> -- <cmd> [args…]
                          connect a tool/MCP (e.g. your knit MCP) or an API
@@ -200,6 +201,7 @@ const run = () => {
   if (cmd === 'create') return harnessCmd(['create', ...process.argv.slice(3)]);
   if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
   if (cmd === 'forget') return harnessCmd(['forget', ...process.argv.slice(3)]);
+  if (cmd === 'budget') return harnessCmd(['budget', ...process.argv.slice(3)]);
   help();
   return Promise.resolve();
 };

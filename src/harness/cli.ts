@@ -16,7 +16,9 @@ import { createFabric } from '../tools/assemble.js';
 import { pickAgent, type AgentKind } from './run.js';
 import { getCustomAgentStore, resolveAgent } from '../agents/registry.js';
 import { bindMemory, getConversationStore } from '../agents/conversation.js';
-import { SavedAgent } from './saved-agent.js';
+import { getResponseCache } from './cache.js';
+import { getTokenBudget, scopeKey } from './tokens.js';
+import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
 
@@ -79,19 +81,37 @@ function parseFlags(argv: string[]): {
   agent: AgentKind;
   scopes: string[];
   saved: string | null;
+  fresh: boolean;
   rest: string[];
 } {
   let agent: AgentKind = 'auto';
   let scopes = [config.demoUserAccessScope];
   let saved: string | null = null;
+  let fresh = false;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--agent') agent = (argv[++i] as AgentKind) ?? 'auto';
     else if (argv[i] === '--scopes') scopes = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     else if (argv[i] === '--saved') saved = (argv[++i] ?? '').trim() || null;
+    else if (argv[i] === '--fresh') fresh = true;
     else rest.push(argv[i]!);
   }
-  return { agent, scopes, saved, rest };
+  return { agent, scopes, saved, fresh, rest };
+}
+
+/**
+ * Cache + budget options for a saved-agent run. The token budget always meters;
+ * the response cache only attaches on the deterministic (`--fresh`, memory-less)
+ * path, since a context-retaining prompt is unique per turn and never cacheable.
+ */
+function tokenOpts(fresh: boolean): SavedAgentOptions {
+  return {
+    budget: getTokenBudget(config.comb.dataDir),
+    budgetLimit: config.comb.tokenBudgetPerScope,
+    cacheModel: config.ollama.generationModel,
+    memoryTokenBudget: config.comb.memoryTokenBudget,
+    ...(fresh ? { cache: getResponseCache(config.comb.dataDir, config.comb.cacheTtlSeconds) } : {}),
+  };
 }
 
 /**
@@ -99,16 +119,29 @@ function parseFlags(argv: string[]): {
  * the generic builtin/tools kinds. Exits with a clear message if a `--saved`
  * name doesn't resolve — never silently falls back to a different agent.
  */
-async function chooseAgent(kind: AgentKind, saved: string | null): Promise<Agent> {
+async function chooseAgent(kind: AgentKind, saved: string | null, fresh: boolean): Promise<Agent> {
   if (!saved) return pickAgent(kind);
   const def = await resolveAgent(getCustomAgentStore(), saved);
   if (!def) {
     stdout.write(`${coral('✗')} no saved agent matches ${bold(saved)} — see ${bold('comb agents')}.\n`);
     process.exit(1);
   }
-  // A saved agent retains context across runs/sessions: bind its persistent
-  // per-agent memory so each exchange is remembered and replayed next time.
-  return new SavedAgent(def, { memory: bindMemory(getConversationStore(), def.id) });
+  // Default: a saved agent retains context across runs/sessions (bound memory).
+  // `--fresh`: a stateless, deterministic run — no memory, response-cached.
+  const opts = tokenOpts(fresh);
+  if (!fresh) opts.memory = bindMemory(getConversationStore(), def.id);
+  return new SavedAgent(def, opts);
+}
+
+/** `comb budget [--scopes a,b]` — show token usage against the per-scope cap. */
+async function showBudget(scopes: string[]): Promise<void> {
+  const key = scopeKey(scopes);
+  const used = await getTokenBudget(config.comb.dataDir).usage(key);
+  const limit = config.comb.tokenBudgetPerScope;
+  stdout.write(`\n${butter('◆')} ${bold('Token budget')} ${dim(`· scope "${key}"`)}\n`);
+  stdout.write(`  ${dim('used')}   ${bold(String(used))} tokens\n`);
+  stdout.write(`  ${dim('limit')}  ${limit > 0 ? `${limit} tokens` : gray('unlimited (set COMB_TOKEN_BUDGET_PER_SCOPE)')}\n`);
+  if (limit > 0) stdout.write(`  ${dim('left')}   ${bold(String(Math.max(0, limit - used)))} tokens\n`);
 }
 
 /** `comb forget <id|name>` — wipe a saved agent's conversation memory. */
@@ -190,22 +223,25 @@ function banner(agent: Agent, fabric: ToolFabric, scopes: string[]): void {
   stdout.write(`${dim('mode')}    ${describeMode()}\n`);
   stdout.write(`${dim('scopes')}  ${scopes.join(', ')}\n`);
   stdout.write(`${dim('tools')}   ${fabric.list().length} available  ${dim('(' + fabric.list().map((t) => t.id).slice(0, 6).join(', ') + '…)')}\n`);
+  const cap = config.comb.tokenBudgetPerScope;
+  stdout.write(`${dim('window')}  ${config.comb.contextWindowTokens} tok  ${dim('· memory ≤')} ${config.comb.memoryTokenBudget} tok  ${dim('· budget')} ${cap > 0 ? cap + ' tok/scope' : 'unlimited'}\n`);
   stdout.write(`${dim(line)}\n${dim('Type a task, or')} ${bold('exit')}${dim('.')}\n`);
 }
 
 async function main(): Promise<void> {
   const [mode, ...argv] = process.argv.slice(2);
-  const { agent: kind, scopes, saved, rest } = parseFlags(argv);
+  const { agent: kind, scopes, saved, fresh, rest } = parseFlags(argv);
   const spin = new Spinner();
 
   // Registry-only commands: no brain/fabric assembly needed.
   if (mode === 'create') return createAgent();
   if (mode === 'agents') return listAgents();
   if (mode === 'forget') return forgetAgent(rest[0]);
+  if (mode === 'budget') return showBudget(scopes);
 
   const brain = await Brain.create();
   const fabric = await createFabric(brain);
-  const agent = await chooseAgent(kind, saved);
+  const agent = await chooseAgent(kind, saved, fresh);
   const ctx = makeCtx(brain, fabric, scopes, spin);
 
   if (mode === 'chat') {
