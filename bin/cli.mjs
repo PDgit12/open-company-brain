@@ -167,7 +167,9 @@ function help() {
   Usage: comb <command> [options]
 
   Build & run agents (the harness)
-    create               build a saved agent step-by-step (no code, just a prompt)
+    create               build a saved agent (no code, just a prompt)
+                         wizard (a TTY) or flags for CI:
+                         --name N --instruction I [--query Q]
     agents               list your saved agents
     forget <name>        wipe a saved agent's conversation memory
     run "<task>"         run an agent over your governed brain + connected tools

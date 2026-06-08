@@ -175,42 +175,68 @@ async function listAgents(): Promise<void> {
   stdout.write(`\n${dim('Run one:')} ${bold('comb run --saved "<name>" "<request>"')}\n`);
 }
 
+/** Pull --name / --instruction / --query out of a create argv (flag form). */
+function parseCreateFlags(argv: string[]): { name?: string; instruction?: string; query?: string } {
+  const out: { name?: string; instruction?: string; query?: string } = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--name') out.name = (argv[++i] ?? '').trim();
+    else if (argv[i] === '--instruction') out.instruction = (argv[++i] ?? '').trim();
+    else if (argv[i] === '--query') out.query = (argv[++i] ?? '').trim();
+  }
+  return out;
+}
+
+/** Persist a definition and print how to run it — shared by both create paths. */
+async function saveAndReport(name: string, instruction: string, query?: string): Promise<void> {
+  const agent = await getCustomAgentStore().save({ name, instruction, query: query || undefined });
+  stdout.write(`\n${butter('✓')} saved ${bold(agent.name)} ${dim(agent.id)}\n`);
+  stdout.write(`${dim('grounds on')}  ${gray(agent.query)}\n`);
+  stdout.write(`\n${dim('Run it:')}\n`);
+  stdout.write(`  ${bold(`comb run --saved "${agent.name}" "<your request>"`)}\n`);
+  stdout.write(`  ${bold(`comb chat --saved "${agent.name}"`)}   ${dim('(a continuing conversation)')}\n`);
+}
+
 /**
- * `comb create` — step-by-step Q&A that writes a saved agent. A no-code agent is
- * just a prompt: a name, the instruction it follows, and what to retrieve for
- * grounding. We collect those, save through the shared registry (file-backed by
- * default, so it survives the process), and print how to run it.
+ * `comb create` — write a saved agent. A no-code agent is just a prompt: a name,
+ * the instruction it follows, and what to retrieve for grounding.
+ *
+ * Two forms share one save path:
+ *   • flag form (scriptable / CI):  comb create --name N --instruction I [--query Q]
+ *   • interactive wizard (a TTY):   step-by-step Q&A
+ * Flags win when present; we only fall to the wizard when they're incomplete.
  */
-async function createAgent(): Promise<void> {
+async function createAgent(argv: string[]): Promise<void> {
   const line = '─'.repeat(54);
   stdout.write(`\n${butter('◆')} ${bold('Create an agent')} ${dim('· no code, just a prompt')}\n${dim(line)}\n`);
+
+  // Flag form — works in any shell, including non-interactive CI.
+  const flags = parseCreateFlags(argv);
+  if (flags.name && flags.instruction) {
+    return saveAndReport(flags.name, flags.instruction, flags.query);
+  }
+
   if (!stdin.isTTY) {
-    stdout.write(gray('create needs an interactive terminal. Or POST /api/agents.\n'));
+    stdout.write(gray('create needs a terminal, or pass flags:\n'));
+    stdout.write(gray('  comb create --name "<name>" --instruction "<what it does>" [--query "<grounding>"]\n'));
     process.exit(1);
   }
   const rl = createInterface({ input: stdin, output: stdout });
   try {
-    const name = (await rl.question(`${dim('name')}         ${coral('›')} `)).trim();
+    const name = (flags.name ?? (await rl.question(`${dim('name')}         ${coral('›')} `))).trim();
     if (!name) {
       stdout.write(`${coral('✗')} a name is required.\n`);
       process.exit(1);
     }
     stdout.write(`${dim('instruction')}  ${gray('what should it do? (one or more lines)')}\n`);
-    const instruction = (await rl.question(`             ${coral('›')} `)).trim();
+    const instruction = (flags.instruction ?? (await rl.question(`             ${coral('›')} `))).trim();
     if (!instruction) {
       stdout.write(`${coral('✗')} an instruction is required.\n`);
       process.exit(1);
     }
-    const query = (await rl.question(
+    const query = (flags.query ?? (await rl.question(
       `${dim('retrieval')}    ${gray('what to search for grounding (Enter = use the name)')} ${coral('›')} `,
-    )).trim();
-
-    const agent = await getCustomAgentStore().save({ name, instruction, query: query || undefined });
-    stdout.write(`\n${butter('✓')} saved ${bold(agent.name)} ${dim(agent.id)}\n`);
-    stdout.write(`${dim('grounds on')}  ${gray(agent.query)}\n`);
-    stdout.write(`\n${dim('Run it:')}\n`);
-    stdout.write(`  ${bold(`comb run --saved "${agent.name}" "<your request>"`)}\n`);
-    stdout.write(`  ${bold(`comb chat --saved "${agent.name}"`)}   ${dim('(a continuing conversation)')}\n`);
+    ))).trim();
+    await saveAndReport(name, instruction, query);
   } finally {
     await rl.close();
   }
@@ -234,7 +260,7 @@ async function main(): Promise<void> {
   const spin = new Spinner();
 
   // Registry-only commands: no brain/fabric assembly needed.
-  if (mode === 'create') return createAgent();
+  if (mode === 'create') return createAgent(argv);
   if (mode === 'agents') return listAgents();
   if (mode === 'forget') return forgetAgent(rest[0]);
   if (mode === 'budget') return showBudget(scopes);
