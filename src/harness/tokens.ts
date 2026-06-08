@@ -14,10 +14,15 @@
 
 import path from 'node:path';
 import { JsonFileCollection } from '../storage/json-file.js';
+import { countTokens } from './tokenizer.js';
 
-/** Approximate tokens in a string (~4 chars/token). Never negative. */
+/**
+ * Token count for budgeting + context-window packing. Delegates to the
+ * configured Tokenizer seam (heuristic by default, exact BPE when configured),
+ * so every caller shares one counter.
+ */
 export function estimateTokens(text: string): number {
-  return text ? Math.ceil(text.length / 4) : 0;
+  return countTokens(text);
 }
 
 /** Canonical budget key for a set of scopes — order-independent. */

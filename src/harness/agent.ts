@@ -14,6 +14,8 @@
  *     and iterate until it answers. This is where "any tool / any MCP" pays off.
  */
 
+import { config } from '../config.js';
+import { postJson } from './http.js';
 import type { Brain } from '../brain/brain.js';
 import type { ToolFabric, ToolSpec } from '../tools/fabric.js';
 
@@ -136,13 +138,11 @@ export class ToolLoopAgent implements Agent {
   }
 
   private async chat(messages: OllamaMessage[], tools: unknown[]): Promise<OllamaMessage> {
-    const res = await fetch(`${this.baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: this.model, messages, tools, stream: false }),
-    });
-    if (!res.ok) throw new Error(`Ollama chat failed (${res.status}): ${await res.text()}`);
-    const json = (await res.json()) as { message?: OllamaMessage };
+    const json = await postJson<{ message?: OllamaMessage }>(
+      `${this.baseUrl}/api/chat`,
+      { model: this.model, messages, tools, stream: false, keep_alive: config.ollama.keepAlive },
+      { label: 'Ollama chat' },
+    );
     return json.message ?? { role: 'assistant', content: '' };
   }
 }

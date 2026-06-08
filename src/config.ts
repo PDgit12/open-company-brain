@@ -31,6 +31,10 @@ const EnvSchema = z.object({
   OLLAMA_BASE_URL: z.string().trim().url().default('http://localhost:11434'),
   OLLAMA_GENERATION_MODEL: z.string().trim().default('llama3.2:1b'),
   OLLAMA_EMBEDDING_MODEL: z.string().trim().default('nomic-embed-text'),
+  // How long Ollama keeps the model loaded in memory after a call. Keeping it
+  // warm lets the server reuse the loaded weights (and prefix KV) across turns,
+  // cutting cold-load latency. Ollama format: '5m', '30s', '-1' (forever), '0'.
+  OLLAMA_KEEP_ALIVE: z.string().trim().default('5m'),
   // Vector dimension of the embedding model (nomic-embed-text = 768).
   EMBEDDING_DIM: z.coerce.number().int().positive().default(768),
   // Minimum cosine similarity for a vector hit to count as grounding. Vector
@@ -72,6 +76,15 @@ const EnvSchema = z.object({
   // Fraction of the window conversation memory may occupy before older turns are
   // dropped — the rest is reserved for retrieved grounding + the answer.
   COMB_MEMORY_WINDOW_FRACTION: z.coerce.number().min(0).max(1).default(0.35),
+  // Token counter. 'heuristic' = zero-dep chars/4 (default, always available).
+  // 'bpe' = exact BPE via the optional `gpt-tokenizer` package when installed
+  // (exact for OpenAI vocabularies, approximate for llama); falls back to the
+  // heuristic if the package is absent.
+  COMB_TOKENIZER: z.enum(['heuristic', 'bpe']).default('heuristic'),
+  // Model-call resilience: per-request timeout and retry count (network errors,
+  // 429, and 5xx are retried with exponential backoff + jitter).
+  COMB_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+  COMB_HTTP_RETRIES: z.coerce.number().int().min(0).default(2),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -109,6 +122,7 @@ export const config = {
     embeddingDim: env.EMBEDDING_DIM,
     vectorDatabaseUrl: env.VECTOR_DATABASE_URL ?? env.DATABASE_URL,
     minScore: env.RETRIEVAL_MIN_SCORE,
+    keepAlive: env.OLLAMA_KEEP_ALIVE,
   },
   database: {
     url: env.DATABASE_URL,
@@ -137,6 +151,9 @@ export const config = {
     cacheTtlSeconds: env.COMB_CACHE_TTL_SECONDS,
     contextWindowTokens: env.COMB_CONTEXT_WINDOW_TOKENS,
     memoryWindowFraction: env.COMB_MEMORY_WINDOW_FRACTION,
+    tokenizer: env.COMB_TOKENIZER,
+    httpTimeoutMs: env.COMB_HTTP_TIMEOUT_MS,
+    httpRetries: env.COMB_HTTP_RETRIES,
     /** Tokens conversation memory may occupy before oldest turns are trimmed. */
     get memoryTokenBudget(): number {
       return Math.floor(env.COMB_CONTEXT_WINDOW_TOKENS * env.COMB_MEMORY_WINDOW_FRACTION);

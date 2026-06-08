@@ -12,6 +12,7 @@
  */
 
 import { config } from '../config.js';
+import { postJson } from '../harness/http.js';
 
 export interface Embedder {
   /** Embed a batch of texts into vectors (one per input, same order). */
@@ -69,15 +70,11 @@ export class OllamaEmbedder implements Embedder {
   async embed(texts: string[]): Promise<number[][]> {
     const out: number[][] = [];
     for (const text of texts) {
-      const res = await fetch(`${this.baseUrl}/api/embeddings`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: this.model, prompt: text }),
-      });
-      if (!res.ok) {
-        throw new Error(`Ollama embeddings failed (${res.status}): ${await res.text()}`);
-      }
-      const json = (await res.json()) as { embedding?: number[] };
+      const json = await postJson<{ embedding?: number[] }>(
+        `${this.baseUrl}/api/embeddings`,
+        { model: this.model, prompt: text, keep_alive: config.ollama.keepAlive },
+        { label: 'Ollama embeddings' },
+      );
       if (!json.embedding?.length) throw new Error('Ollama returned an empty embedding.');
       out.push(json.embedding);
     }

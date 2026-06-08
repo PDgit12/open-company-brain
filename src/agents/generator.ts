@@ -10,6 +10,7 @@
 
 import { Langbase } from 'langbase';
 import { config } from '../config.js';
+import { postJson } from '../harness/http.js';
 import { SYSTEM_PROMPT } from './prompts.js';
 import type { RetrievedChunk } from '../brain/memory.js';
 
@@ -75,20 +76,19 @@ export class OllamaGenerator implements Generator {
   ) {}
 
   async generate({ prompt }: GenerateInput): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
+    const json = await postJson<{ message?: { content?: string } }>(
+      `${this.baseUrl}/api/chat`,
+      {
         model: this.model,
         stream: false,
+        keep_alive: config.ollama.keepAlive,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: prompt },
         ],
-      }),
-    });
-    if (!res.ok) throw new Error(`Ollama chat failed (${res.status}): ${await res.text()}`);
-    const json = (await res.json()) as { message?: { content?: string } };
+      },
+      { label: 'Ollama chat' },
+    );
     return json.message?.content ?? '';
   }
 }
