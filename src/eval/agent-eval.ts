@@ -24,6 +24,7 @@ import { NO_CONTEXT_REPLY, createGenerator } from '../agents/generator.js';
 import { estimateTokens } from '../harness/tokens.js';
 import type { AgentResult } from '../harness/agent.js';
 import type { AgentKind } from '../harness/run.js';
+import type { RunRecord } from '../observability/runs.js';
 
 export type AgentCheckKind =
   | 'output_includes' // output contains a substring
@@ -162,6 +163,28 @@ export async function gradeTurn(checks: AgentCheck[], result: AgentResult): Prom
     out.push(c.check === 'judge' ? await gradeJudge(c.value ?? '', result.output) : gradeStructural(c, result));
   }
   return out;
+}
+
+/**
+ * Promote a recorded run into a regression scenario — the prod → eval loop.
+ *
+ * A run that misbehaved in production becomes a permanent eval case: same agent,
+ * same scopes, same input, with the EXPECTED behaviour asserted. By default we
+ * assert `cites_sources` (the run should ground next time — the usual regression
+ * target for a missed-grounding refusal); pass expectRefusal to instead lock in
+ * a refusal that was correct. Edit the emitted scenario to add a judge rubric.
+ */
+export function scenarioFromRun(run: RunRecord, opts: { expectRefusal?: boolean } = {}): AgentScenario {
+  const agent: AgentSpec = run.agent.startsWith('saved:')
+    ? { saved: run.agent.slice('saved:'.length) }
+    : { kind: run.agent as AgentKind };
+  const checks: AgentCheck[] = opts.expectRefusal ? [{ check: 'refuses' }] : [{ check: 'cites_sources' }];
+  return {
+    name: `regression: ${run.input.replace(/\s+/g, ' ').slice(0, 60)}`,
+    agent,
+    scopes: run.scopes,
+    turns: [{ input: run.input, checks }],
+  };
 }
 
 /**

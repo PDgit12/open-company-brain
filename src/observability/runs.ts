@@ -18,6 +18,7 @@ import pg from 'pg';
 import { config } from '../config.js';
 import { JsonFileCollection } from '../storage/json-file.js';
 import { estimateTokens } from '../harness/tokens.js';
+import { NO_CONTEXT_REPLY } from '../agents/generator.js';
 import type { Agent, AgentContext, AgentResult, AgentStep } from '../harness/agent.js';
 
 export interface RunRecord {
@@ -42,6 +43,24 @@ export interface RunStore {
 }
 
 const nextRunId = (): string => `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * Failure-shaped classification of a recorded run. We can't know ground truth,
+ * so these are REVIEW SIGNALS, not verdicts:
+ *   • 'refused'    — the agent declined (cite-or-refuse fired). Legit, OR a
+ *                    missed-grounding bug — exactly what's worth promoting.
+ *   • 'ungrounded' — it answered with no citation and no tool call (a possible
+ *                    hallucination — answered from nothing).
+ *   • 'ok'         — answered with grounding/tools.
+ * `comb runs --failed` surfaces the non-ok runs for human triage → promotion.
+ */
+export type RunConcern = 'ok' | 'refused' | 'ungrounded';
+
+export function classifyRun(r: Pick<RunRecord, 'output' | 'steps'>): RunConcern {
+  if (r.output.includes(NO_CONTEXT_REPLY)) return 'refused';
+  const grounded = /Sources:\s*\[/.test(r.output) || r.steps.length > 0;
+  return grounded ? 'ok' : 'ungrounded';
+}
 
 /** Build a trace record from a finished run. Token counts use the active tokenizer. */
 export function toRecord(

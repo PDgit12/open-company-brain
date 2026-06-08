@@ -19,7 +19,9 @@ import { bindMemory, getConversationStore } from '../agents/conversation.js';
 import { getResponseCache } from './cache.js';
 import { getTokenBudget, scopeKey } from './tokens.js';
 import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
-import { getRunStore, tracedRun } from '../observability/runs.js';
+import { getRunStore, tracedRun, classifyRun, type RunConcern } from '../observability/runs.js';
+import { scenarioFromRun } from '../eval/agent-eval.js';
+import { readFile, writeFile } from 'node:fs/promises';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
 
@@ -145,21 +147,73 @@ async function showBudget(scopes: string[]): Promise<void> {
   if (limit > 0) stdout.write(`  ${dim('left')}   ${bold(String(Math.max(0, limit - used)))} tokens\n`);
 }
 
-/** `comb runs [--limit N]` — recent agent runs with token + latency metrics. */
-async function listRuns(limit: number): Promise<void> {
-  const runs = await getRunStore().list(limit);
+const concernTag: Record<RunConcern, string> = {
+  ok: '',
+  refused: ' ' + butter('⚑ refused'),
+  ungrounded: ' ' + coral('⚑ ungrounded'),
+};
+
+/**
+ * `comb runs [--limit N] [--failed]` — recent agent runs with token + latency
+ * metrics. `--failed` keeps only failure-shaped runs (refused / ungrounded) —
+ * the triage queue for the prod → eval loop.
+ */
+async function listRuns(limit: number, failedOnly: boolean): Promise<void> {
+  const all = await getRunStore().list(failedOnly ? Math.max(limit, 200) : limit);
+  const runs = (failedOnly ? all.filter((r) => classifyRun(r) !== 'ok') : all).slice(0, limit);
   if (!runs.length) {
-    stdout.write(`${dim('No runs recorded yet.')} Run an agent, then check back.\n`);
+    stdout.write(failedOnly ? `${dim('No failure-shaped runs. ')}${butter('✓')}\n` : `${dim('No runs recorded yet.')} Run an agent, then check back.\n`);
     return;
   }
-  stdout.write(`\n${butter('◆')} ${bold('Recent runs')} ${dim(`· ${runs.length}`)}\n`);
+  stdout.write(`\n${butter('◆')} ${bold(failedOnly ? 'Flagged runs' : 'Recent runs')} ${dim(`· ${runs.length}`)}\n`);
   for (const r of runs) {
     const when = r.at.replace('T', ' ').slice(0, 19);
-    stdout.write(`  ${coral('•')} ${bold(r.id)}  ${dim(when)}  ${gray(r.agent)}\n`);
+    stdout.write(`  ${coral('•')} ${bold(r.id)}  ${dim(when)}  ${gray(r.agent)}${concernTag[classifyRun(r)]}\n`);
     stdout.write(`    ${dim('in')} ${gray(r.input.replace(/\s+/g, ' ').slice(0, 56))}\n`);
     stdout.write(`    ${dim('tokens')} ${r.promptTokens}+${r.outputTokens}  ${dim('· tools')} ${r.steps.length}  ${dim('·')} ${r.latencyMs}ms\n`);
   }
-  stdout.write(`\n${dim('Inspect one:')} ${bold('comb trace <run id>')}\n`);
+  stdout.write(
+    failedOnly
+      ? `\n${dim('Lock one in as a regression:')} ${bold('comb promote <run id>')}\n`
+      : `\n${dim('Inspect one:')} ${bold('comb trace <run id>')}  ${dim('· only failures:')} ${bold('comb runs --failed')}\n`,
+  );
+}
+
+const DEFAULT_REGRESSION_SUITE = 'comb-regressions.json';
+
+/**
+ * `comb promote <run id> [--suite file] [--expect-refusal]` — turn a recorded
+ * run into a permanent regression case appended to an eval suite. This is the
+ * prod → eval loop in one command: a run that misbehaved becomes a test that
+ * gates CI forever after. Run the suite with `comb eval --suite <file>`.
+ */
+async function promoteRun(runId: string | undefined, suitePath: string, expectRefusal: boolean): Promise<void> {
+  const needle = (runId ?? '').trim();
+  if (!needle) {
+    stdout.write(gray('usage: comb promote <run id> [--suite file.json] [--expect-refusal]\n'));
+    process.exit(1);
+  }
+  const run = await getRunStore().get(needle);
+  if (!run) {
+    stdout.write(`${coral('✗')} no run ${bold(needle)} — see ${bold('comb runs')}.\n`);
+    process.exit(1);
+  }
+  const scenario = scenarioFromRun(run, { expectRefusal });
+  // Read the existing suite (tolerate missing/empty), append, write back.
+  let suite: unknown[] = [];
+  try {
+    const parsed: unknown = JSON.parse(await readFile(suitePath, 'utf8'));
+    if (Array.isArray(parsed)) suite = parsed;
+  } catch {
+    // no suite yet — start a new one
+  }
+  suite.push(scenario);
+  await writeFile(suitePath, JSON.stringify(suite, null, 2) + '\n', 'utf8');
+
+  const expect = expectRefusal ? 'refuses' : 'cites_sources';
+  stdout.write(`\n${butter('✓')} promoted ${bold(run.id)} → ${bold(suitePath)} ${dim(`(${suite.length} case${suite.length === 1 ? '' : 's'})`)}\n`);
+  stdout.write(`  ${dim('asserts')} ${expect}  ${dim('· agent')} ${run.agent}  ${dim('· scopes')} ${run.scopes.join(', ')}\n`);
+  stdout.write(`\n${dim('Gate on it:')} ${bold(`comb eval --suite ${suitePath}`)}\n`);
 }
 
 /** `comb trace <id>` — the full tool-call trace + metrics for one run. */
@@ -312,9 +366,14 @@ async function main(): Promise<void> {
   if (mode === 'budget') return showBudget(scopes);
   if (mode === 'runs') {
     const li = argv.indexOf('--limit');
-    return listRuns(li !== -1 ? Math.max(1, Number(argv[li + 1]) || 20) : 20);
+    return listRuns(li !== -1 ? Math.max(1, Number(argv[li + 1]) || 20) : 20, argv.includes('--failed'));
   }
   if (mode === 'trace') return showTrace(rest[0]);
+  if (mode === 'promote') {
+    const si = argv.indexOf('--suite');
+    const runId = argv.find((a) => a.startsWith('run_')) ?? rest[0];
+    return promoteRun(runId, si !== -1 ? (argv[si + 1] ?? DEFAULT_REGRESSION_SUITE) : DEFAULT_REGRESSION_SUITE, argv.includes('--expect-refusal'));
+  }
 
   const brain = await Brain.create();
   const fabric = await createFabric(brain);
