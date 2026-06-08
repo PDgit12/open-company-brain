@@ -160,6 +160,15 @@ async function harnessCmd(forwarded) {
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 
+/** Agentic eval runner: `eval [--suite file.json]` (forwarded to src/eval/agent-run.ts). */
+async function evalCmd(forwarded) {
+  const dist = path.join(ROOT, 'dist', 'eval', 'agent-run.js');
+  const useDist = await exists(dist);
+  const [cmd, base] = useDist ? ['node', [dist]] : ['npx', ['-y', 'tsx', path.join(ROOT, 'src', 'eval', 'agent-run.ts')]];
+  const child = spawn(cmd, [...base, ...forwarded], { stdio: 'inherit', cwd: process.cwd() });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
+
 function help() {
   console.log(`
   comb — your company's agentic OS harness (Claude Code, for your own agents)
@@ -176,6 +185,8 @@ function help() {
                          [--agent auto|builtin|tools] [--saved <name>] [--fresh] [--scopes a,b]
     chat                 interactive agent REPL   [--saved <name>]
     budget               show token usage against the per-scope cap  [--scopes a,b]
+    eval                 run the agentic eval suite (grounding, refusal, tools,
+                         budget, scope, recall)   [--suite file.json]
     tools                list every tool an agent can use (brain + connected)
     connect <name> -- <cmd> [args…]
                          connect a tool/MCP (e.g. your knit MCP) or an API
@@ -204,6 +215,7 @@ const run = () => {
   if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
   if (cmd === 'forget') return harnessCmd(['forget', ...process.argv.slice(3)]);
   if (cmd === 'budget') return harnessCmd(['budget', ...process.argv.slice(3)]);
+  if (cmd === 'eval') return evalCmd(process.argv.slice(3));
   help();
   return Promise.resolve();
 };

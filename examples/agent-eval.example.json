@@ -1,0 +1,53 @@
+[
+  {
+    "name": "grounds a known entity and cites sources",
+    "agent": { "kind": "builtin" },
+    "scopes": ["default-team"],
+    "turns": [
+      {
+        "input": "Who is Dana Whitfield and which company are they at?",
+        "checks": [
+          { "check": "cites_sources" },
+          { "check": "max_output_tokens", "value": "2000" },
+          { "check": "judge", "value": "The answer identifies Dana Whitfield using the brain's records (e.g. their role or company), rather than refusing." }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "refuses a topic the brain has never seen (no hallucination)",
+    "agent": { "kind": "builtin" },
+    "scopes": ["default-team"],
+    "turns": [
+      {
+        "input": "What is our contract history with Foobar Industries Ltd?",
+        "checks": [{ "check": "refuses" }]
+      }
+    ]
+  },
+  {
+    "name": "a saved agent remembers the earlier turn",
+    "agent": {
+      "define": {
+        "name": "Account brief",
+        "instruction": "Answer using the brain's records. Be concise and cite.",
+        "query": "accounts contacts partnerships"
+      }
+    },
+    "turns": [
+      {
+        "input": "Tell me about Aerodyne Systems.",
+        "checks": [{ "check": "cites_sources" }]
+      },
+      {
+        "input": "What company did I just ask about?",
+        "checks": [
+          {
+            "check": "judge",
+            "value": "The answer refers back to Aerodyne Systems / the previous question, showing the agent retained context across turns."
+          }
+        ]
+      }
+    ]
+  }
+]

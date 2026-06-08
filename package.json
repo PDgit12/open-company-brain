@@ -60,6 +60,7 @@
     "run:agent": "tsx src/harness/cli.ts run",
     "chat": "tsx src/harness/cli.ts chat",
     "eval": "tsx src/eval/run.ts",
+    "eval:agents": "tsx src/eval/agent-run.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
