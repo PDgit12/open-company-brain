@@ -13,6 +13,7 @@
  */
 
 import type { CustomAgent } from '../agents/registry.js';
+import { formatMemory, type AgentMemory } from '../agents/conversation.js';
 import type { Agent, AgentContext, AgentResult } from './agent.js';
 
 /** Stitch the cited sources onto generated text, matching BuiltinAgent's shape. */
@@ -27,25 +28,46 @@ export function runQuery(def: CustomAgent, task: string): string {
   return t ? `${def.query} ${t}`.trim() : def.query;
 }
 
-/** Instruction for a run: the saved instruction plus the user's specific ask. */
-export function runInstruction(def: CustomAgent, task: string): string {
+/**
+ * Instruction for a run: the saved instruction, any prior conversation (so the
+ * agent retains context across runs/sessions), then the user's specific ask.
+ */
+export function runInstruction(def: CustomAgent, task: string, memoryBlock = ''): string {
   const t = task.trim();
-  return t ? `${def.instruction}\n\nUser request: ${t}` : def.instruction;
+  const parts = [def.instruction];
+  if (memoryBlock) parts.push(memoryBlock);
+  if (t) parts.push(`User request: ${t}`);
+  return parts.join('\n\n');
+}
+
+export interface SavedAgentOptions {
+  /** Per-agent memory binding. When present, the run is context-retaining. */
+  memory?: AgentMemory;
 }
 
 export class SavedAgent implements Agent {
   readonly name: string;
-  constructor(private readonly def: CustomAgent) {
+  constructor(
+    private readonly def: CustomAgent,
+    private readonly opts: SavedAgentOptions = {},
+  ) {
     this.name = `saved:${def.name}`;
   }
 
   async run(task: string, ctx: AgentContext): Promise<AgentResult> {
     ctx.onStatus?.('thinking');
+    const priorTurns = this.opts.memory ? await this.opts.memory.recent() : [];
     const { text, sources } = await ctx.brain.draft(
       runQuery(this.def, task),
-      runInstruction(this.def, task),
+      runInstruction(this.def, task, formatMemory(priorTurns)),
       ctx.scopes,
     );
-    return { output: withSources(text, sources), steps: [] };
+    const output = withSources(text, sources);
+    // Persist the exchange so the next run remembers it. Store the raw answer
+    // (without the Sources footer) to keep the memory block clean.
+    if (this.opts.memory && task.trim()) {
+      await this.opts.memory.remember(task.trim(), text);
+    }
+    return { output, steps: [] };
   }
 }

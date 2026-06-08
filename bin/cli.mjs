@@ -169,6 +169,7 @@ function help() {
   Build & run agents (the harness)
     create               build a saved agent step-by-step (no code, just a prompt)
     agents               list your saved agents
+    forget <name>        wipe a saved agent's conversation memory
     run "<task>"         run an agent over your governed brain + connected tools
                          [--agent auto|builtin|tools] [--saved <name>] [--scopes a,b]
     chat                 interactive agent REPL   [--saved <name>]
@@ -198,6 +199,7 @@ const run = () => {
   if (cmd === 'chat') return harnessCmd(['chat', ...process.argv.slice(3)]);
   if (cmd === 'create') return harnessCmd(['create', ...process.argv.slice(3)]);
   if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
+  if (cmd === 'forget') return harnessCmd(['forget', ...process.argv.slice(3)]);
   help();
   return Promise.resolve();
 };

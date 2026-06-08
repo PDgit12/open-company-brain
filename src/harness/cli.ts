@@ -15,6 +15,7 @@ import { config, describeMode } from '../config.js';
 import { createFabric } from '../tools/assemble.js';
 import { pickAgent, type AgentKind } from './run.js';
 import { getCustomAgentStore, resolveAgent } from '../agents/registry.js';
+import { bindMemory, getConversationStore } from '../agents/conversation.js';
 import { SavedAgent } from './saved-agent.js';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
@@ -105,7 +106,25 @@ async function chooseAgent(kind: AgentKind, saved: string | null): Promise<Agent
     stdout.write(`${coral('✗')} no saved agent matches ${bold(saved)} — see ${bold('comb agents')}.\n`);
     process.exit(1);
   }
-  return new SavedAgent(def);
+  // A saved agent retains context across runs/sessions: bind its persistent
+  // per-agent memory so each exchange is remembered and replayed next time.
+  return new SavedAgent(def, { memory: bindMemory(getConversationStore(), def.id) });
+}
+
+/** `comb forget <id|name>` — wipe a saved agent's conversation memory. */
+async function forgetAgent(idOrName: string | undefined): Promise<void> {
+  const needle = (idOrName ?? '').trim();
+  if (!needle) {
+    stdout.write(gray('usage: comb forget <agent id or name>\n'));
+    process.exit(1);
+  }
+  const def = await resolveAgent(getCustomAgentStore(), needle);
+  if (!def) {
+    stdout.write(`${coral('✗')} no saved agent matches ${bold(needle)} — see ${bold('comb agents')}.\n`);
+    process.exit(1);
+  }
+  await getConversationStore().clear(def.id);
+  stdout.write(`${butter('✓')} cleared memory for ${bold(def.name)}.\n`);
 }
 
 /** `comb agents` — list saved agents (the no-code definitions on this brain). */
@@ -182,6 +201,7 @@ async function main(): Promise<void> {
   // Registry-only commands: no brain/fabric assembly needed.
   if (mode === 'create') return createAgent();
   if (mode === 'agents') return listAgents();
+  if (mode === 'forget') return forgetAgent(rest[0]);
 
   const brain = await Brain.create();
   const fabric = await createFabric(brain);
