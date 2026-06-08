@@ -14,8 +14,10 @@
  * the access boundary is enforced when an agent RUNS (Brain.draft is scoped).
  */
 
+import path from 'node:path';
 import pg from 'pg';
 import { config } from '../config.js';
+import { JsonFileCollection } from '../storage/json-file.js';
 
 export interface CustomAgent {
   id: string;
@@ -39,6 +41,22 @@ export interface CustomAgentStore {
   get(id: string): Promise<CustomAgent | undefined>;
 }
 
+/**
+ * Resolve a saved agent by id OR (case-insensitive) name. The CLI takes either,
+ * so a human can type `comb run --saved "Risk scan"` without copying an id.
+ * Shared by every store impl, so the lookup rule is defined exactly once.
+ */
+export async function resolveAgent(
+  store: CustomAgentStore,
+  idOrName: string,
+): Promise<CustomAgent | undefined> {
+  const needle = idOrName.trim();
+  const byId = await store.get(needle);
+  if (byId) return byId;
+  const lower = needle.toLowerCase();
+  return (await store.list()).find((a) => a.name.toLowerCase() === lower);
+}
+
 function toAgent(input: SaveAgentInput, id: string, createdAt: string): CustomAgent {
   return {
     id,
@@ -49,8 +67,10 @@ function toAgent(input: SaveAgentInput, id: string, createdAt: string): CustomAg
   };
 }
 
-let counter = 0;
-const nextId = (): string => `agent_${++counter}_${process.pid}`;
+// Process-safe id: a saved agent written by one `comb create` run must not
+// collide with one written by another. Time + randomness, not a process counter.
+const nextId = (): string =>
+  `agent_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 export class InMemoryCustomAgentStore implements CustomAgentStore {
   private agents: CustomAgent[] = [];
@@ -67,6 +87,33 @@ export class InMemoryCustomAgentStore implements CustomAgentStore {
 
   async get(id: string): Promise<CustomAgent | undefined> {
     return this.agents.find((a) => a.id === id);
+  }
+}
+
+/**
+ * File-backed registry — the zero-setup persistence default. Saved agents live
+ * in one JSON file under the data dir, so `comb create` survives a process exit
+ * with no database. Mirrors the action-delivery `file` sink philosophy.
+ */
+export class FileCustomAgentStore implements CustomAgentStore {
+  private readonly collection: JsonFileCollection<CustomAgent>;
+
+  constructor(dataDir: string) {
+    this.collection = new JsonFileCollection<CustomAgent>(path.join(dataDir, 'agents.json'));
+  }
+
+  async save(input: SaveAgentInput): Promise<CustomAgent> {
+    const agent = toAgent(input, nextId(), new Date().toISOString());
+    await this.collection.append(agent);
+    return agent;
+  }
+
+  async list(): Promise<CustomAgent[]> {
+    return this.collection.read();
+  }
+
+  async get(id: string): Promise<CustomAgent | undefined> {
+    return (await this.collection.read()).find((a) => a.id === id);
   }
 }
 
@@ -125,14 +172,17 @@ export class PgCustomAgentStore implements CustomAgentStore {
 
 let singleton: CustomAgentStore | null = null;
 /**
- * Process-wide store so the API and the dashboard share one registry.
- * Uses Postgres when a connection string is configured (local or Langbase+PG),
- * so saved agents persist; falls back to in-memory in zero-setup mock mode.
+ * Process-wide store so the API, the dashboard, and the CLI share one registry.
+ * Postgres when a connection string is configured (local or Langbase+PG); else
+ * the file-backed store under the data dir — so saved agents always persist,
+ * even in zero-setup mock mode. (InMemory remains for direct, isolated tests.)
  */
 export function getCustomAgentStore(): CustomAgentStore {
   if (!singleton) {
     const pgUrl = config.ollama.vectorDatabaseUrl;
-    singleton = pgUrl ? new PgCustomAgentStore(pgUrl) : new InMemoryCustomAgentStore();
+    singleton = pgUrl
+      ? new PgCustomAgentStore(pgUrl)
+      : new FileCustomAgentStore(config.comb.dataDir);
   }
   return singleton;
 }

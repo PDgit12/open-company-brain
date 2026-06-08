@@ -167,9 +167,11 @@ function help() {
   Usage: comb <command> [options]
 
   Build & run agents (the harness)
+    create               build a saved agent step-by-step (no code, just a prompt)
+    agents               list your saved agents
     run "<task>"         run an agent over your governed brain + connected tools
-                         [--agent auto|builtin|tools] [--scopes a,b]
-    chat                 interactive agent REPL
+                         [--agent auto|builtin|tools] [--saved <name>] [--scopes a,b]
+    chat                 interactive agent REPL   [--saved <name>]
     tools                list every tool an agent can use (brain + connected)
     connect <name> -- <cmd> [args…]
                          connect a tool/MCP (e.g. your knit MCP) or an API
@@ -194,6 +196,8 @@ const run = () => {
   if (cmd === 'connect') return toolsCmd(['connect', ...process.argv.slice(3)]);
   if (cmd === 'run') return harnessCmd(['run', ...process.argv.slice(3)]);
   if (cmd === 'chat') return harnessCmd(['chat', ...process.argv.slice(3)]);
+  if (cmd === 'create') return harnessCmd(['create', ...process.argv.slice(3)]);
+  if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
   help();
   return Promise.resolve();
 };

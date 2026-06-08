@@ -56,6 +56,15 @@ const EnvSchema = z.object({
   ACTION_DELIVERY: z.enum(['outbox', 'file', 'webhook']).default('outbox'),
   ACTION_OUTBOX_PATH: z.string().trim().default('outbox'),
   ACTION_WEBHOOK_URL: z.string().trim().default(''),
+  // Zero-setup persistence root. Saved agents, per-agent conversation memory,
+  // token budgets, and the response cache live here as JSON when no Postgres is
+  // configured. Gitignored; mirrors ACTION_OUTBOX_PATH's local-file philosophy.
+  COMB_DATA_DIR: z.string().trim().default('.comb'),
+  // Per-scope generation token budget. 0 = unlimited (default). When > 0, a
+  // saved agent run that would exceed the budget for its scope refuses instead.
+  COMB_TOKEN_BUDGET_PER_SCOPE: z.coerce.number().int().min(0).default(0),
+  // Response-cache time-to-live (seconds) for deterministic saved-agent runs.
+  COMB_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).default(86400),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -113,6 +122,12 @@ export const config = {
     kind: env.ACTION_DELIVERY,
     outboxPath: env.ACTION_OUTBOX_PATH,
     webhookUrl: env.ACTION_WEBHOOK_URL,
+  },
+  comb: {
+    /** Root dir for zero-setup file persistence (saved agents, memory, cache). */
+    dataDir: env.COMB_DATA_DIR,
+    tokenBudgetPerScope: env.COMB_TOKEN_BUDGET_PER_SCOPE,
+    cacheTtlSeconds: env.COMB_CACHE_TTL_SECONDS,
   },
 } as const;
 

@@ -13,3 +13,10 @@ process.env.LLM_BACKEND = 'mock';
 // The auth-enabled path is tested in isolation (ingest-auth.test.ts) with
 // vi.resetModules + a fresh config import.
 process.env.INGEST_API_KEY = '';
+// Point zero-setup file persistence at a throwaway temp dir so tests that hit
+// the file-backed stores never write into the repo. Suites that assert on the
+// file layout create their own temp dirs; this only catches incidental writes.
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+process.env.COMB_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'comb-test-'));

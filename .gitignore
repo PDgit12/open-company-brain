@@ -9,6 +9,7 @@ coverage/
 *.tsbuildinfo
 .brain-state.json
 outbox/
+.comb/
 
 # Personal / internal — kept local, never shipped in the repo
 docs/STUDY_PLAYBOOK.md

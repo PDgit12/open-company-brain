@@ -14,6 +14,8 @@ import { Brain } from '../brain/brain.js';
 import { config, describeMode } from '../config.js';
 import { createFabric } from '../tools/assemble.js';
 import { pickAgent, type AgentKind } from './run.js';
+import { getCustomAgentStore, resolveAgent } from '../agents/registry.js';
+import { SavedAgent } from './saved-agent.js';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
 
@@ -72,16 +74,94 @@ async function runOnce(agent: Agent, ctx: AgentContext, task: string, spin: Spin
   }
 }
 
-function parseFlags(argv: string[]): { agent: AgentKind; scopes: string[]; rest: string[] } {
+function parseFlags(argv: string[]): {
+  agent: AgentKind;
+  scopes: string[];
+  saved: string | null;
+  rest: string[];
+} {
   let agent: AgentKind = 'auto';
   let scopes = [config.demoUserAccessScope];
+  let saved: string | null = null;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--agent') agent = (argv[++i] as AgentKind) ?? 'auto';
     else if (argv[i] === '--scopes') scopes = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    else if (argv[i] === '--saved') saved = (argv[++i] ?? '').trim() || null;
     else rest.push(argv[i]!);
   }
-  return { agent, scopes, rest };
+  return { agent, scopes, saved, rest };
+}
+
+/**
+ * Resolve which agent to run: an explicit saved agent (by id or name) wins over
+ * the generic builtin/tools kinds. Exits with a clear message if a `--saved`
+ * name doesn't resolve — never silently falls back to a different agent.
+ */
+async function chooseAgent(kind: AgentKind, saved: string | null): Promise<Agent> {
+  if (!saved) return pickAgent(kind);
+  const def = await resolveAgent(getCustomAgentStore(), saved);
+  if (!def) {
+    stdout.write(`${coral('✗')} no saved agent matches ${bold(saved)} — see ${bold('comb agents')}.\n`);
+    process.exit(1);
+  }
+  return new SavedAgent(def);
+}
+
+/** `comb agents` — list saved agents (the no-code definitions on this brain). */
+async function listAgents(): Promise<void> {
+  const agents = await getCustomAgentStore().list();
+  if (!agents.length) {
+    stdout.write(`${dim('No saved agents yet.')} Create one with ${bold('comb create')}.\n`);
+    return;
+  }
+  stdout.write(`\n${butter('◆')} ${bold('Saved agents')} ${dim(`· ${agents.length}`)}\n`);
+  for (const a of agents) {
+    stdout.write(`  ${coral('•')} ${bold(a.name)}  ${dim(a.id)}\n`);
+    stdout.write(`    ${gray(a.instruction.replace(/\s+/g, ' ').slice(0, 72))}\n`);
+  }
+  stdout.write(`\n${dim('Run one:')} ${bold('comb run --saved "<name>" "<request>"')}\n`);
+}
+
+/**
+ * `comb create` — step-by-step Q&A that writes a saved agent. A no-code agent is
+ * just a prompt: a name, the instruction it follows, and what to retrieve for
+ * grounding. We collect those, save through the shared registry (file-backed by
+ * default, so it survives the process), and print how to run it.
+ */
+async function createAgent(): Promise<void> {
+  const line = '─'.repeat(54);
+  stdout.write(`\n${butter('◆')} ${bold('Create an agent')} ${dim('· no code, just a prompt')}\n${dim(line)}\n`);
+  if (!stdin.isTTY) {
+    stdout.write(gray('create needs an interactive terminal. Or POST /api/agents.\n'));
+    process.exit(1);
+  }
+  const rl = createInterface({ input: stdin, output: stdout });
+  try {
+    const name = (await rl.question(`${dim('name')}         ${coral('›')} `)).trim();
+    if (!name) {
+      stdout.write(`${coral('✗')} a name is required.\n`);
+      process.exit(1);
+    }
+    stdout.write(`${dim('instruction')}  ${gray('what should it do? (one or more lines)')}\n`);
+    const instruction = (await rl.question(`             ${coral('›')} `)).trim();
+    if (!instruction) {
+      stdout.write(`${coral('✗')} an instruction is required.\n`);
+      process.exit(1);
+    }
+    const query = (await rl.question(
+      `${dim('retrieval')}    ${gray('what to search for grounding (Enter = use the name)')} ${coral('›')} `,
+    )).trim();
+
+    const agent = await getCustomAgentStore().save({ name, instruction, query: query || undefined });
+    stdout.write(`\n${butter('✓')} saved ${bold(agent.name)} ${dim(agent.id)}\n`);
+    stdout.write(`${dim('grounds on')}  ${gray(agent.query)}\n`);
+    stdout.write(`\n${dim('Run it:')}\n`);
+    stdout.write(`  ${bold(`comb run --saved "${agent.name}" "<your request>"`)}\n`);
+    stdout.write(`  ${bold(`comb chat --saved "${agent.name}"`)}   ${dim('(a continuing conversation)')}\n`);
+  } finally {
+    await rl.close();
+  }
 }
 
 function banner(agent: Agent, fabric: ToolFabric, scopes: string[]): void {
@@ -96,12 +176,16 @@ function banner(agent: Agent, fabric: ToolFabric, scopes: string[]): void {
 
 async function main(): Promise<void> {
   const [mode, ...argv] = process.argv.slice(2);
-  const { agent: kind, scopes, rest } = parseFlags(argv);
+  const { agent: kind, scopes, saved, rest } = parseFlags(argv);
   const spin = new Spinner();
+
+  // Registry-only commands: no brain/fabric assembly needed.
+  if (mode === 'create') return createAgent();
+  if (mode === 'agents') return listAgents();
 
   const brain = await Brain.create();
   const fabric = await createFabric(brain);
-  const agent = pickAgent(kind);
+  const agent = await chooseAgent(kind, saved);
   const ctx = makeCtx(brain, fabric, scopes, spin);
 
   if (mode === 'chat') {
