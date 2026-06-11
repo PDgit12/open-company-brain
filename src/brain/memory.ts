@@ -51,6 +51,26 @@ export interface MemoryStore {
   stats(accessScopes: string[]): Promise<SourceCount[]>;
 }
 
+/**
+ * WRITE-BOUNDARY GUARD: every stored document MUST carry a non-empty access
+ * scope. An untagged doc isn't a leak (readers fail closed) — it's worse in a
+ * quieter way: permanently invisible knowledge that no query can ever surface.
+ * The ingest path always stamps a scope; this guard catches every OTHER writer
+ * (seed scripts, connectors, direct library use) loudly at the boundary.
+ * Shared by all store impls so the rule is defined exactly once.
+ */
+export function assertScoped(docs: MemoryDocument[]): void {
+  for (const d of docs) {
+    const access = d.metadata[META_ACCESS];
+    if (!access || !access.trim()) {
+      throw new Error(
+        `Refusing to store document "${d.id}" without an access scope (${META_ACCESS}). ` +
+          `Unscoped knowledge is unreachable by every reader — tag it or drop it.`,
+      );
+    }
+  }
+}
+
 // ─── Mock implementation ─────────────────────────────────────────────────────
 
 const STOPWORDS = new Set([
@@ -70,6 +90,7 @@ export class MockMemoryStore implements MemoryStore {
   private docs: MemoryDocument[] = [];
 
   async upsert(docs: MemoryDocument[]): Promise<number> {
+    assertScoped(docs);
     const byId = new Map(this.docs.map((d) => [d.id, d]));
     for (const d of docs) byId.set(d.id, d);
     this.docs = [...byId.values()];
@@ -148,6 +169,7 @@ export class LangbaseMemoryStore implements MemoryStore {
   }
 
   async upsert(docs: MemoryDocument[]): Promise<number> {
+    assertScoped(docs);
     await this.ensureMemory();
     for (const d of docs) {
       // Langbase requires a valid filename with an allowed extension. Our ids
@@ -236,6 +258,7 @@ export class PgVectorMemoryStore implements MemoryStore {
   }
 
   async upsert(docs: MemoryDocument[]): Promise<number> {
+    assertScoped(docs);
     await this.ensure();
     if (!docs.length) return 0;
     const vectors = await this.embedder.embed(docs.map((d) => d.text));

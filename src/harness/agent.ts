@@ -91,6 +91,18 @@ interface OllamaMessage {
 
 const SYSTEM = `You are an agent running on a governed knowledge OS. Use the provided tools to gather grounded facts before answering. Prefer the brain.* tools for company knowledge. Cite sources. If you cannot ground an answer, say so plainly — never invent.`;
 
+/**
+ * Clamp a tool result before it enters the conversation. A connected MCP tool
+ * can return megabytes; unclamped, one call silently blows the context window
+ * and the server truncates from the top — clipping the system prompt first.
+ * ~24k chars ≈ 6k tokens: generous for real results, safe for small windows.
+ */
+export const MAX_TOOL_RESULT_CHARS = 24_000;
+export function clampToolResult(s: string, max = MAX_TOOL_RESULT_CHARS): string {
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}\n…[truncated ${s.length - max} of ${s.length} chars — refine the tool call for more]`;
+}
+
 export class ToolLoopAgent implements Agent {
   readonly name = 'tools';
   constructor(
@@ -122,7 +134,7 @@ export class ToolLoopAgent implements Agent {
           : call.function.arguments;
         let result: string;
         try {
-          result = await ctx.fabric.call(id, args, ctx.scopes);
+          result = clampToolResult(await ctx.fabric.call(id, args, ctx.scopes));
         } catch (err) {
           result = `Tool error: ${err instanceof Error ? err.message : String(err)}`;
         }

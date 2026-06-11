@@ -35,3 +35,31 @@ describe('brain end-to-end (mock mode)', () => {
     expect(result.sources.length).toBeGreaterThan(0);
   });
 });
+
+// ── Audit fixes: write-boundary scope guard + tool-result clamp ──────────────
+import { MockMemoryStore, assertScoped } from '../src/brain/memory.js';
+import { clampToolResult } from '../src/harness/agent.js';
+import { META_ACCESS, META_SOURCE } from '../src/constants.js';
+
+describe('write boundary — unscoped documents are refused loudly', () => {
+  const doc = (access?: string) => ({
+    id: 'd1', text: 'x',
+    metadata: { [META_SOURCE]: 's', ...(access !== undefined ? { [META_ACCESS]: access } : {}) },
+  });
+
+  it('rejects a missing or blank access tag instead of storing invisible knowledge', async () => {
+    const store = new MockMemoryStore();
+    await expect(store.upsert([doc(undefined)])).rejects.toThrow(/without an access scope/);
+    await expect(store.upsert([doc('  ')])).rejects.toThrow(/without an access scope/);
+    expect(() => assertScoped([doc('team')])).not.toThrow();
+  });
+});
+
+describe('tool-result clamp — one huge tool call cannot blow the window', () => {
+  it('passes small results through and truncates huge ones with a marker', () => {
+    expect(clampToolResult('small')).toBe('small');
+    const clamped = clampToolResult('x'.repeat(50_000));
+    expect(clamped.length).toBeLessThan(25_000);
+    expect(clamped).toContain('truncated');
+  });
+});
