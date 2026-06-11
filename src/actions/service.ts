@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { config } from '../config.js';
 import type { Brain } from '../brain/brain.js';
 import { createActionStore, type ActionStore } from './store.js';
 import { createActionExecutor, type ActionExecutor } from './executor.js';
@@ -49,15 +50,38 @@ function hash(s: string): string {
   return (h >>> 0).toString(36);
 }
 
+/**
+ * The autonomy dial, L2: when enabled, a grounded proposal is approved and
+ * executed BY POLICY instead of waiting for a human click — bounded by an
+ * hourly rate cap so a runaway loop can't fire unbounded side effects. Off by
+ * default; turn it on per deployment once eval evidence justifies it.
+ */
+export interface AutoApprovePolicy {
+  enabled: boolean;
+  perHour: number;
+}
+
 export class ActionService {
   constructor(
     private readonly brain: Brain,
     private readonly store: ActionStore,
     private readonly executor: ActionExecutor,
+    private readonly policy: AutoApprovePolicy = { enabled: false, perHour: 20 },
   ) {}
 
-  static create(brain: Brain): ActionService {
-    return new ActionService(brain, createActionStore(), createActionExecutor());
+  static create(brain: Brain, policy?: AutoApprovePolicy): ActionService {
+    return new ActionService(brain, createActionStore(), createActionExecutor(), policy ?? {
+      enabled: config.actions.autoApprove,
+      perHour: config.actions.autoApprovePerHour,
+    });
+  }
+
+  /** Executions in the last hour — the L2 rate-cap denominator. */
+  private async executedLastHour(): Promise<number> {
+    const cutoff = Date.now() - 3_600_000;
+    return (await this.store.list()).filter(
+      (a) => a.executedAt && new Date(a.executedAt).getTime() >= cutoff,
+    ).length;
   }
 
   private async log(action: ProposedAction, event: AuditEvent, detail: string): Promise<void> {
@@ -86,10 +110,22 @@ export class ActionService {
     };
     await this.store.save(action);
     await this.log(action, 'proposed', `proposed: ${title}`);
+
+    // L2 autonomy: policy approves grounded proposals without a human click,
+    // under the hourly cap. Cap reached → the action WAITS as 'proposed' (falls
+    // back to L1 human review) and the audit trail says why.
+    if (this.policy.enabled) {
+      if ((await this.executedLastHour()) < this.policy.perHour) {
+        const decided = await this.approve(action.id, { by: 'policy' });
+        if (decided.ok) return { ok: true, action: decided.action };
+        return { ok: true, action: (await this.store.get(action.id)) ?? action };
+      }
+      await this.log(action, 'proposed', `auto-approve skipped: hourly cap (${this.policy.perHour}) reached — awaiting human`);
+    }
     return { ok: true, action };
   }
 
-  async approve(id: string): Promise<DecisionResult> {
+  async approve(id: string, opts: { by?: 'human' | 'policy' } = {}): Promise<DecisionResult> {
     const action = await this.store.get(id);
     if (!action) return { ok: false, reason: 'Action not found.' };
 
@@ -101,7 +137,7 @@ export class ActionService {
     if (action.status === 'rejected') return { ok: false, reason: 'Action was rejected.' };
     if (action.status === 'failed') return { ok: false, reason: 'Action previously failed.' };
 
-    await this.log(action, 'approved', 'human approved');
+    await this.log(action, 'approved', opts.by === 'policy' ? 'auto-approved by policy (L2)' : 'human approved');
     // Feedback fuel: an approved action is a positive signal on its draft.
     await getFeedbackStore().record({
       kind: 'action',

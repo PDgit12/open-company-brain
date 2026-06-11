@@ -69,6 +69,12 @@ const EnvSchema = z.object({
   ACTION_DELIVERY: z.enum(['outbox', 'file', 'webhook']).default('outbox'),
   ACTION_OUTBOX_PATH: z.string().trim().default('outbox'),
   ACTION_WEBHOOK_URL: z.string().trim().default(''),
+  // The autonomy dial, L2: when 'on', a grounded proposal is approved and
+  // executed BY POLICY (no human click), bounded by an hourly rate cap. Off by
+  // default — turn it on per deployment once eval evidence justifies it. Every
+  // auto-approval is audited as policy (not human), so accountability survives.
+  ACTION_AUTO_APPROVE: z.enum(['off', 'on']).default('off'),
+  ACTION_AUTO_APPROVE_PER_HOUR: z.coerce.number().int().positive().default(20),
   // Zero-setup persistence root. Saved agents, per-agent conversation memory,
   // token budgets, and the response cache live here as JSON when no Postgres is
   // configured. Gitignored; mirrors ACTION_OUTBOX_PATH's local-file philosophy.
@@ -168,6 +174,10 @@ export const config = {
     kind: env.ACTION_DELIVERY,
     outboxPath: env.ACTION_OUTBOX_PATH,
     webhookUrl: env.ACTION_WEBHOOK_URL,
+  },
+  actions: {
+    autoApprove: env.ACTION_AUTO_APPROVE === 'on',
+    autoApprovePerHour: env.ACTION_AUTO_APPROVE_PER_HOUR,
   },
   comb: {
     /** Root dir for zero-setup file persistence (saved agents, memory, cache). */
