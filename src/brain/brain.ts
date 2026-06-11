@@ -20,7 +20,7 @@
 
 import { config } from '../config.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCount } from './memory.js';
-import { createGenerator, NO_CONTEXT_REPLY, type Generator } from '../agents/generator.js';
+import { createGenerator, NO_CONTEXT_REPLY, OllamaGenerator, type Generator } from '../agents/generator.js';
 import { assessGrounding, resolveGroundingPolicy, type GroundingPolicy } from './grounding.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
 import { runReactions, type FanoutResult } from '../fanout/engine.js';
@@ -47,10 +47,23 @@ export interface BrainAnswer {
 export class Brain {
   private constructor(
     private readonly memory: MemoryStore,
-    private readonly generator: Generator,
+    private generator: Generator,
     private readonly feedback: FeedbackStore,
     private readonly grounding: GroundingPolicy,
   ) {}
+
+  /**
+   * Hot-swap the generation model for THIS brain instance (local backend only —
+   * model choice is an Ollama call parameter there; on Langbase it's pipe
+   * config, and the mock has no model). Recall, scopes, memory, and the
+   * grounding gate are untouched: only generation changes, so a `/model` switch
+   * mid-conversation keeps every governance property intact.
+   */
+  setGenerationModel(model: string): boolean {
+    if (config.backend !== 'local') return false;
+    this.generator = new OllamaGenerator(config.ollama.baseUrl, model.trim());
+    return true;
+  }
 
   /** Record a user's verdict on an answer (fuel for the learning loops). */
   async recordAnswerFeedback(

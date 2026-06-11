@@ -14,8 +14,10 @@ import { Brain } from '../brain/brain.js';
 import { config, describeMode } from '../config.js';
 import { createFabric } from '../tools/assemble.js';
 import { pickAgent, type AgentKind } from './run.js';
-import { getCustomAgentStore, resolveAgent } from '../agents/registry.js';
+import { getCustomAgentStore, resolveAgent, type CustomAgent } from '../agents/registry.js';
 import { bindMemory, getConversationStore } from '../agents/conversation.js';
+import { parseChatCommand, CHAT_HELP } from './chat-commands.js';
+import { ToolLoopAgent } from './agent.js';
 import { getResponseCache } from './cache.js';
 import { getTokenBudget, scopeKey } from './tokens.js';
 import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
@@ -130,6 +132,23 @@ function tokenOpts(fresh: boolean): SavedAgentOptions {
  * the generic builtin/tools kinds. Exits with a clear message if a `--saved`
  * name doesn't resolve — never silently falls back to a different agent.
  */
+/**
+ * Resolve a `/agent` switch inside chat: a generic kind or a saved agent by
+ * name/id (memory-bound). Returns null on a miss — chat prints an error and
+ * keeps the session alive (never process.exit mid-conversation).
+ */
+async function switchChatAgent(arg: string): Promise<{ agent: Agent; def: CustomAgent | null } | null> {
+  if (!arg) return null;
+  if (arg === 'builtin' || arg === 'tools' || arg === 'auto') {
+    return { agent: pickAgent(arg), def: null };
+  }
+  const def = await resolveAgent(getCustomAgentStore(), arg);
+  if (!def) return null;
+  const opts = tokenOpts(false);
+  opts.memory = bindMemory(getConversationStore(), def.id);
+  return { agent: new SavedAgent(def, opts), def };
+}
+
 async function chooseAgent(kind: AgentKind, saved: string | null, fresh: boolean): Promise<Agent> {
   if (!saved) return pickAgent(kind);
   const def = await resolveAgent(getCustomAgentStore(), saved);
@@ -420,7 +439,7 @@ function banner(agent: Agent, fabric: ToolFabric, scopes: string[]): void {
   stdout.write(`${dim('tools')}   ${fabric.list().length} available  ${dim('(' + fabric.list().map((t) => t.id).slice(0, 6).join(', ') + '…)')}\n`);
   const cap = config.comb.tokenBudgetPerScope;
   stdout.write(`${dim('window')}  ${config.comb.contextWindowTokens} tok  ${dim('· memory ≤')} ${config.comb.memoryTokenBudget} tok  ${dim('· budget')} ${cap > 0 ? cap + ' tok/scope' : 'unlimited'}\n`);
-  stdout.write(`${dim(line)}\n${dim('Type a task, or')} ${bold('exit')}${dim('.')}\n`);
+  stdout.write(`${dim(line)}\n${dim('Type a task ·')} ${bold('/help')} ${dim('for commands ·')} ${bold('exit')} ${dim('to leave.')}\n`);
 }
 
 async function main(): Promise<void> {
@@ -451,16 +470,85 @@ async function main(): Promise<void> {
   const ctx = makeCtx(brain, fabric, scopes, spin);
 
   if (mode === 'chat') {
-    banner(agent, fabric, scopes);
+    // The chat session is also where agents are operated: /agent switches who
+    // you're talking to, /model hot-swaps the local generation model, /forget
+    // wipes memory — all without leaving the conversation.
+    let current: Agent = agent;
+    let currentDef: CustomAgent | null = saved ? ((await resolveAgent(getCustomAgentStore(), saved)) ?? null) : null;
+    banner(current, fabric, scopes);
     const rl = createInterface({ input: stdin, output: stdout });
+    const prompt = (): boolean => stdout.write(`\n${coral('›')} `);
     try {
-      for (;;) {
-        const line = (await rl.question(`\n${coral('›')} `)).trim();
-        if (!line || line === 'exit' || line === 'quit') break;
-        await runOnce(agent, ctx, line, spin);
+      // Async-iterate rather than rl.question(): the iterator BUFFERS lines
+      // that arrive while a turn is being processed (a piped/scripted session
+      // delivers everything at once) and ends cleanly on stdin EOF — question()
+      // drops those lines and rejects with "readline was closed".
+      prompt();
+      for await (const raw of rl) {
+        const line = raw.trim();
+        if (!line) {
+          prompt();
+          continue;
+        }
+        if (line === 'exit' || line === 'quit') break;
+        const command = parseChatCommand(line);
+        if (!command) {
+          await runOnce(current, ctx, line, spin);
+          prompt();
+          continue;
+        }
+        if (command.cmd === 'exit') break;
+        switch (command.cmd) {
+          case 'help':
+            stdout.write(CHAT_HELP);
+            break;
+          case 'agents':
+            await listAgents();
+            break;
+          case 'budget':
+            await showBudget(scopes);
+            break;
+          case 'forget':
+            if (currentDef) {
+              await getConversationStore().clear(currentDef.id);
+              stdout.write(`${butter('✓')} memory cleared for ${bold(currentDef.name)}.\n`);
+            } else {
+              stdout.write(gray('current agent is not a saved agent — nothing to forget.\n'));
+            }
+            break;
+          case 'agent': {
+            const next = await switchChatAgent(command.arg);
+            if (!next) {
+              stdout.write(`${coral('✗')} no agent matches ${bold(command.arg || '<name>')} — ${bold('/agents')} to list.\n`);
+            } else {
+              current = next.agent;
+              currentDef = next.def;
+              stdout.write(`${butter('✓')} talking to ${bold(current.name)}\n`);
+            }
+            break;
+          }
+          case 'model': {
+            if (!command.arg) {
+              stdout.write(gray('usage: /model <ollama model, e.g. qwen2.5:14b>\n'));
+              break;
+            }
+            if (!brain.setGenerationModel(command.arg)) {
+              stdout.write(`${coral('✗')} /model needs the local backend (LLM_BACKEND=local).\n`);
+              break;
+            }
+            // The tool-loop agent holds its own model handle — rebuild it too.
+            if (current.name === 'tools') current = new ToolLoopAgent(config.ollama.baseUrl, command.arg);
+            stdout.write(`${butter('✓')} generation model → ${bold(command.arg)}  ${dim('(recall, scopes, memory, grounding unchanged)')}\n`);
+            break;
+          }
+          case 'unknown':
+            stdout.write(gray(`unknown command /${command.raw} — try /help\n`));
+            break;
+        }
+        prompt();
       }
     } finally {
-      await rl.close();
+      rl.close();
       await fabric.close();
     }
     stdout.write(dim('\nbye.\n'));
