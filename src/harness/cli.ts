@@ -20,6 +20,7 @@ import { parseChatCommand, CHAT_HELP } from './chat-commands.js';
 import { ToolLoopAgent } from './agent.js';
 import { draftAgent } from '../agents/architect.js';
 import { resolveContextWindow, FALLBACK_WINDOW, type ResolvedWindow } from './context-window.js';
+import { ActionService } from '../actions/service.js';
 import { getResponseCache } from './cache.js';
 import { getTokenBudget, scopeKey } from './tokens.js';
 import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
@@ -220,6 +221,77 @@ async function listRuns(limit: number, failedOnly: boolean): Promise<void> {
 }
 
 const DEFAULT_REGRESSION_SUITE = 'comb-regressions.json';
+
+const statusBadge: Record<string, string> = {
+  proposed: butter('● awaiting approval'),
+  executed: '✓ executed',
+  rejected: gray('✗ rejected'),
+  failed: coral('✗ failed'),
+};
+
+/**
+ * `comb actions [--all]` — THE human-in-the-loop queue. Default shows only
+ * actions awaiting a decision; --all includes the decided history. The store
+ * is file-backed on real backends, so this CLI sees the same queue the server
+ * process writes to.
+ */
+async function listActions(showAll: boolean): Promise<void> {
+  const svc = ActionService.create(await Brain.create());
+  const all = await svc.list();
+  const rows = showAll ? all : all.filter((a) => a.status === 'proposed');
+  if (!rows.length) {
+    stdout.write(showAll ? `${dim('No actions recorded yet.')}\n` : `${dim('Nothing awaiting approval. ')}${butter('✓')}\n`);
+    return;
+  }
+  stdout.write(`\n${butter('◆')} ${bold(showAll ? 'Actions' : 'Awaiting your approval')} ${dim(`· ${rows.length}`)}\n`);
+  for (const a of rows) {
+    stdout.write(`  ${coral('•')} ${bold(a.id.slice(0, 8))}  ${statusBadge[a.status] ?? a.status}  ${gray(a.title)}\n`);
+    stdout.write(`    ${gray(a.body.replace(/\s+/g, ' ').slice(0, 76))}\n`);
+    stdout.write(`    ${dim('grounded on')} ${[...new Set(a.sources.map((s) => s.source))].join(', ')}  ${dim('·')} ${dim(a.createdAt.slice(0, 19).replace('T', ' '))}\n`);
+  }
+  stdout.write(`\n${dim('Decide:')} ${bold('comb approve <id>')} ${dim('·')} ${bold('comb reject <id> [reason]')}\n`);
+}
+
+/** Resolve a (possibly shortened) action id against the queue. */
+async function findAction(svc: ActionService, idArg: string | undefined): Promise<string | null> {
+  const needle = (idArg ?? '').trim();
+  if (!needle) return null;
+  const all = await svc.list();
+  const hit = all.find((a) => a.id === needle) ?? all.find((a) => a.id.startsWith(needle));
+  return hit?.id ?? null;
+}
+
+/** `comb approve <id>` — the human decision that lets a side effect happen. */
+async function approveAction(idArg: string | undefined): Promise<void> {
+  const svc = ActionService.create(await Brain.create());
+  const id = await findAction(svc, idArg);
+  if (!id) {
+    stdout.write(gray('usage: comb approve <action id>   (see comb actions)\n'));
+    process.exit(1);
+  }
+  const r = await svc.approve(id);
+  if (!r.ok) {
+    stdout.write(`${coral('✗')} ${r.reason}\n`);
+    process.exit(1);
+  }
+  stdout.write(`${butter('✓')} ${bold(r.action.title)} → ${r.action.effect ?? r.action.status}\n`);
+}
+
+/** `comb reject <id> [reason]` — decline; the draft becomes negative feedback. */
+async function rejectAction(idArg: string | undefined, reason: string): Promise<void> {
+  const svc = ActionService.create(await Brain.create());
+  const id = await findAction(svc, idArg);
+  if (!id) {
+    stdout.write(gray('usage: comb reject <action id> [reason]\n'));
+    process.exit(1);
+  }
+  const r = await svc.reject(id, reason || undefined);
+  if (!r.ok) {
+    stdout.write(`${coral('✗')} ${r.reason}\n`);
+    process.exit(1);
+  }
+  stdout.write(`${butter('✓')} rejected ${bold(r.action.title)}${reason ? dim(` — ${reason}`) : ''}\n`);
+}
 
 /**
  * `comb calibrate --labels file.json [--scopes a,b]` — place the grounding
@@ -541,6 +613,9 @@ async function main(): Promise<void> {
   }
   if (mode === 'trace') return showTrace(rest[0]);
   if (mode === 'calibrate') return calibrate(argv, scopes);
+  if (mode === 'actions') return listActions(argv.includes('--all'));
+  if (mode === 'approve') return approveAction(rest[0]);
+  if (mode === 'reject') return rejectAction(rest[0], rest.slice(1).join(' '));
   if (mode === 'promote') {
     const si = argv.indexOf('--suite');
     const runId = argv.find((a) => a.startsWith('run_')) ?? rest[0];

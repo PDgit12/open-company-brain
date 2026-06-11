@@ -196,6 +196,10 @@ function help() {
                          [--agent auto|builtin|tools] [--saved <name>] [--fresh] [--scopes a,b]
     chat                 interactive agent REPL   [--saved <name>]
     budget               show token usage against the per-scope cap  [--scopes a,b]
+    actions              the human-in-the-loop queue — what awaits your approval
+                         [--all includes decided history]
+    approve <id>         approve a proposed action (executes + delivers)
+    reject <id> [why]    decline it (the draft becomes negative feedback)
     runs                 recent agent runs with token + latency metrics
                          [--limit N] [--failed]  (--failed = refused/ungrounded)
     trace <id>           full tool-call trace + metrics for one run
@@ -241,6 +245,9 @@ const run = () => {
   if (cmd === 'trace') return harnessCmd(['trace', ...process.argv.slice(3)]);
   if (cmd === 'promote') return harnessCmd(['promote', ...process.argv.slice(3)]);
   if (cmd === 'calibrate') return harnessCmd(['calibrate', ...process.argv.slice(3)]);
+  if (cmd === 'actions') return harnessCmd(['actions', ...process.argv.slice(3)]);
+  if (cmd === 'approve') return harnessCmd(['approve', ...process.argv.slice(3)]);
+  if (cmd === 'reject') return harnessCmd(['reject', ...process.argv.slice(3)]);
   if (cmd === 'eval') return evalCmd(process.argv.slice(3));
   help();
   return Promise.resolve();
