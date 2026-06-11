@@ -162,6 +162,7 @@ export async function saveCalibration(
 /** The embedding-model key calibration is stored under for the active backend. */
 export function activeEmbeddingModel(): string {
   if (config.backend === 'local') return config.ollama.embeddingModel;
+  if (config.backend === 'openai') return config.openai.embeddingModel;
   if (config.backend === 'langbase') return config.langbase.embeddingModel;
   return 'mock';
 }

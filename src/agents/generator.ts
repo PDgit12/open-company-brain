@@ -93,9 +93,40 @@ export class OllamaGenerator implements Generator {
   }
 }
 
+/**
+ * BYO-key generation via the OpenAI-compatible chat protocol. One class covers
+ * OpenAI, Groq, Together, OpenRouter, LM Studio, vLLM, … — point OPENAI_BASE_URL
+ * at the provider and supply OPENAI_API_KEY (some local servers accept any key).
+ */
+export class OpenAIGenerator implements Generator {
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey: string,
+    private readonly model: string,
+  ) {}
+
+  async generate({ prompt }: GenerateInput): Promise<string> {
+    const json = await postJson<{ choices?: Array<{ message?: { content?: string } }> }>(
+      `${this.baseUrl}/chat/completions`,
+      {
+        model: this.model,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+      },
+      { label: 'OpenAI-compatible chat', headers: { authorization: `Bearer ${this.apiKey}` } },
+    );
+    return json.choices?.[0]?.message?.content ?? '';
+  }
+}
+
 export function createGenerator(): Generator {
   if (config.backend === 'local') {
     return new OllamaGenerator(config.ollama.baseUrl, config.ollama.generationModel);
+  }
+  if (config.backend === 'openai' && config.openai.apiKey) {
+    return new OpenAIGenerator(config.openai.baseUrl, config.openai.apiKey, config.openai.model);
   }
   if (config.backend === 'langbase' && config.langbase.apiKey) {
     return new LangbasePipe(config.langbase.apiKey, config.langbase.pipeName);

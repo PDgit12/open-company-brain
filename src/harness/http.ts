@@ -16,6 +16,8 @@ export interface PostJsonOptions {
   retries?: number;
   /** Human label for error messages, e.g. 'Ollama chat'. */
   label?: string;
+  /** Extra headers (e.g. Authorization for BYO-key providers). */
+  headers?: Record<string, string>;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -47,7 +49,7 @@ export async function postJson<T>(
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...opts.headers },
         body: JSON.stringify(body),
         signal: controller.signal,
       });

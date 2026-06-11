@@ -25,9 +25,18 @@ const EnvSchema = z.object({
     .default('openai:text-embedding-3-large'),
   LANGBASE_GENERATION_MODEL: z.string().trim().default('openai:gpt-4o-mini'),
 
-  // Backend selection. `auto` = langbase if keyed, else mock. `local` = fully
-  // self-hosted (Ollama generation + Ollama embeddings + pgvector recall): $0/query.
-  LLM_BACKEND: z.enum(['auto', 'mock', 'langbase', 'local']).default('auto'),
+  // Backend selection. `auto` = openai if OPENAI_API_KEY, else langbase if
+  // keyed, else mock. `local` = fully self-hosted (Ollama generation + Ollama
+  // embeddings + pgvector): $0/query. `openai` = BRING YOUR OWN KEY: any
+  // OpenAI-compatible endpoint (OpenAI, Groq, Together, OpenRouter, LM Studio,
+  // vLLM) via OPENAI_BASE_URL — one protocol covers nearly every provider.
+  LLM_BACKEND: z.enum(['auto', 'mock', 'langbase', 'local', 'openai']).default('auto'),
+  OPENAI_API_KEY: z.string().trim().optional().or(z.literal('').transform(() => undefined)),
+  OPENAI_BASE_URL: z.string().trim().url().default('https://api.openai.com/v1'),
+  OPENAI_MODEL: z.string().trim().default('gpt-4o-mini'),
+  OPENAI_EMBEDDING_MODEL: z.string().trim().default('text-embedding-3-small'),
+  // Vector dimension of the OpenAI-compatible embedding model (3-small = 1536).
+  OPENAI_EMBEDDING_DIM: z.coerce.number().int().positive().default(1536),
   OLLAMA_BASE_URL: z.string().trim().url().default('http://localhost:11434'),
   OLLAMA_GENERATION_MODEL: z.string().trim().default('llama3.2:1b'),
   OLLAMA_EMBEDDING_MODEL: z.string().trim().default('nomic-embed-text'),
@@ -69,10 +78,11 @@ const EnvSchema = z.object({
   COMB_TOKEN_BUDGET_PER_SCOPE: z.coerce.number().int().min(0).default(0),
   // Response-cache time-to-live (seconds) for deterministic saved-agent runs.
   COMB_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).default(86400),
-  // The model's usable context window, in tokens. The harness packs system +
-  // conversation memory + retrieved context + the request to fit inside it,
-  // trimming oldest memory first. Default suits small local models (Ollama).
-  COMB_CONTEXT_WINDOW_TOKENS: z.coerce.number().int().positive().default(8192),
+  // The model's usable context window, in tokens. 0 (default) = DYNAMIC: the
+  // harness resolves it from the active model — asking Ollama directly on the
+  // local backend, else a known-models table — so swapping models never
+  // silently under- or over-packs the prompt. Set a positive number to pin it.
+  COMB_CONTEXT_WINDOW_TOKENS: z.coerce.number().int().min(0).default(0),
   // Fraction of the window conversation memory may occupy before older turns are
   // dropped — the rest is reserved for retrieved grounding + the answer.
   COMB_MEMORY_WINDOW_FRACTION: z.coerce.number().min(0).max(1).default(0.35),
@@ -100,17 +110,28 @@ if (!parsed.success) {
 const env = parsed.data;
 
 const hasLangbase = Boolean(env.LANGBASE_API_KEY);
+const hasOpenAi = Boolean(env.OPENAI_API_KEY);
 
-// Resolve the backend: explicit wins; `auto` picks langbase-if-keyed, else mock.
-const backend: 'mock' | 'langbase' | 'local' =
-  env.LLM_BACKEND !== 'auto' ? env.LLM_BACKEND : hasLangbase ? 'langbase' : 'mock';
+// Resolve the backend: explicit wins; `auto` prefers a BYO key (openai) over
+// langbase, else mock. `local` is always explicit (it needs Ollama running).
+const backend: 'mock' | 'langbase' | 'local' | 'openai' =
+  env.LLM_BACKEND !== 'auto' ? env.LLM_BACKEND : hasOpenAi ? 'openai' : hasLangbase ? 'langbase' : 'mock';
 
 export const config = {
   port: env.PORT,
   demoUserAccessScope: env.DEMO_USER_ACCESS_SCOPE,
 
-  /** Resolved backend: 'mock' | 'langbase' | 'local'. The factories switch on this. */
+  /** Resolved backend: 'mock' | 'langbase' | 'local' | 'openai'. Factories switch on this. */
   backend,
+
+  /** BYO key: any OpenAI-compatible endpoint (OpenAI, Groq, Together, vLLM…). */
+  openai: {
+    apiKey: env.OPENAI_API_KEY,
+    baseUrl: env.OPENAI_BASE_URL,
+    model: env.OPENAI_MODEL,
+    embeddingModel: env.OPENAI_EMBEDDING_MODEL,
+    embeddingDim: env.OPENAI_EMBEDDING_DIM,
+  },
 
   langbase: {
     apiKey: env.LANGBASE_API_KEY,
@@ -133,9 +154,9 @@ export const config = {
   },
 
   /** Recall layer mode (for the banner). */
-  memoryMode: backend === 'langbase' ? ('live' as const) : backend === 'local' ? ('local' as const) : ('mock' as const),
+  memoryMode: backend === 'mock' ? ('mock' as const) : backend === 'local' ? ('local' as const) : ('live' as const),
   /** Generation layer mode (for the banner). */
-  pipeMode: backend === 'langbase' ? ('live' as const) : backend === 'local' ? ('local' as const) : ('mock' as const),
+  pipeMode: backend === 'mock' ? ('mock' as const) : backend === 'local' ? ('local' as const) : ('live' as const),
 
   ingest: {
     apiKey: env.INGEST_API_KEY,
@@ -159,10 +180,6 @@ export const config = {
     httpTimeoutMs: env.COMB_HTTP_TIMEOUT_MS,
     httpRetries: env.COMB_HTTP_RETRIES,
     groundingMargin: env.COMB_GROUNDING_MARGIN,
-    /** Tokens conversation memory may occupy before oldest turns are trimmed. */
-    get memoryTokenBudget(): number {
-      return Math.floor(env.COMB_CONTEXT_WINDOW_TOKENS * env.COMB_MEMORY_WINDOW_FRACTION);
-    },
   },
 } as const;
 

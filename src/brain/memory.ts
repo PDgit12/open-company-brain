@@ -291,6 +291,18 @@ export class PgVectorMemoryStore implements MemoryStore {
 }
 
 export function createMemoryStore(opts: { minScoreOverride?: number } = {}): MemoryStore {
+  // BYO-key backend: recall is pgvector with OpenAI-compatible embeddings —
+  // same store as local, different embedder (the factory resolves it).
+  if (config.backend === 'openai') {
+    if (!config.ollama.vectorDatabaseUrl) {
+      throw new Error('The openai backend needs a Postgres for pgvector — set VECTOR_DATABASE_URL (or DATABASE_URL).');
+    }
+    return new PgVectorMemoryStore(
+      config.ollama.vectorDatabaseUrl,
+      undefined,
+      opts.minScoreOverride ?? config.ollama.minScore,
+    );
+  }
   if (config.backend === 'local') {
     if (!config.ollama.vectorDatabaseUrl) {
       throw new Error('Local backend needs a Postgres for pgvector — set VECTOR_DATABASE_URL (or DATABASE_URL).');

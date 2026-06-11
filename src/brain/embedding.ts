@@ -82,12 +82,45 @@ export class OllamaEmbedder implements Embedder {
   }
 }
 
+/** BYO-key embeddings via the OpenAI-compatible /embeddings protocol (batched). */
+export class OpenAIEmbedder implements Embedder {
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey: string,
+    private readonly model: string,
+    readonly dim: number,
+  ) {}
+
+  async embed(texts: string[]): Promise<number[][]> {
+    if (!texts.length) return [];
+    const json = await postJson<{ data?: Array<{ index: number; embedding: number[] }> }>(
+      `${this.baseUrl}/embeddings`,
+      { model: this.model, input: texts },
+      { label: 'OpenAI-compatible embeddings', headers: { authorization: `Bearer ${this.apiKey}` } },
+    );
+    const rows = json.data ?? [];
+    if (rows.length !== texts.length) {
+      throw new Error(`OpenAI-compatible embeddings returned ${rows.length} vectors for ${texts.length} inputs.`);
+    }
+    // The API may return out of order; index is authoritative.
+    return [...rows].sort((a, b) => a.index - b.index).map((r) => r.embedding);
+  }
+}
+
 export function createEmbedder(): Embedder {
   if (config.backend === 'local') {
     return new OllamaEmbedder(
       config.ollama.baseUrl,
       config.ollama.embeddingModel,
       config.ollama.embeddingDim,
+    );
+  }
+  if (config.backend === 'openai' && config.openai.apiKey) {
+    return new OpenAIEmbedder(
+      config.openai.baseUrl,
+      config.openai.apiKey,
+      config.openai.embeddingModel,
+      config.openai.embeddingDim,
     );
   }
   return new MockEmbedder();

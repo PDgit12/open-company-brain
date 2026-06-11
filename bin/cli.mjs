@@ -56,9 +56,10 @@ async function ensureEnv() {
 // Mirror src/config.ts backend resolution so the CLI never lies about the mode.
 function resolveBackend(map) {
   const lb = Boolean(map.LANGBASE_API_KEY && map.LANGBASE_API_KEY.trim());
+  const oa = Boolean(map.OPENAI_API_KEY && map.OPENAI_API_KEY.trim());
   const explicit = (map.LLM_BACKEND || 'auto').trim();
-  if (explicit && explicit !== 'auto') return explicit; // mock | langbase | local
-  return lb ? 'langbase' : 'mock';
+  if (explicit && explicit !== 'auto') return explicit; // mock | langbase | local | openai
+  return oa ? 'openai' : lb ? 'langbase' : 'mock';
 }
 
 function reportMode(map) {
@@ -74,6 +75,14 @@ function reportMode(map) {
     console.log(`   ${vec ? '✓' : '✗'} pgvector Postgres  ${vec ? 'set' : 'MISSING — set VECTOR_DATABASE_URL (or DATABASE_URL)'}`);
     console.log('   ! needs `ollama serve` running and the models pulled — `npm run setup:local` does both.');
     console.log('\n  Mode: recall=local  generation=local  ($0 per query)');
+    return;
+  }
+
+  if (backend === 'openai') {
+    const oa = Boolean(map.OPENAI_API_KEY && map.OPENAI_API_KEY.trim());
+    console.log(`   ${oa ? '✓' : '✗'} OpenAI-compat key  ${oa ? `set — ${map.OPENAI_BASE_URL || 'https://api.openai.com/v1'} (${map.OPENAI_MODEL || 'gpt-4o-mini'})` : 'MISSING — set OPENAI_API_KEY'}`);
+    console.log(`   ${vec ? '✓' : '✗'} pgvector Postgres  ${vec ? 'set' : 'MISSING — set VECTOR_DATABASE_URL (or DATABASE_URL)'}`);
+    console.log('\n  Mode: recall=live (your key)  generation=live (your key)');
     return;
   }
 

@@ -19,6 +19,7 @@ import { bindMemory, getConversationStore } from '../agents/conversation.js';
 import { parseChatCommand, CHAT_HELP } from './chat-commands.js';
 import { ToolLoopAgent } from './agent.js';
 import { draftAgent } from '../agents/architect.js';
+import { resolveContextWindow, FALLBACK_WINDOW, type ResolvedWindow } from './context-window.js';
 import { getResponseCache } from './cache.js';
 import { getTokenBudget, scopeKey } from './tokens.js';
 import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
@@ -114,6 +115,17 @@ function parseFlags(argv: string[]): {
 }
 
 /**
+ * The active model's context window — resolved ONCE per process in main()
+ * (dynamic: Ollama introspection → known-models table → safe default), then
+ * read by every agent build. Falls back conservatively if read before resolve.
+ */
+let windowInfo: ResolvedWindow = {
+  tokens: FALLBACK_WINDOW,
+  source: 'default',
+  memoryTokens: Math.floor(FALLBACK_WINDOW * config.comb.memoryWindowFraction),
+};
+
+/**
  * Cache + budget options for a saved-agent run. The token budget always meters;
  * the response cache only attaches on the deterministic (`--fresh`, memory-less)
  * path, since a context-retaining prompt is unique per turn and never cacheable.
@@ -123,7 +135,7 @@ function tokenOpts(fresh: boolean): SavedAgentOptions {
     budget: getTokenBudget(config.comb.dataDir),
     budgetLimit: config.comb.tokenBudgetPerScope,
     cacheModel: config.ollama.generationModel,
-    memoryTokenBudget: config.comb.memoryTokenBudget,
+    memoryTokenBudget: windowInfo.memoryTokens,
     ...(fresh ? { cache: getResponseCache(config.comb.dataDir, config.comb.cacheTtlSeconds) } : {}),
   };
 }
@@ -507,7 +519,7 @@ function banner(agent: Agent, fabric: ToolFabric, scopes: string[]): void {
   stdout.write(`${dim('scopes')}  ${scopes.join(', ')}\n`);
   stdout.write(`${dim('tools')}   ${fabric.list().length} available  ${dim('(' + fabric.list().map((t) => t.id).slice(0, 6).join(', ') + '…)')}\n`);
   const cap = config.comb.tokenBudgetPerScope;
-  stdout.write(`${dim('window')}  ${config.comb.contextWindowTokens} tok  ${dim('· memory ≤')} ${config.comb.memoryTokenBudget} tok  ${dim('· budget')} ${cap > 0 ? cap + ' tok/scope' : 'unlimited'}\n`);
+  stdout.write(`${dim('window')}  ${windowInfo.tokens} tok ${dim(`(${windowInfo.source})`)}  ${dim('· memory ≤')} ${windowInfo.memoryTokens} tok  ${dim('· budget')} ${cap > 0 ? cap + ' tok/scope' : 'unlimited'}\n`);
   stdout.write(`${dim(line)}\n${dim('Type a task ·')} ${bold('/help')} ${dim('for commands ·')} ${bold('exit')} ${dim('to leave.')}\n`);
 }
 
@@ -534,6 +546,10 @@ async function main(): Promise<void> {
     const runId = argv.find((a) => a.startsWith('run_')) ?? rest[0];
     return promoteRun(runId, si !== -1 ? (argv[si + 1] ?? DEFAULT_REGRESSION_SUITE) : DEFAULT_REGRESSION_SUITE, argv.includes('--expect-refusal'));
   }
+
+  // Resolve the active model's real context window before any agent is built —
+  // memory packing and the banner both derive from it.
+  windowInfo = await resolveContextWindow();
 
   const brain = await Brain.create();
   const fabric = await createFabric(brain);
