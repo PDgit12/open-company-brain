@@ -365,6 +365,37 @@ async function listAgents(): Promise<void> {
 }
 
 /**
+ * `comb ingest <file> [--source name] [--scope s]` — feed the brain from the
+ * CLI, no server needed. Format is inferred from the extension (.csv/.json,
+ * else text). Same governed path as the HTTP webhook: chunk → embed → store
+ * with the caller's scope; fan-out reactions run if configured.
+ */
+async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
+  const positional = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1] ?? '').startsWith('--'));
+  const file = positional[0];
+  if (!file) {
+    stdout.write(gray('usage: comb ingest <file> [--source name] [--scope s]\n'));
+    process.exit(1);
+  }
+  const si = argv.indexOf('--source');
+  const sci = argv.indexOf('--scope');
+  const source = si !== -1 ? (argv[si + 1] ?? '') : file.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+  const scope = sci !== -1 ? (argv[sci + 1] ?? '') : scopes[0]!;
+  const ext = (file.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
+  const format = ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
+
+  const content = await readFile(file, 'utf8');
+  const brain = await Brain.create();
+  const spin = new Spinner();
+  spin.start(`embedding ${file}`);
+  const r = await brain.ingest({ format, content, source, scope }, [scope]);
+  spin.stop();
+  stdout.write(`${butter('✓')} ingested ${bold(String(r.ingested))} record${r.ingested === 1 ? '' : 's'}  ${dim(`· source=${r.source} · scope=${r.scope} · format=${format}`)}\n`);
+  if (r.reactions.length) stdout.write(`  ${dim('fan-out reactions ran:')} ${r.reactions.length}\n`);
+  stdout.write(`${dim('Ask about it:')} ${bold(`comb run --agent builtin "<question>" --scopes ${scope}`)}\n`);
+}
+
+/**
  * `comb new "<what you want>"` — one prompt builds the whole agent surface:
  * the model (or a deterministic fallback) drafts the definition, we save it,
  * write a starter calibration-label file for it, and print every next step.
@@ -486,6 +517,7 @@ async function main(): Promise<void> {
   const spin = new Spinner();
 
   // Registry-only commands: no brain/fabric assembly needed.
+  if (mode === 'ingest') return ingestFile(argv, scopes);
   if (mode === 'new') return newAgent(rest.join(' '));
   if (mode === 'create') return createAgent(argv);
   if (mode === 'agents') return listAgents();

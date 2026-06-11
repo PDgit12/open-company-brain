@@ -203,6 +203,8 @@ function help() {
   Setup & data
     init                 guided setup — create .env and add your keys
     doctor               report the active backend and what's still needed
+    ingest <file>        feed the brain from the CLI (.txt/.md/.csv/.json)
+                         [--source name] [--scope s]
     demo                 (npm run demo) web console + HTTP API at :4000
 
   Advanced
@@ -221,6 +223,7 @@ const run = () => {
   if (cmd === 'run') return harnessCmd(['run', ...process.argv.slice(3)]);
   if (cmd === 'chat') return harnessCmd(['chat', ...process.argv.slice(3)]);
   if (cmd === 'new') return harnessCmd(['new', ...process.argv.slice(3)]);
+  if (cmd === 'ingest') return harnessCmd(['ingest', ...process.argv.slice(3)]);
   if (cmd === 'create') return harnessCmd(['create', ...process.argv.slice(3)]);
   if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
   if (cmd === 'forget') return harnessCmd(['forget', ...process.argv.slice(3)]);
