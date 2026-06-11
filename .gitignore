@@ -10,6 +10,9 @@ coverage/
 .brain-state.json
 outbox/
 .comb/
+# per-deployment artifacts comb generates for the user
+calibration-*.json
+comb-regressions.json
 
 # Personal / internal — kept local, never shipped in the repo
 docs/STUDY_PLAYBOOK.md

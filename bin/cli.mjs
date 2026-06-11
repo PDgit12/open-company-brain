@@ -176,7 +176,9 @@ function help() {
   Usage: comb <command> [options]
 
   Build & run agents (the harness)
-    create               build a saved agent (no code, just a prompt)
+    new "<wish>"         ONE PROMPT builds the whole agent: definition +
+                         calibration labels + every next step, ready to run
+    create               build a saved agent manually
                          wizard (a TTY) or flags for CI:
                          --name N --instruction I [--query Q]
     agents               list your saved agents
@@ -218,6 +220,7 @@ const run = () => {
   if (cmd === 'connect') return toolsCmd(['connect', ...process.argv.slice(3)]);
   if (cmd === 'run') return harnessCmd(['run', ...process.argv.slice(3)]);
   if (cmd === 'chat') return harnessCmd(['chat', ...process.argv.slice(3)]);
+  if (cmd === 'new') return harnessCmd(['new', ...process.argv.slice(3)]);
   if (cmd === 'create') return harnessCmd(['create', ...process.argv.slice(3)]);
   if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
   if (cmd === 'forget') return harnessCmd(['forget', ...process.argv.slice(3)]);

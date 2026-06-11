@@ -18,6 +18,7 @@ import { getCustomAgentStore, resolveAgent, type CustomAgent } from '../agents/r
 import { bindMemory, getConversationStore } from '../agents/conversation.js';
 import { parseChatCommand, CHAT_HELP } from './chat-commands.js';
 import { ToolLoopAgent } from './agent.js';
+import { draftAgent } from '../agents/architect.js';
 import { getResponseCache } from './cache.js';
 import { getTokenBudget, scopeKey } from './tokens.js';
 import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
@@ -363,6 +364,43 @@ async function listAgents(): Promise<void> {
   stdout.write(`\n${dim('Run one:')} ${bold('comb run --saved "<name>" "<request>"')}\n`);
 }
 
+/**
+ * `comb new "<what you want>"` — one prompt builds the whole agent surface:
+ * the model (or a deterministic fallback) drafts the definition, we save it,
+ * write a starter calibration-label file for it, and print every next step.
+ * This is the "just describe it" path; `comb create` remains the manual one.
+ */
+async function newAgent(wish: string): Promise<void> {
+  const trimmed = wish.trim();
+  if (!trimmed) {
+    stdout.write(gray('usage: comb new "<describe the agent you want>"\n'));
+    process.exit(1);
+  }
+  const line = '─'.repeat(54);
+  stdout.write(`\n${butter('◆')} ${bold('Build an agent from a prompt')}\n${dim(line)}\n`);
+
+  const draft = await draftAgent(trimmed);
+  const agent = await getCustomAgentStore().save({
+    name: draft.name,
+    instruction: draft.instruction,
+    query: draft.query,
+  });
+  const slug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const labelsPath = `calibration-${slug}.json`;
+  await writeFile(labelsPath, JSON.stringify(draft.labels, null, 2) + '\n', 'utf8');
+
+  stdout.write(`${butter('✓')} ${bold(agent.name)}  ${dim(agent.id)}  ${dim(`· drafted by ${draft.draftedBy}`)}\n`);
+  stdout.write(`  ${dim('does')}        ${gray(agent.instruction.replace(/\s+/g, ' ').slice(0, 76))}\n`);
+  stdout.write(`  ${dim('grounds on')}  ${gray(agent.query)}\n`);
+  stdout.write(`  ${dim('labels')}      ${gray(labelsPath)} ${dim(`(${draft.labels.length} starter queries — edit to match your data)`)}\n`);
+  stdout.write(`${dim(line)}\n${bold('Your surface:')}\n`);
+  stdout.write(`  1. add data      ${dim('npm run demo → paste at :4000, or POST /api/ingest')}\n`);
+  stdout.write(`  2. calibrate     ${dim(`comb calibrate --labels ${labelsPath}`)}\n`);
+  stdout.write(`  3. talk          ${dim(`comb chat --saved "${agent.name}"   (/model, /forget, /budget inside)`)}\n`);
+  stdout.write(`  4. watch         ${dim('comb runs · comb trace <id> · comb runs --failed')}\n`);
+  stdout.write(`  5. harden        ${dim('comb promote <run id> → comb eval --suite comb-regressions.json')}\n`);
+}
+
 /** Pull --name / --instruction / --query out of a create argv (flag form). */
 function parseCreateFlags(argv: string[]): { name?: string; instruction?: string; query?: string } {
   const out: { name?: string; instruction?: string; query?: string } = {};
@@ -448,6 +486,7 @@ async function main(): Promise<void> {
   const spin = new Spinner();
 
   // Registry-only commands: no brain/fabric assembly needed.
+  if (mode === 'new') return newAgent(rest.join(' '));
   if (mode === 'create') return createAgent(argv);
   if (mode === 'agents') return listAgents();
   if (mode === 'forget') return forgetAgent(rest[0]);
