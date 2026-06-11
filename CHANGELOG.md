@@ -4,6 +4,57 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.5.0] — 2026-06-11
+
+The production-trust release: refusal decided in code, agents built from one
+prompt, autonomy with governance, and a quality plane that ratchets.
+
+### Added — trust kernel
+- **Grounding floor**: `assessGrounding` gates every generation — thin retrieval
+  → deterministic refusal BEFORE the model runs (fixes the silent cite-or-refuse
+  inversion on the vector path). Refusals carry no sources and cost ~0 tokens.
+- **Per-model calibration**: `comb calibrate --labels file.json` places the floor
+  from labeled answerable/unanswerable queries (midpoint-candidate sweep), stored
+  per embedding model.
+- **Write-boundary scope guard**: storing a document without an access scope now
+  fails loudly in every memory store.
+
+### Added — agent runtime
+- **`comb new "<wish>"`**: one prompt drafts a complete agent (definition +
+  starter calibration labels) via a direct model call, with a deterministic
+  fallback. `comb create` (wizard + CI flags), `comb agents`, `comb forget`.
+- **Per-agent conversation memory** (file → Postgres) with **poisoning hygiene**:
+  only grounded exchanges are stored; only grounded turns replay; legacy rows
+  auto-invalidated (PG migrates in place).
+- **Saved-agent runs**: `comb run --saved <name>` / `comb chat --saved`, with
+  in-chat `/agent`, `/model` (hot-swap, local), `/budget`, `/forget`, `/help`.
+- **`comb ingest <file>`**: feed the brain from the CLI, no server needed.
+
+### Added — model plane
+- **BYO key**: new `openai` backend — any OpenAI-compatible endpoint (OpenAI,
+  Groq, Together, OpenRouter, LM Studio, vLLM) for generation + embeddings.
+- **Dynamic context window**: resolved per model (Ollama introspection → known-
+  models table → safe default); memory packing derives from it.
+- **Tokenizer seam** (heuristic default, optional exact BPE), per-scope **token
+  budgets** (refuse on exhaustion), **response cache** (TTL, deterministic runs),
+  **retries/timeouts** with backoff on all model calls, **Ollama keep_alive**,
+  **tool-result clamping** in the agent loop.
+
+### Added — quality plane
+- **Agentic evals**: `comb eval [--suite file.json]` asserts behaviour over the
+  step trace (cites/refuses/uses_tool/budget/scope) hermetically, plus a live
+  LLM-judge + multi-turn memory layer that skips (not fails) on mock.
+- **Run traces**: every run persists steps/tokens/latency — `comb runs [--failed]`,
+  `comb trace <id>`; **prod→eval loop**: `comb promote <run id>` turns a flagged
+  run into a permanent regression case.
+
+### Added — action plane
+- **Durable approval queue** (file-backed; survives restarts) + CLI surface:
+  `comb actions`, `comb approve <id>`, `comb reject <id>` — cross-process with
+  the server. **L2 autonomy**: `ACTION_AUTO_APPROVE=on` lets policy approve
+  grounded proposals under an hourly rate cap, audited as policy (not human);
+  grounding is checked before policy ever sees a proposal.
+
 ## [0.4.0] — 2026-06-07
 
 ### Changed — reframed into a universal agentic OS (breaking)
