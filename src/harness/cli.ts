@@ -21,6 +21,14 @@ import { getTokenBudget, scopeKey } from './tokens.js';
 import { SavedAgent, type SavedAgentOptions } from './saved-agent.js';
 import { getRunStore, tracedRun, classifyRun, type RunConcern } from '../observability/runs.js';
 import { scenarioFromRun } from '../eval/agent-eval.js';
+import { createMemoryStore } from '../brain/memory.js';
+import {
+  activeEmbeddingModel,
+  chooseFloor,
+  saveCalibration,
+  type CalibrationPoint,
+  type LabeledQuery,
+} from '../brain/grounding.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
@@ -180,6 +188,67 @@ async function listRuns(limit: number, failedOnly: boolean): Promise<void> {
 }
 
 const DEFAULT_REGRESSION_SUITE = 'comb-regressions.json';
+
+/**
+ * `comb calibrate --labels file.json [--scopes a,b]` — place the grounding
+ * floor FROM DATA instead of a hardcoded 0.5. Retrieves every labeled query
+ * with NO floor (so the full score distribution is visible), sweeps candidate
+ * floors, picks the one that best separates answerable from unanswerable, and
+ * stores it per embedding model. The Brain uses it on the next boot.
+ */
+async function calibrate(argv: string[], scopes: string[]): Promise<void> {
+  const li = argv.indexOf('--labels');
+  const labelsPath = li !== -1 ? argv[li + 1] : undefined;
+  if (!labelsPath) {
+    stdout.write(gray('usage: comb calibrate --labels labels.json [--scopes a,b]\n'));
+    stdout.write(gray('labels.json: [{ "query": "...", "answerable": true|false }, ...]\n'));
+    process.exit(1);
+  }
+  if (config.backend === 'mock') {
+    stdout.write(`${coral('✗')} calibration is for live backends — the mock keyword path already refuses on no-match.\n`);
+    process.exit(1);
+  }
+  const parsed: unknown = JSON.parse(await readFile(labelsPath, 'utf8'));
+  const labels = (Array.isArray(parsed) ? parsed : []) as LabeledQuery[];
+  const valid = labels.filter((l) => l && typeof l.query === 'string' && typeof l.answerable === 'boolean');
+  if (valid.length < 4) {
+    stdout.write(`${coral('✗')} need at least 4 labeled queries (mix of answerable + unanswerable).\n`);
+    process.exit(1);
+  }
+
+  const model = activeEmbeddingModel();
+  const line = '─'.repeat(54);
+  stdout.write(`\n${butter('◆')} ${bold('Calibrate grounding floor')} ${dim(`· ${model}`)}\n${dim(line)}\n`);
+
+  // Floor-less retrieval: we need to SEE the noise scores to place the floor.
+  const memory = createMemoryStore({ minScoreOverride: 0 });
+  const points: CalibrationPoint[] = [];
+  for (const l of valid) {
+    const chunks = await memory.retrieve({ query: l.query, accessScopes: scopes, topK: 8 });
+    const bestScore = chunks.length ? Math.max(...chunks.map((c) => c.score)) : 0;
+    points.push({ query: l.query, answerable: l.answerable, bestScore });
+    const tag = l.answerable ? butter('answerable  ') : gray('unanswerable');
+    stdout.write(`  ${tag} ${bestScore.toFixed(3)}  ${gray(l.query.slice(0, 48))}\n`);
+  }
+
+  const result = chooseFloor(points);
+  await saveCalibration(config.comb.dataDir, model, {
+    floor: result.floor,
+    answerableRecall: result.answerableRecall,
+    unanswerableRefusal: result.unanswerableRefusal,
+    samples: valid.length,
+    calibratedAt: new Date().toISOString(),
+  });
+
+  stdout.write(`${dim(line)}\n`);
+  stdout.write(`${butter('✓')} floor ${bold(result.floor.toFixed(2))} ${dim(`(was ${config.ollama.minScore} default)`)}\n`);
+  stdout.write(`  ${dim('answerable recall')}     ${(result.answerableRecall * 100).toFixed(0)}%\n`);
+  stdout.write(`  ${dim('unanswerable refusal')}  ${(result.unanswerableRefusal * 100).toFixed(0)}%\n`);
+  if (result.answerableRecall < 1 || result.unanswerableRefusal < 1) {
+    stdout.write(`  ${gray('imperfect separation — add more labeled queries or improve the corpus.')}\n`);
+  }
+  stdout.write(`\n${dim('Stored per-model; the brain uses it on next run. Re-run after changing the embedding model or growing the data.')}\n`);
+}
 
 /**
  * `comb promote <run id> [--suite file] [--expect-refusal]` — turn a recorded
@@ -369,6 +438,7 @@ async function main(): Promise<void> {
     return listRuns(li !== -1 ? Math.max(1, Number(argv[li + 1]) || 20) : 20, argv.includes('--failed'));
   }
   if (mode === 'trace') return showTrace(rest[0]);
+  if (mode === 'calibrate') return calibrate(argv, scopes);
   if (mode === 'promote') {
     const si = argv.indexOf('--suite');
     const runId = argv.find((a) => a.startsWith('run_')) ?? rest[0];

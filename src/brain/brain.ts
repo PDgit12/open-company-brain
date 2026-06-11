@@ -20,7 +20,8 @@
 
 import { config } from '../config.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCount } from './memory.js';
-import { createGenerator, type Generator } from '../agents/generator.js';
+import { createGenerator, NO_CONTEXT_REPLY, type Generator } from '../agents/generator.js';
+import { assessGrounding, resolveGroundingPolicy, type GroundingPolicy } from './grounding.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
 import { runReactions, type FanoutResult } from '../fanout/engine.js';
 import { demoDocuments } from '../seed/seed-data.js';
@@ -48,6 +49,7 @@ export class Brain {
     private readonly memory: MemoryStore,
     private readonly generator: Generator,
     private readonly feedback: FeedbackStore,
+    private readonly grounding: GroundingPolicy,
   ) {}
 
   /** Record a user's verdict on an answer (fuel for the learning loops). */
@@ -85,7 +87,22 @@ export class Brain {
     if (config.backend === 'mock') {
       await memory.upsert(demoDocuments());
     }
-    return new Brain(memory, createGenerator(), getFeedbackStore());
+    // Grounding policy is resolved once at boot: calibrated per-embedding-model
+    // floor when `comb calibrate` has run, else the env floor + safety margin.
+    return new Brain(memory, createGenerator(), getFeedbackStore(), await resolveGroundingPolicy());
+  }
+
+  /**
+   * THE GROUNDING GATE — the harness decides refusal, not the model.
+   * Vector search always returns nearest neighbours; a context assembled from
+   * barely-relevant chunks reads plausible and produces a fluent, cited, wrong
+   * answer. So before any generation we check the retrieval scores against the
+   * calibrated floor and refuse deterministically when grounding is too thin —
+   * the model never sees a context it shouldn't answer from. Refusals carry NO
+   * sources: we don't cite what we refused to use.
+   */
+  private refuseUnlessGrounded(chunks: RetrievedChunk[]): RetrievedChunk[] | null {
+    return assessGrounding(chunks, this.grounding).sufficient ? chunks : null;
   }
 
   /**
@@ -103,6 +120,10 @@ export class Brain {
     const retrieved = await this.memory.retrieve({ query: question, accessScopes, topK: 8 });
     // Reranking loop: boost sources humans found useful, demote rejected ones.
     const chunks = await this.rerank(retrieved, accessScopes);
+    // Grounding gate: refuse in code before generation when retrieval is thin.
+    if (!this.refuseUnlessGrounded(chunks)) {
+      return { answer: NO_CONTEXT_REPLY, sources: [] };
+    }
     const context = buildContextBlock(chunks);
     // Few-shot learning loop: inject approved past answers (scope-gated) as
     // exemplars so the brain's style/rigor compounds with usage.
@@ -123,6 +144,10 @@ export class Brain {
     accessScopes: string[],
   ): Promise<{ text: string; sources: RetrievedChunk[] }> {
     const chunks = await this.memory.retrieve({ query, accessScopes, topK: 8 });
+    // Same grounding gate as ask(): every no-code agent inherits it for free.
+    if (!this.refuseUnlessGrounded(chunks)) {
+      return { text: NO_CONTEXT_REPLY, sources: [] };
+    }
     const context = buildContextBlock(chunks);
     const text = await this.generator.generate({
       prompt: `${instruction}\n\nCONTEXT:\n${context}`,

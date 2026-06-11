@@ -1,0 +1,10 @@
+[
+  { "query": "Who is Dana Whitfield and which company are they at?", "answerable": true },
+  { "query": "Tell me about Aerodyne Systems and our partnership", "answerable": true },
+  { "query": "Which contracts or renewals are coming up?", "answerable": true },
+  { "query": "What did the last field notes say about Helix Biolabs?", "answerable": true },
+  { "query": "What is our contract history with Foobar Industries Ltd?", "answerable": false },
+  { "query": "What is the weather forecast for next Tuesday?", "answerable": false },
+  { "query": "Summarize our acquisition of Initech in 1999", "answerable": false },
+  { "query": "What are the office wifi passwords?", "answerable": false }
+]

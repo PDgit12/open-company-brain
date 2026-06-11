@@ -76,6 +76,10 @@ const EnvSchema = z.object({
   // Fraction of the window conversation memory may occupy before older turns are
   // dropped — the rest is reserved for retrieved grounding + the answer.
   COMB_MEMORY_WINDOW_FRACTION: z.coerce.number().min(0).max(1).default(0.35),
+  // Thin-grounding safety margin ABOVE the retrieval floor, applied on live
+  // backends until a per-model calibration exists (`comb calibrate`). A best
+  // score barely over the floor is nearest-neighbour noise, not grounding.
+  COMB_GROUNDING_MARGIN: z.coerce.number().min(0).max(0.5).default(0.05),
   // Token counter. 'heuristic' = zero-dep chars/4 (default, always available).
   // 'bpe' = exact BPE via the optional `gpt-tokenizer` package when installed
   // (exact for OpenAI vocabularies, approximate for llama); falls back to the
@@ -154,6 +158,7 @@ export const config = {
     tokenizer: env.COMB_TOKENIZER,
     httpTimeoutMs: env.COMB_HTTP_TIMEOUT_MS,
     httpRetries: env.COMB_HTTP_RETRIES,
+    groundingMargin: env.COMB_GROUNDING_MARGIN,
     /** Tokens conversation memory may occupy before oldest turns are trimmed. */
     get memoryTokenBudget(): number {
       return Math.floor(env.COMB_CONTEXT_WINDOW_TOKENS * env.COMB_MEMORY_WINDOW_FRACTION);

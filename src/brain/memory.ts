@@ -290,12 +290,18 @@ export class PgVectorMemoryStore implements MemoryStore {
   }
 }
 
-export function createMemoryStore(): MemoryStore {
+export function createMemoryStore(opts: { minScoreOverride?: number } = {}): MemoryStore {
   if (config.backend === 'local') {
     if (!config.ollama.vectorDatabaseUrl) {
       throw new Error('Local backend needs a Postgres for pgvector — set VECTOR_DATABASE_URL (or DATABASE_URL).');
     }
-    return new PgVectorMemoryStore(config.ollama.vectorDatabaseUrl);
+    // minScoreOverride: calibration retrieves WITHOUT the floor (0) so it can
+    // observe the full score distribution and place the floor from data.
+    return new PgVectorMemoryStore(
+      config.ollama.vectorDatabaseUrl,
+      undefined,
+      opts.minScoreOverride ?? config.ollama.minScore,
+    );
   }
   if (config.backend === 'langbase' && config.langbase.apiKey) {
     return new LangbaseMemoryStore(config.langbase.apiKey, config.langbase.memoryName);

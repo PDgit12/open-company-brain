@@ -192,6 +192,8 @@ function help() {
                          [--suite file.json] [--expect-refusal]
     eval                 run the agentic eval suite (grounding, refusal, tools,
                          budget, scope, recall)   [--suite file.json]
+    calibrate            place the grounding floor from labeled queries
+                         --labels labels.json [--scopes a,b]
     tools                list every tool an agent can use (brain + connected)
     connect <name> -- <cmd> [args…]
                          connect a tool/MCP (e.g. your knit MCP) or an API
@@ -223,6 +225,7 @@ const run = () => {
   if (cmd === 'runs') return harnessCmd(['runs', ...process.argv.slice(3)]);
   if (cmd === 'trace') return harnessCmd(['trace', ...process.argv.slice(3)]);
   if (cmd === 'promote') return harnessCmd(['promote', ...process.argv.slice(3)]);
+  if (cmd === 'calibrate') return harnessCmd(['calibrate', ...process.argv.slice(3)]);
   if (cmd === 'eval') return evalCmd(process.argv.slice(3));
   help();
   return Promise.resolve();

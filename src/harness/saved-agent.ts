@@ -24,10 +24,16 @@ export function withSources(text: string, sources: { source: string }[]): string
   return cites.length ? `${text}\n\nSources: ${cites.map((s) => `[${s}]`).join(' ')}` : text;
 }
 
-/** Retrieval query for a run: the saved query, sharpened by the user's request. */
+/**
+ * Retrieval query for a run: the USER's request when present, else the saved
+ * query (for empty/scheduled runs). Deliberately NOT a composite — mixing the
+ * definition's topic terms into retrieval inflates similarity scores with
+ * always-present corpus matches, which defeats the grounding gate: an
+ * unanswerable request would still clear the calibrated floor on the strength
+ * of the saved keywords alone. The gate must judge what the user actually asked.
+ */
 export function runQuery(def: CustomAgent, task: string): string {
-  const t = task.trim();
-  return t ? `${def.query} ${t}`.trim() : def.query;
+  return task.trim() || def.query;
 }
 
 /**

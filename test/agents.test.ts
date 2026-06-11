@@ -93,7 +93,9 @@ describe('SavedAgent — runs a definition on the governed kernel', () => {
       instruction: 'List upcoming renewals.',
       query: 'renewal date tier',
     });
-    expect(runQuery(def, 'for Q3')).toBe('renewal date tier for Q3');
+    // Retrieval uses the user's request (the gate judges what was asked);
+    // the saved query only covers empty/scheduled runs.
+    expect(runQuery(def, 'upcoming renewals for Q3')).toBe('upcoming renewals for Q3');
     expect(runQuery(def, '')).toBe('renewal date tier');
     expect(runInstruction(def, 'for Q3')).toContain('User request: for Q3');
     expect(runInstruction(def, '')).toBe('List upcoming renewals.');
@@ -107,7 +109,9 @@ describe('SavedAgent — runs a definition on the governed kernel', () => {
     });
     const brain = await Brain.create();
     const fabric = await createFabric(brain, { servers: [] });
-    const r = await new SavedAgent(def).run('what is the status', {
+    // Retrieval runs on the user's request, so the request must carry the
+    // information need (a bare "what is the status" rightly refuses now).
+    const r = await new SavedAgent(def).run('What is the Project Atlas migration status?', {
       brain, fabric, scopes: ['default-team'],
     });
     expect(r.output).toMatch(/Sources:/);
