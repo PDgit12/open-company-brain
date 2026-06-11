@@ -111,9 +111,11 @@ export class SavedAgent implements Agent {
     }
 
     // Context-retaining path: generate, persist the exchange, meter usage.
+    // Memory hygiene: only a GROUNDED exchange is remembered (sources prove
+    // grounding post-gate; refusals carry none) — poison never enters memory.
     const { text, sources } = await ctx.brain.draft(query, instruction, ctx.scopes);
     const output = withSources(text, sources);
-    if (memory && task.trim()) await memory.remember(task.trim(), text);
+    if (memory && task.trim()) await memory.remember(task.trim(), text, sources.length > 0);
     if (budget) await budget.record(key, estimateTokens(`${query}\n${instruction}\n${text}`));
     return { output, steps: [] };
   }

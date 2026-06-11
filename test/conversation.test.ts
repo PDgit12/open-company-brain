@@ -18,7 +18,7 @@ import type { AgentContext } from '../src/harness/agent.js';
 
 const tempDir = (): Promise<string> => mkdtemp(path.join(tmpdir(), 'comb-convo-'));
 const turn = (role: 'user' | 'assistant', content: string): ConversationTurn => ({
-  role, content, at: new Date().toISOString(),
+  role, content, at: new Date().toISOString(), grounded: true,
 });
 
 const def: CustomAgent = {
@@ -75,15 +75,31 @@ describe('ConversationStore — per-agent memory', () => {
 });
 
 describe('bindMemory + formatMemory', () => {
-  it('remember() writes a user turn then an assistant turn', async () => {
+  it('remember() writes a user turn then an assistant turn (grounded)', async () => {
     const store = new InMemoryConversationStore();
     const mem = bindMemory(store, 'a');
-    await mem.remember('what is X?', 'X is Y.');
+    await mem.remember('what is X?', 'X is Y.', true);
     const turns = await mem.recent();
     expect(turns.map((t) => [t.role, t.content])).toEqual([
       ['user', 'what is X?'],
       ['assistant', 'X is Y.'],
     ]);
+  });
+
+  it('HYGIENE: an ungrounded exchange is never stored — poison cannot enter memory', async () => {
+    const store = new InMemoryConversationStore();
+    const mem = bindMemory(store, 'a');
+    await mem.remember('unknowable?', "I don't have that in the brain yet.", false);
+    expect(await mem.recent()).toEqual([]);
+  });
+
+  it('HYGIENE: legacy/unmarked turns are auto-invalidated for replay', async () => {
+    const store = new InMemoryConversationStore();
+    // A pre-hygiene row: no grounded field (how poisoned history looks).
+    await store.append('a', { role: 'assistant', content: 'old hallucination', at: new Date().toISOString() });
+    await store.append('a', turn('assistant', 'grounded fact'));
+    const replayed = await store.history('a');
+    expect(replayed.map((t) => t.content)).toEqual(['grounded fact']);
   });
 
   it('formatMemory renders turns and is empty for no history', () => {

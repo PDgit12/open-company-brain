@@ -24,6 +24,15 @@ export interface ConversationTurn {
   role: Role;
   content: string;
   at: string;
+  /**
+   * MEMORY HYGIENE: only turns from GROUNDED exchanges are replayed into
+   * future prompts. An ungrounded answer stored as memory is poison — it
+   * re-enters later prompts as if it were fact (observed live: pre-fix
+   * hallucinations kept resurfacing from an agent's own history). Writers mark
+   * grounded exchanges true; history() filters on it, so legacy/unmarked rows
+   * are auto-invalidated without being deleted (forensics keep the raw rows).
+   */
+  grounded?: boolean;
 }
 
 /** A turn as stored in a flat, multi-agent collection (file/PG). */
@@ -40,8 +49,10 @@ export interface ConversationStore {
   clear(agentId: string): Promise<void>;
 }
 
-const strip = ({ role, content, at }: StoredTurn): ConversationTurn => ({ role, content, at });
+const strip = ({ role, content, at, grounded }: StoredTurn): ConversationTurn => ({ role, content, at, grounded });
 const tail = <T>(xs: T[], limit?: number): T[] => (limit && limit > 0 ? xs.slice(-limit) : xs);
+/** The hygiene filter: only explicitly grounded turns are eligible for replay. */
+const replayable = (t: ConversationTurn): boolean => t.grounded === true;
 
 // ─── In-memory (direct tests) ────────────────────────────────────────────────
 
@@ -55,7 +66,7 @@ export class InMemoryConversationStore implements ConversationStore {
   }
 
   async history(agentId: string, limit = DEFAULT_MEMORY_TURNS): Promise<ConversationTurn[]> {
-    return tail(this.turns.get(agentId) ?? [], limit);
+    return tail((this.turns.get(agentId) ?? []).filter(replayable), limit);
   }
 
   async clear(agentId: string): Promise<void> {
@@ -80,7 +91,7 @@ export class FileConversationStore implements ConversationStore {
 
   async history(agentId: string, limit = DEFAULT_MEMORY_TURNS): Promise<ConversationTurn[]> {
     const all = await this.collection.read();
-    return tail(all.filter((t) => t.agentId === agentId).map(strip), limit);
+    return tail(all.filter((t) => t.agentId === agentId).map(strip).filter(replayable), limit);
   }
 
   async clear(agentId: string): Promise<void> {
@@ -107,8 +118,15 @@ export class PgConversationStore implements ConversationStore {
          agent_id text NOT NULL,
          role text NOT NULL,
          content text NOT NULL,
-         at timestamptz NOT NULL DEFAULT now()
+         at timestamptz NOT NULL DEFAULT now(),
+         grounded boolean NOT NULL DEFAULT false
        )`,
+    );
+    // Hygiene migration: legacy tables gain the column with DEFAULT false, so
+    // every pre-hygiene row (the potentially poisoned history) is auto-
+    // invalidated for replay while remaining queryable for forensics.
+    await this.pool.query(
+      `ALTER TABLE ${this.table} ADD COLUMN IF NOT EXISTS grounded boolean NOT NULL DEFAULT false`,
     );
     await this.pool.query(
       `CREATE INDEX IF NOT EXISTS ${this.table}_agent_idx ON ${this.table} (agent_id, seq)`,
@@ -119,18 +137,18 @@ export class PgConversationStore implements ConversationStore {
   async append(agentId: string, turn: ConversationTurn): Promise<void> {
     await this.ensure();
     await this.pool.query(
-      `INSERT INTO ${this.table} (agent_id, role, content, at) VALUES ($1, $2, $3, $4)`,
-      [agentId, turn.role, turn.content, turn.at],
+      `INSERT INTO ${this.table} (agent_id, role, content, at, grounded) VALUES ($1, $2, $3, $4, $5)`,
+      [agentId, turn.role, turn.content, turn.at, turn.grounded === true],
     );
   }
 
   async history(agentId: string, limit = DEFAULT_MEMORY_TURNS): Promise<ConversationTurn[]> {
     await this.ensure();
-    // Take the most recent `limit` rows, then return them oldest-first.
+    // Only grounded turns replay; take the most recent `limit`, oldest-first.
     const { rows } = await this.pool.query(
       `SELECT role, content, at FROM (
          SELECT role, content, at, seq FROM ${this.table}
-          WHERE agent_id = $1 ORDER BY seq DESC LIMIT $2
+          WHERE agent_id = $1 AND grounded ORDER BY seq DESC LIMIT $2
        ) recent ORDER BY seq ASC`,
       [agentId, limit],
     );
@@ -138,6 +156,7 @@ export class PgConversationStore implements ConversationStore {
       role: r.role,
       content: r.content,
       at: typeof r.at === 'string' ? r.at : r.at.toISOString(),
+      grounded: true,
     }));
   }
 
@@ -164,16 +183,20 @@ export function getConversationStore(): ConversationStore {
 /** A memory view bound to one agent — what the SavedAgent adapter consumes. */
 export interface AgentMemory {
   recent(limit?: number): Promise<ConversationTurn[]>;
-  remember(user: string, assistant: string): Promise<void>;
+  /** Persist an exchange. Ungrounded exchanges are NOT stored (memory hygiene). */
+  remember(user: string, assistant: string, grounded: boolean): Promise<void>;
 }
 
 export function bindMemory(store: ConversationStore, agentId: string): AgentMemory {
   return {
     recent: (limit) => store.history(agentId, limit),
-    async remember(user, assistant) {
+    async remember(user, assistant, grounded) {
+      // Hygiene at the source: a refusal or ungrounded answer carries no
+      // reusable knowledge and is exactly how poison enters memory — skip it.
+      if (!grounded) return;
       const at = new Date().toISOString();
-      await store.append(agentId, { role: 'user', content: user, at });
-      await store.append(agentId, { role: 'assistant', content: assistant, at: new Date().toISOString() });
+      await store.append(agentId, { role: 'user', content: user, at, grounded: true });
+      await store.append(agentId, { role: 'assistant', content: assistant, at: new Date().toISOString(), grounded: true });
     },
   };
 }
