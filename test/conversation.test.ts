@@ -177,6 +177,40 @@ describe('SavedAgent — context retention across runs', () => {
     expect(await store.history(def.id)).toHaveLength(4);
   });
 
+  it('memory-vs-grounding: a refused query with grounded memory answers FROM MEMORY, marked and unstored', async () => {
+    const store = new InMemoryConversationStore();
+    const agent = new SavedAgent(def, { memory: bindMemory(store, def.id) });
+    // Brain stub: first draft grounds; second REFUSES (no sources); converse echoes.
+    let calls = 0;
+    const brain = {
+      draft: async () => (++calls === 1
+        ? { text: 'grounded answer', sources: [{ source: 'doc' }] }
+        : { text: "I don't have that in the brain yet.", sources: [] }),
+      converse: async (_i: string, conversation: string) => `you asked about: ${conversation.includes('first question') ? 'first question' : '?'}`,
+    } as unknown as AgentContext['brain'];
+    const ctx = { brain, fabric: { list: () => [] }, scopes: ['default-team'] } as unknown as AgentContext;
+
+    await agent.run('first question', ctx); // grounded → remembered
+    const r = await agent.run('what did I just ask you?', ctx); // refused → memory fallback
+    expect(r.output).toContain('first question');
+    expect(r.output).toContain('(from conversation memory');
+    expect(r.output).not.toMatch(/Sources:/); // never masquerades as grounded
+    // The derivative exchange is NOT stored — memory still holds only run 1.
+    expect(await store.history(def.id)).toHaveLength(2);
+  });
+
+  it('memory-vs-grounding: with NO grounded memory, a refused query still refuses', async () => {
+    const store = new InMemoryConversationStore();
+    const agent = new SavedAgent(def, { memory: bindMemory(store, def.id) });
+    const brain = {
+      draft: async () => ({ text: "I don't have that in the brain yet.", sources: [] }),
+      converse: async () => { throw new Error('must not be called with empty memory'); },
+    } as unknown as AgentContext['brain'];
+    const ctx = { brain, fabric: { list: () => [] }, scopes: ['default-team'] } as unknown as AgentContext;
+    const r = await agent.run('unknowable thing', ctx);
+    expect(r.output).toContain("I don't have that in the brain yet.");
+  });
+
   it('without a memory binding, runs are stateless (no persistence)', async () => {
     const agent = new SavedAgent(def); // no memory
     const { brain, seen } = spyBrain();

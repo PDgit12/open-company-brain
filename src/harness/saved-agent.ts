@@ -18,6 +18,13 @@ import { cacheKey, type ResponseCache } from './cache.js';
 import { estimateTokens, scopeKey, type TokenBudget } from './tokens.js';
 import type { Agent, AgentContext, AgentResult } from './agent.js';
 
+/**
+ * Marker appended to a memory-derived answer. It signals "this came from the
+ * conversation, not company records" to both humans and the run classifier —
+ * a memory answer must never masquerade as grounded knowledge.
+ */
+export const MEMORY_REPLY_NOTE = '(from conversation memory — no brain records matched)';
+
 /** Stitch the cited sources onto generated text, matching BuiltinAgent's shape. */
 export function withSources(text: string, sources: { source: string }[]): string {
   const cites = [...new Set(sources.map((s) => s.source))];
@@ -114,8 +121,22 @@ export class SavedAgent implements Agent {
     // Memory hygiene: only a GROUNDED exchange is remembered (sources prove
     // grounding post-gate; refusals carry none) — poison never enters memory.
     const { text, sources } = await ctx.brain.draft(query, instruction, ctx.scopes);
+    const grounded = sources.length > 0;
+
+    // Memory-vs-grounding policy: a conversational meta-question ("what did I
+    // just ask you?") has no corpus grounding, so the gate refuses — but the
+    // agent DOES hold grounded dialogue history that can answer it. Fall back
+    // to memory-only conversing: explicitly marked, never cited, and never
+    // stored back (a derivative answer must not compound into future prompts).
+    if (!grounded && memoryBlock) {
+      const fromMemory = await ctx.brain.converse(runInstruction(this.def, task), memoryBlock);
+      const output = `${fromMemory.trim()}\n\n${MEMORY_REPLY_NOTE}`;
+      if (budget) await budget.record(key, estimateTokens(`${instruction}\n${fromMemory}`));
+      return { output, steps: [] };
+    }
+
     const output = withSources(text, sources);
-    if (memory && task.trim()) await memory.remember(task.trim(), text, sources.length > 0);
+    if (memory && task.trim()) await memory.remember(task.trim(), text, grounded);
     if (budget) await budget.record(key, estimateTokens(`${query}\n${instruction}\n${text}`));
     return { output, steps: [] };
   }

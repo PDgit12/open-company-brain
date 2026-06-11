@@ -19,6 +19,7 @@ import { config } from '../config.js';
 import { JsonFileCollection } from '../storage/json-file.js';
 import { estimateTokens } from '../harness/tokens.js';
 import { NO_CONTEXT_REPLY } from '../agents/generator.js';
+import { MEMORY_REPLY_NOTE } from '../harness/saved-agent.js';
 import type { Agent, AgentContext, AgentResult, AgentStep } from '../harness/agent.js';
 
 export interface RunRecord {
@@ -58,6 +59,9 @@ export type RunConcern = 'ok' | 'refused' | 'ungrounded';
 
 export function classifyRun(r: Pick<RunRecord, 'output' | 'steps'>): RunConcern {
   if (r.output.includes(NO_CONTEXT_REPLY)) return 'refused';
+  // A marked memory-derived answer is intentional behavior (the memory-vs-
+  // grounding policy), not an ungrounded answer masquerading as fact.
+  if (r.output.includes(MEMORY_REPLY_NOTE)) return 'ok';
   const grounded = /Sources:\s*\[/.test(r.output) || r.steps.length > 0;
   return grounded ? 'ok' : 'ungrounded';
 }

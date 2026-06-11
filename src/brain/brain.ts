@@ -169,6 +169,29 @@ export class Brain {
     return { text, sources: chunks };
   }
 
+  /**
+   * Conversational recall — answer from the DIALOGUE, not from company records.
+   *
+   * Used only as the saved-agent fallback when retrieval refused but grounded
+   * conversation memory exists (e.g. "what did I just ask you?"). This is NOT a
+   * grounding bypass: the only context the model sees is the conversation
+   * itself (which contains exclusively grounded exchanges, per memory hygiene),
+   * the caller marks the output as memory-derived, and it is never cited or
+   * stored back — so a memory answer can't masquerade as knowledge or compound.
+   */
+  async converse(instruction: string, conversation: string): Promise<string> {
+    const prompt =
+      `${instruction}\n\n` +
+      `CONTEXT (the conversation so far — dialogue history, NOT company records):\n${conversation}\n\n` +
+      `Answer only from this conversation. If the answer isn't in it, say you don't know.`;
+    // The conversation doubles as the mock generator's context chunk, keeping
+    // this path deterministic and testable without credentials.
+    return this.generator.generate({
+      prompt,
+      chunks: [{ text: conversation, source: 'conversation', metadata: {}, score: 1 }],
+    });
+  }
+
   /** Attention agent: what needs follow-up across the brain's recent knowledge. */
   async health(accessScopes: string[]): Promise<BrainAnswer> {
     const retrieved = await this.memory.retrieve({
