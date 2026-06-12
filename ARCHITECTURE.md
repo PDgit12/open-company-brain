@@ -10,6 +10,20 @@
 
 ## 1. The locked idea
 
+**THE SYSTEM: the Brain powers the OS.** The Brain (Blomfield's RFS) makes the
+company legible and TRUE — knowledge mined from its own artifacts, scoped,
+cited-or-refused, kept current. The OS (Hu's RFS) is the closed loop that runs
+ON it — monitoring reality against intent, flagging divergence with evidence,
+adjusting through approved actions. Neither sells alone: Brain without loop =
+commodity search (Glean); loop without Brain = uninstallable noise. Together,
+with ENFORCEMENT at every joint, they are one product.
+
+**What we SELL is the OS's outcome** (the Gong lesson: one function, loop
+closed completely, priced on money provably saved — e.g. misalignment rework
+≈ $2.25M/yr per 50 engineers). **The Brain is WHY ours works** when ~95% of
+enterprise AI pilots fail on missing context. Brain = moat; OS = money; the
+wedge vertical is chosen by discovery (FIS conversations), not by us in a doc.
+
 **Comb turns a company from an open loop into a closed loop: every answer
 provable, every action authorized, every failure a permanent test — one
 self-hosted kernel any agent connects to over MCP.**
