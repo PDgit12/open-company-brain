@@ -165,18 +165,22 @@ export async function runDivergenceWatch(
       const rec = await checkIntent(model, intent, items, { source: event.source, scope: event.scope });
       if (rec.status === 'diverged') {
         try {
+          // Ground the alert on the EVIDENCE (just embedded → retrieves above
+          // the floor), not the intent statement (often retrieves nothing).
           const r = await ActionService.create(brain).propose(
             {
               title: `Divergence: ${intent.statement.slice(0, 60)}`,
-              instruction: `Draft a short, factual divergence alert. Reality just observed: "${rec.evidence[0]?.slice(0, 300)}". The intent it endangers: "${intent.statement}". State what diverged and what decision is needed.`,
-              query: intent.statement,
+              instruction: `Draft a short, factual divergence alert. The intent it endangers: "${intent.statement}". State what diverged per the context and what decision is needed.`,
+              query: rec.evidence[0]?.slice(0, 300) ?? intent.statement,
               by: 'divergence-engine',
             },
             [event.scope],
           );
           if (r.ok) rec.actionId = r.action.id;
-        } catch {
-          // flag stands even if the action draft failed
+          else rec.rationale += ` [alert draft refused: ${r.reason.slice(0, 60)}]`;
+        } catch (err) {
+          // The flag stands; the failure is visible, never swallowed silently.
+          rec.rationale += ` [alert proposal failed: ${err instanceof Error ? err.message.slice(0, 60) : 'error'}]`;
         }
       }
       records.push(rec);
