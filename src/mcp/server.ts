@@ -24,6 +24,18 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { Brain } from '../brain/brain.js';
 import { config, describeMode } from '../config.js';
+import { ActionService } from '../actions/service.js';
+import { getRunStore, classifyRun } from '../observability/runs.js';
+
+/**
+ * PRINCIPAL: who this connection IS. Each MCP host registers comb with its own
+ * env (MCP_PRINCIPAL + MCP_SCOPES), so attribution is per-connection — the
+ * accountability unit behind every write/act/prove call (scopes authorize;
+ * the principal attributes).
+ */
+function principalName(): string {
+  return (process.env.MCP_PRINCIPAL ?? '').trim() || 'unnamed-agent';
+}
 
 /** Resolve caller scopes: explicit arg → MCP_SCOPES env → demo default. */
 function resolveScopes(arg?: string): string[] {
@@ -36,7 +48,8 @@ function resolveScopes(arg?: string): string[] {
 
 export async function createMcpServer(): Promise<McpServer> {
   const brain = await Brain.create();
-  const server = new McpServer({ name: 'open-company-brain', version: '0.4.0' });
+  const actions = ActionService.create(brain);
+  const server = new McpServer({ name: 'open-company-brain', version: '0.5.0' });
 
   // ── search_brain: governed retrieval, host synthesizes ──────────────────────
   server.tool(
@@ -102,6 +115,51 @@ export async function createMcpServer(): Promise<McpServer> {
       if (stats.length === 0) return { content: [{ type: 'text', text: 'The brain is empty (within the allowed scopes).' }] };
       const text = stats.map((s) => `- ${s.source}: ${s.count}`).join('\n');
       return { content: [{ type: 'text', text: `Sources:\n${text}` }] };
+    },
+  );
+
+  // ── ACT: propose an action (enters the human/policy approval queue) ─────────
+  server.tool(
+    'propose_action',
+    'Propose a real-world action (a notice, an update, a reply). The draft is GROUNDED in the brain (refused if no grounding) and enters the approval queue — a human (or rate-capped policy at L2) must approve before anything executes. Returns the action id to check status.',
+    {
+      title: z.string().describe('Short label, e.g. "Notify managers about policy change".'),
+      instruction: z.string().describe('What to draft (the trust contract applies).'),
+      query: z.string().describe('What to retrieve from the brain to ground the draft.'),
+      scopes: z.string().optional().describe('Comma-separated access scopes.'),
+    },
+    async ({ title, instruction, query, scopes }) => {
+      const r = await actions.propose({ title, instruction, query, by: principalName() }, resolveScopes(scopes));
+      if (!r.ok) return { content: [{ type: 'text', text: `REFUSED: ${r.reason}` }] };
+      return { content: [{ type: 'text', text: `Proposed (${r.action.status}): id=${r.action.id}\nDraft:\n${r.action.body.slice(0, 800)}` }] };
+    },
+  );
+
+  // ── ACT: check an action's status ────────────────────────────────────────────
+  server.tool(
+    'action_status',
+    'Check the status of a proposed action (proposed | executed | rejected | failed) and its effect.',
+    { id: z.string().describe('The action id returned by propose_action.') },
+    async ({ id }) => {
+      const all = await actions.list();
+      const a = all.find((x) => x.id === id) ?? all.find((x) => x.id.startsWith(id));
+      if (!a) return { content: [{ type: 'text', text: `No action ${id}.` }] };
+      return { content: [{ type: 'text', text: `${a.title}: ${a.status}${a.effect ? ` — ${a.effect}` : ''}` }] };
+    },
+  );
+
+  // ── PROVE: query recent runs (the receipts) ──────────────────────────────────
+  server.tool(
+    'query_runs',
+    "Query the brain's recent agent runs — the audit/observability trail: status (answered/refused/memory), tokens, latency, concern classification. Use to verify what the system actually did.",
+    { limit: z.number().optional().describe('How many recent runs (default 10).') },
+    async ({ limit }) => {
+      const runs = await getRunStore().list(limit ?? 10);
+      if (!runs.length) return { content: [{ type: 'text', text: 'No runs recorded yet.' }] };
+      const text = runs
+        .map((r) => `- ${r.id} [${classifyRun(r)}] ${r.agent} · "${r.input.slice(0, 50)}" · ${r.promptTokens}+${r.outputTokens} tok · ${r.latencyMs}ms`)
+        .join('\n');
+      return { content: [{ type: 'text', text }] };
     },
   );
 

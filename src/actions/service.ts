@@ -38,6 +38,8 @@ export interface ProposeInput {
   query: string;
   /** Optional stable idempotency key; derived from title+query when absent. */
   idempotencyKey?: string;
+  /** Who proposed it (principal name) — lands in the audit trail. */
+  by?: string;
 }
 
 /** Deterministic FNV-1a hash → stable idempotency suffix. */
@@ -109,7 +111,7 @@ export class ActionService {
       createdAt: nowIso(),
     };
     await this.store.save(action);
-    await this.log(action, 'proposed', `proposed: ${title}`);
+    await this.log(action, 'proposed', `proposed: ${title}${input.by ? ` (by ${input.by})` : ''}`);
 
     // L2 autonomy: policy approves grounded proposals without a human click,
     // under the hourly cap. Cap reached → the action WAITS as 'proposed' (falls
