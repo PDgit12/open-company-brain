@@ -15,7 +15,7 @@ import { createFabric } from '../tools/assemble.js';
 import { config } from '../config.js';
 import { pickAgent } from '../harness/run.js';
 import { SavedAgent } from '../harness/saved-agent.js';
-import { getCustomAgentStore, resolveAgent, type CustomAgent } from '../agents/registry.js';
+import { getCustomAgentStore, resolveAgent, withDefaults, type CustomAgent } from '../agents/registry.js';
 import { InMemoryConversationStore, bindMemory } from '../agents/conversation.js';
 import {
   AGENT_SUITE,
@@ -31,13 +31,13 @@ import type { ToolFabric } from '../tools/fabric.js';
 
 function inlineAgent(def: InlineAgentDef): CustomAgent {
   const slug = def.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  return {
+  return withDefaults({
     id: `eval_${slug}`,
     name: def.name,
     instruction: def.instruction,
     query: (def.query ?? def.name).trim(),
     createdAt: new Date().toISOString(),
-  };
+  });
 }
 
 /** Build the agent a scenario asks for. Returns null when a saved ref is unknown. */

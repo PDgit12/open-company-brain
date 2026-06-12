@@ -19,6 +19,9 @@ import pg from 'pg';
 import { config } from '../config.js';
 import { JsonFileCollection } from '../storage/json-file.js';
 
+/** The autonomy dial position — EARNED per agent, never global. */
+export type AutonomyLevel = 'L0' | 'L1' | 'L2';
+
 export interface CustomAgent {
   id: string;
   name: string;
@@ -27,18 +30,52 @@ export interface CustomAgent {
   /** What to retrieve for grounding (defaults to the run-time question). */
   query: string;
   createdAt: string;
+  // ── v2 lifecycle fields (legacy rows normalized via withDefaults) ─────────
+  /** Definition version — bumped on update. */
+  version: number;
+  /** Fabric tool ids this agent MAY call. Default: brain tools only. */
+  toolGrants: string[];
+  /** 'answer' = prose AnswerRecord; a JSON-schema string = machine contract. */
+  outputContract: string;
+  /** L0 inform · L1 draft+human-approve · L2 policy-approve (rate-capped). */
+  autonomy: AutonomyLevel;
+  /** Benched agents don't run. */
+  enabled: boolean;
+  /**
+   * COMMISSIONED = passed its birth-kit starter evals ("born tested").
+   * v2-created agents start false and must pass `comb commission`; legacy
+   * rows (pre-v2) normalize to true so nothing already deployed breaks.
+   */
+  commissioned: boolean;
 }
 
 export interface SaveAgentInput {
   name: string;
   instruction: string;
   query?: string;
+  /** v2 creation paths set false to require commissioning; default true (legacy). */
+  commissioned?: boolean;
+}
+
+/** Normalize a (possibly legacy) row to the v2 shape — defaults defined ONCE. */
+export function withDefaults(a: Partial<CustomAgent> & Pick<CustomAgent, 'id' | 'name' | 'instruction' | 'query' | 'createdAt'>): CustomAgent {
+  return {
+    version: 1,
+    toolGrants: ['brain.*'],
+    outputContract: 'answer',
+    autonomy: 'L1',
+    enabled: true,
+    commissioned: true, // legacy rows predate the gate — grandfathered
+    ...a,
+  };
 }
 
 export interface CustomAgentStore {
   save(input: SaveAgentInput): Promise<CustomAgent>;
   list(): Promise<CustomAgent[]>;
   get(id: string): Promise<CustomAgent | undefined>;
+  /** Patch v2 lifecycle fields (commissioned/enabled/autonomy/…); bumps version. */
+  update(id: string, patch: Partial<Omit<CustomAgent, 'id' | 'createdAt'>>): Promise<CustomAgent | undefined>;
 }
 
 /**
@@ -58,13 +95,19 @@ export async function resolveAgent(
 }
 
 function toAgent(input: SaveAgentInput, id: string, createdAt: string): CustomAgent {
-  return {
+  return withDefaults({
     id,
     name: input.name.trim(),
     instruction: input.instruction.trim(),
     query: (input.query ?? input.name).trim(),
     createdAt,
-  };
+    ...(input.commissioned === undefined ? {} : { commissioned: input.commissioned }),
+  });
+}
+
+/** Apply a patch immutably and bump the version. */
+function applyPatch(a: CustomAgent, patch: Partial<Omit<CustomAgent, 'id' | 'createdAt'>>): CustomAgent {
+  return withDefaults({ ...a, ...patch, id: a.id, createdAt: a.createdAt, version: (a.version ?? 1) + 1 });
 }
 
 // Process-safe id: a saved agent written by one `comb create` run must not
@@ -82,11 +125,20 @@ export class InMemoryCustomAgentStore implements CustomAgentStore {
   }
 
   async list(): Promise<CustomAgent[]> {
-    return [...this.agents];
+    return this.agents.map(withDefaults);
   }
 
   async get(id: string): Promise<CustomAgent | undefined> {
-    return this.agents.find((a) => a.id === id);
+    const a = this.agents.find((x) => x.id === id);
+    return a ? withDefaults(a) : undefined;
+  }
+
+  async update(id: string, patch: Partial<Omit<CustomAgent, 'id' | 'createdAt'>>): Promise<CustomAgent | undefined> {
+    const i = this.agents.findIndex((x) => x.id === id);
+    if (i === -1) return undefined;
+    const next = applyPatch(withDefaults(this.agents[i]!), patch);
+    this.agents[i] = next;
+    return next;
   }
 }
 
@@ -109,11 +161,22 @@ export class FileCustomAgentStore implements CustomAgentStore {
   }
 
   async list(): Promise<CustomAgent[]> {
-    return this.collection.read();
+    return (await this.collection.read()).map(withDefaults);
   }
 
   async get(id: string): Promise<CustomAgent | undefined> {
-    return (await this.collection.read()).find((a) => a.id === id);
+    const a = (await this.collection.read()).find((x) => x.id === id);
+    return a ? withDefaults(a) : undefined;
+  }
+
+  async update(id: string, patch: Partial<Omit<CustomAgent, 'id' | 'createdAt'>>): Promise<CustomAgent | undefined> {
+    const all = await this.collection.read();
+    const i = all.findIndex((x) => x.id === id);
+    if (i === -1) return undefined;
+    const next = applyPatch(withDefaults(all[i]!), patch);
+    all[i] = next;
+    await this.collection.write(all);
+    return next;
   }
 }
 
@@ -141,15 +204,23 @@ export class PgCustomAgentStore implements CustomAgentStore {
          created_at timestamptz NOT NULL DEFAULT now()
        )`,
     );
+    // v2: lifecycle fields live in one jsonb column — legacy rows get NULL
+    // and normalize through withDefaults on read (grandfathered commissioned).
+    await this.pool.query(`ALTER TABLE ${this.table} ADD COLUMN IF NOT EXISTS lifecycle jsonb`);
     this.ready = true;
+  }
+
+  private static lifecycleOf(a: CustomAgent): Record<string, unknown> {
+    const { version, toolGrants, outputContract, autonomy, enabled, commissioned } = a;
+    return { version, toolGrants, outputContract, autonomy, enabled, commissioned };
   }
 
   async save(input: SaveAgentInput): Promise<CustomAgent> {
     await this.ensure();
     const agent = toAgent(input, nextId(), new Date().toISOString());
     await this.pool.query(
-      `INSERT INTO ${this.table} (id, name, instruction, query, created_at) VALUES ($1, $2, $3, $4, $5)`,
-      [agent.id, agent.name, agent.instruction, agent.query, agent.createdAt],
+      `INSERT INTO ${this.table} (id, name, instruction, query, created_at, lifecycle) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [agent.id, agent.name, agent.instruction, agent.query, agent.createdAt, JSON.stringify(PgCustomAgentStore.lifecycleOf(agent))],
     );
     return agent;
   }
@@ -157,16 +228,31 @@ export class PgCustomAgentStore implements CustomAgentStore {
   async list(): Promise<CustomAgent[]> {
     await this.ensure();
     const { rows } = await this.pool.query(
-      `SELECT id, name, instruction, query, created_at FROM ${this.table} ORDER BY created_at ASC`,
+      `SELECT id, name, instruction, query, created_at, lifecycle FROM ${this.table} ORDER BY created_at ASC`,
     );
-    return rows.map((r: { id: string; name: string; instruction: string; query: string; created_at: Date | string }) => ({
-      id: r.id, name: r.name, instruction: r.instruction, query: r.query,
-      createdAt: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
-    }));
+    return rows.map((r: { id: string; name: string; instruction: string; query: string; created_at: Date | string; lifecycle: Record<string, unknown> | null }) =>
+      withDefaults({
+        id: r.id, name: r.name, instruction: r.instruction, query: r.query,
+        createdAt: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
+        ...(r.lifecycle ?? {}),
+      }),
+    );
   }
 
   async get(id: string): Promise<CustomAgent | undefined> {
     return (await this.list()).find((a) => a.id === id);
+  }
+
+  async update(id: string, patch: Partial<Omit<CustomAgent, 'id' | 'createdAt'>>): Promise<CustomAgent | undefined> {
+    await this.ensure();
+    const current = await this.get(id);
+    if (!current) return undefined;
+    const next = applyPatch(current, patch);
+    await this.pool.query(
+      `UPDATE ${this.table} SET name=$2, instruction=$3, query=$4, lifecycle=$5 WHERE id=$1`,
+      [id, next.name, next.instruction, next.query, JSON.stringify(PgCustomAgentStore.lifecycleOf(next))],
+    );
+    return next;
   }
 }
 
