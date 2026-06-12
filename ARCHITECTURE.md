@@ -4,6 +4,34 @@
 > phase; when code and this document disagree during the migration, the
 > document wins unless a phase note says otherwise.
 
+## The locked idea (positioning — YC RFS: "The AI Operating System for Companies")
+
+**Comb turns a company from an open loop into a closed loop: every answer
+provable, every action authorized, every failure a permanent test — one
+self-hosted kernel any agent connects to over MCP.**
+
+- We are NOT an agent runtime (Claude Code/Strands/Copilot are channels, not
+  competitors), NOT enterprise search (Onyx/Glean's won ground — no connector
+  marathon), NOT an observe-only eval platform. Our differentiation is
+  ENFORCEMENT: everyone else observes the loop; our loop gates.
+- Company Brain (Blomfield RFS) = our memory subsystem. Software-for-Agents
+  (Epstein RFS) = our interface philosophy (MCP/CLI-first). Both subsumed.
+- Integration strategy: agents-as-sensors — external agents feed the brain
+  through MCP write tools as a by-product of working; no glue-code connectors.
+
+### Identity inversion (the v2 surface shift)
+1. The MCP SERVER is the primary product surface and must expose the full
+   kernel: read (search/ask), WRITE (ingest), ACT (actions.propose/status),
+   PROVE (traces, eval submit). The CLI runner (`comb run/chat`) is the
+   reference client and operator console — essential, but not the identity.
+2. PRINCIPALS become first-class: every surface call carries an authenticated
+   principal {id, name, scopes, kind: human|agent} so every trace, action, and
+   audit row is ATTRIBUTABLE (the MCP-governance compliance gap: shared
+   credentials = no attribution = HIPAA/SOC2/GDPR failure). Scope strings stay
+   the authorization unit; the principal is the accountability unit.
+3. Work arrives from OUTSIDE runtimes → the TaskEnvelope/inbox (Phase 6) is
+   load-bearing for the positioning, not an optional nicety.
+
 ## The one principle
 
 **The model is never the authority, and the model never speaks prose to the
@@ -176,12 +204,21 @@ Agents connect to the brain through exactly one interface: governed retrieval
    refinery CLEAN stage (dedupe/boilerplate).
 5. AgentDefinition v2 (triggers · toolGrants · outputContract · autonomy) +
    the creation spine with BIRTH KIT + COMMISSIONING gate.
+   [part 1 shipped: registry v2 + lifecycle module; part 2: CLI wiring + gate]
+5.5 POSITIONING SURFACES (the identity inversion, pulled forward):
+   README/CHANGELOG lead with the closed-loop sentence · MCP server gains
+   WRITE/ACT/PROVE tools (ingest, actions.propose/status, trace query) ·
+   PRINCIPALS on MCP+HTTP surfaces (API key → {id, name, scopes, kind};
+   traces/actions/audit rows carry principal id).
 6. TaskEnvelope + inbox queue + worker loop (reactive/scheduled/delegated
-   triggers unified); scheduler.
+   triggers unified); scheduler. Load-bearing for external runtimes.
 7. Corpus PROFILE + agent factory (data-born agents w/ auto-calibration +
    auto-evals, commissioned at birth).
 8. Ops: config injection (kill import-frozen global) · PG tiers for
-   budget/cache · dashboard (maintenance/analytics/brain-graph).
+   budget/cache · storage tiers (S3 Vectors for scale/AWS) · dashboard
+   (maintenance/analytics/brain-graph). DEFERRED until pulled by a user:
+   Expectations object (business-level closed loop), structured machine
+   output contracts, n8n node.
 
 ## The onboarding lifecycle (canonical journey — the UX the build serves)
 
