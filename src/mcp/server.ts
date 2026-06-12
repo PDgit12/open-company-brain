@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { Brain } from '../brain/brain.js';
 import { config, describeMode } from '../config.js';
 import { ActionService } from '../actions/service.js';
+import { getIntentStore, type IntentKind } from '../intents/registry.js';
 import { getRunStore, classifyRun } from '../observability/runs.js';
 
 /**
@@ -160,6 +161,31 @@ export async function createMcpServer(): Promise<McpServer> {
         .map((r) => `- ${r.id} [${classifyRun(r)}] ${r.agent} · "${r.input.slice(0, 50)}" · ${r.promptTokens}+${r.outputTokens} tok · ${r.latencyMs}ms`)
         .join('\n');
       return { content: [{ type: 'text', text }] };
+    },
+  );
+
+  // ── INTENT: declare/list what SHOULD be happening (the loop's reference) ────
+  server.tool(
+    'declare_intent',
+    'Declare an INTENT — what SHOULD be happening (a sprint goal, spec, policy, or procedure). The divergence engine compares reality against intents; flags always cite the intent they diverged from.',
+    {
+      statement: z.string().describe('The expectation, plainly: "Sprint 14 ships the export API".'),
+      kind: z.enum(['goal', 'spec', 'policy', 'procedure']).optional().describe('Defaults to goal.'),
+      scopes: z.string().optional().describe('Comma-separated scopes this governs.'),
+    },
+    async ({ statement, kind, scopes }) => {
+      const it = await getIntentStore().save({ statement, kind: kind as IntentKind | undefined, scopes: resolveScopes(scopes) });
+      return { content: [{ type: 'text', text: `Intent ${it.id} (${it.kind}, v${it.version}) declared by ${principalName()}.` }] };
+    },
+  );
+  server.tool(
+    'list_intents',
+    'List declared intents (what SHOULD be happening) visible to the caller scopes.',
+    { scopes: z.string().optional() },
+    async ({ scopes }) => {
+      const all = await getIntentStore().list(resolveScopes(scopes));
+      if (!all.length) return { content: [{ type: 'text', text: 'No intents declared.' }] };
+      return { content: [{ type: 'text', text: all.map((i) => `- ${i.id} [${i.kind} v${i.version}${i.enabled ? '' : ' disabled'}] ${i.statement}`).join('\n') }] };
     },
   );
 

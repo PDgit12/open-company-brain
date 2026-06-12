@@ -20,6 +20,7 @@ import { parseChatCommand, CHAT_HELP } from './chat-commands.js';
 import { ToolLoopAgent } from './agent.js';
 import { draftAgent } from '../agents/architect.js';
 import { buildBirthKit, saveBirthKit, commission } from '../agents/lifecycle.js';
+import { getIntentStore, type IntentKind } from '../intents/registry.js';
 import { runAgentEval } from '../eval/agent-run.js';
 import { resolveContextWindow, FALLBACK_WINDOW, type ResolvedWindow } from './context-window.js';
 import { ActionService } from '../actions/service.js';
@@ -475,6 +476,35 @@ async function commissionAgent(idOrName: string | undefined): Promise<void> {
   }
 }
 
+/**
+ * `comb intent "<statement>" [--kind goal|spec|policy|procedure]` — declare
+ * WHAT SHOULD BE HAPPENING. Intents are the closed loop's reference signal:
+ * the divergence engine compares reality streams against them.
+ */
+async function declareIntent(statement: string, argv: string[], scopes: string[]): Promise<void> {
+  if (!statement.trim()) {
+    stdout.write(gray('usage: comb intent "<what should happen>" [--kind goal|spec|policy|procedure] [--scopes a,b]\n'));
+    process.exit(1);
+  }
+  const ki = argv.indexOf('--kind');
+  const kind = (ki !== -1 ? argv[ki + 1] : 'goal') as IntentKind;
+  const it = await getIntentStore().save({ statement, kind, scopes });
+  stdout.write(`${butter('✓')} intent ${bold(it.id)} ${dim(`· ${it.kind} · v${it.version} · scopes ${it.scopes.join(',')}`)}\n  ${gray(it.statement)}\n`);
+}
+
+/** `comb intents` — list the reference signals reality is compared against. */
+async function listIntents(scopes: string[]): Promise<void> {
+  const all = await getIntentStore().list(scopes);
+  if (!all.length) {
+    stdout.write(`${dim('No intents declared.')} ${bold('comb intent "<what should happen>"')}\n`);
+    return;
+  }
+  stdout.write(`\n${butter('◆')} ${bold('Intents')} ${dim(`· ${all.length} (what SHOULD be happening)`)}\n`);
+  for (const i of all) {
+    stdout.write(`  ${i.enabled ? coral('•') : gray('◦')} ${bold(i.id)}  ${dim(`${i.kind} · v${i.version}`)}\n    ${gray(i.statement.slice(0, 76))}\n`);
+  }
+}
+
 /** `comb forget <id|name>` — wipe a saved agent's conversation memory. */
 async function forgetAgent(idOrName: string | undefined): Promise<void> {
   const needle = (idOrName ?? '').trim();
@@ -670,6 +700,8 @@ async function main(): Promise<void> {
   if (mode === 'agents') return listAgents();
   if (mode === 'forget') return forgetAgent(rest[0]);
   if (mode === 'commission') return commissionAgent(rest.join(' '));
+  if (mode === 'intent') return declareIntent(rest.join(' '), argv, scopes);
+  if (mode === 'intents') return listIntents(scopes);
   if (mode === 'budget') return showBudget(scopes);
   if (mode === 'runs') {
     const li = argv.indexOf('--limit');
