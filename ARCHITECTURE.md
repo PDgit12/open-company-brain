@@ -52,11 +52,12 @@ is pinned, comment-guarded, and changed only with a live A/B.
 |---|---|---|
 | Language | TypeScript (strict), Node ≥20, ESM | one language across kernel/CLI/server; types ARE the contract system (P1); no Python split-brain |
 | Truth store | **PostgreSQL** (single instance) | one database holds vectors + agents + memory + traces + queue + audit → transactional consistency, one backup, one `docker compose up` |
-| Vectors | **pgvector** (hot path) | colocated with truth; scope filter in the same WHERE clause as similarity — access control can't desync from retrieval. S3 Vectors later as the cold/scale tier behind the same seam |
+| Vectors | **pgvector** (default) + **S3 Vectors** (first-class option, `VECTOR_BACKEND=s3`) | pgvector: colocated with truth, scope filter in the same WHERE clause as similarity (access control can't desync), 2026 consensus starting point, ~10M-vector comfort. S3 Vectors: ~90% cheaper at scale, serverless, the AWS-native + massive-corpus choice — supported as an equal `MemoryStore` impl (same scope + score contract; calibration handles its distribution by design). Decision rule: interactive hot path & self-host-only deployments → pgvector; AWS-native or >10M vectors or cost-driven → S3 Vectors; both can tier (hot PG / cold S3). **Also seam-ready: Qdrant** |
+| Queue (phase 6) | **PG `FOR UPDATE SKIP LOCKED`** | atomic claim+lock in one transaction, ACID with the rest of the kernel; 2026 guidance: "adding Redis for job queuing alone is engineering overhead" when PG exists. Ceiling ~100–200 jobs/s — orders above agent-task volume. **Escape hatch: BullMQ+Redis** if flows/rate-limit complexity ever pulls |
 | Local models | **Ollama** (qwen2.5:3b default; any ≤3B works) | $0/query, self-host wedge, grammar-constrained decoding (`format:<json-schema>`), `/api/show` window introspection, keep_alive |
 | BYO cloud | **OpenAI-compatible protocol** | one protocol = OpenAI/Groq/Together/OpenRouter/LM Studio/vLLM; structured outputs supported |
 | Embeddings | nomic-embed-text (local) / text-embedding-3-small (BYO) | independent of generation model; calibration is stored PER embedder because score distributions differ |
-| HTTP | Express 4 | boring, known; the API is small — no framework worship |
+| HTTP | Express 4 | our API is small and DB/LLM-bound — 2026 benchmarks show framework choice moves DB-bound APIs ~30%, while LLM latency dominates by 100×; migration cost > benefit. **Escape hatch: Hono** (edge-portable, Fetch-native) if surfaces are ever rebuilt |
 | Agent bus | **@modelcontextprotocol/sdk** | MCP is the winning agent-interface standard; primary product surface |
 | Validation | zod (config), hand-rolled pure validators (records) | record validators must be dependency-free pure functions — they're the product |
 | Tests | vitest, hermetic (mock backend + temp dirs) | every commit gates on typecheck+lint+test+build; live verification is a separate, explicit step |
