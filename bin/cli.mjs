@@ -199,7 +199,8 @@ ${h('Build agents')}
     ${c('new "<wish>"')}         ${d('ONE PROMPT builds the whole agent + calibration labels')}
     ${c('create')}               ${d('manual build — wizard (TTY) or CI flags:')}
                          ${d('--name N --instruction I [--query Q]')}
-    ${c('agents')}               ${d('list your saved agents')}
+    ${c('commission <name>')}    ${d('run an agent’s birth evals — must pass to become runnable')}
+    ${c('agents')}               ${d('list your saved agents (✓ commissioned · ● draft)')}
     ${c('forget <name>')}        ${d('wipe a saved agent’s conversation memory')}
 ${h('Run them')}
     ${c('run "<task>"')}         ${d('one governed, cited run')}
@@ -248,6 +249,7 @@ const run = () => {
   if (cmd === 'create') return harnessCmd(['create', ...process.argv.slice(3)]);
   if (cmd === 'agents') return harnessCmd(['agents', ...process.argv.slice(3)]);
   if (cmd === 'forget') return harnessCmd(['forget', ...process.argv.slice(3)]);
+  if (cmd === 'commission') return harnessCmd(['commission', ...process.argv.slice(3)]);
   if (cmd === 'budget') return harnessCmd(['budget', ...process.argv.slice(3)]);
   if (cmd === 'runs') return harnessCmd(['runs', ...process.argv.slice(3)]);
   if (cmd === 'trace') return harnessCmd(['trace', ...process.argv.slice(3)]);

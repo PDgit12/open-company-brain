@@ -19,6 +19,8 @@ import { bindMemory, getConversationStore } from '../agents/conversation.js';
 import { parseChatCommand, CHAT_HELP } from './chat-commands.js';
 import { ToolLoopAgent } from './agent.js';
 import { draftAgent } from '../agents/architect.js';
+import { buildBirthKit, saveBirthKit, commission } from '../agents/lifecycle.js';
+import { runAgentEval } from '../eval/agent-run.js';
 import { resolveContextWindow, FALLBACK_WINDOW, type ResolvedWindow } from './context-window.js';
 import { ActionService } from '../actions/service.js';
 import { getResponseCache } from './cache.js';
@@ -157,7 +159,7 @@ async function switchChatAgent(arg: string): Promise<{ agent: Agent; def: Custom
     return { agent: pickAgent(arg), def: null };
   }
   const def = await resolveAgent(getCustomAgentStore(), arg);
-  if (!def) return null;
+  if (!def || !def.enabled || !def.commissioned) return null;
   const opts = tokenOpts(false);
   opts.memory = bindMemory(getConversationStore(), def.id);
   return { agent: new SavedAgent(def, opts), def };
@@ -168,6 +170,17 @@ async function chooseAgent(kind: AgentKind, saved: string | null, fresh: boolean
   const def = await resolveAgent(getCustomAgentStore(), saved);
   if (!def) {
     stdout.write(`${coral('✗')} no saved agent matches ${bold(saved)} — see ${bold('comb agents')}.\n`);
+    process.exit(1);
+  }
+  // THE RUNNABLE-GATE: a draft (uncommissioned) or benched agent cannot run.
+  // "Born tested" — it must pass its birth-kit evals first.
+  if (!def.enabled) {
+    stdout.write(`${coral('✗')} ${bold(def.name)} is disabled.\n`);
+    process.exit(1);
+  }
+  if (!def.commissioned) {
+    stdout.write(`${coral('✗')} ${bold(def.name)} is a DRAFT — it must pass its birth evals first:\n`);
+    stdout.write(`  ${bold(`comb commission "${def.name}"`)}\n`);
     process.exit(1);
   }
   // Default: a saved agent retains context across runs/sessions (bound memory).
@@ -417,6 +430,51 @@ async function showTrace(id: string | undefined): Promise<void> {
   stdout.write(`${dim('output')}\n  ${r.output.replace(/\n/g, '\n  ')}\n`);
 }
 
+/**
+ * `comb commission <id|name>` — THE GATE. Runs the agent's birth-kit starter
+ * suite; a full pass flips commissioned=true and the agent becomes runnable.
+ * A failing agent stays a draft ("born tested" — nobody ships untested).
+ */
+async function commissionAgent(idOrName: string | undefined): Promise<void> {
+  const needle = (idOrName ?? '').trim();
+  if (!needle) {
+    stdout.write(gray('usage: comb commission <agent id or name>\n'));
+    process.exit(1);
+  }
+  const store = getCustomAgentStore();
+  const def = await resolveAgent(store, needle);
+  if (!def) {
+    stdout.write(`${coral('✗')} no saved agent matches ${bold(needle)} — see ${bold('comb agents')}.\n`);
+    process.exit(1);
+  }
+  if (def.commissioned) {
+    stdout.write(`${butter('✓')} ${bold(def.name)} is already commissioned.\n`);
+    return;
+  }
+  const line = '─'.repeat(54);
+  stdout.write(`\n${butter('◆')} ${bold('Commissioning')} ${def.name} ${dim('· running its birth evals')}\n${dim(line)}\n`);
+  const outcome = await commission(def, store, runAgentEval);
+  if (outcome.grandfathered) {
+    stdout.write(`${butter('✓')} no birth kit found (legacy agent) — commissioned directly.\n`);
+    return;
+  }
+  for (const r of outcome.results) {
+    stdout.write(`  ${r.passed ? butter('✓') : coral('✗')} ${r.name}\n`);
+    if (!r.passed) {
+      for (const t of r.turns) for (const c of t.checks) {
+        if (c.status === 'fail') stdout.write(`      ${coral('✗')} ${c.check}${c.detail ? dim(` — ${c.detail}`) : ''}\n`);
+      }
+    }
+  }
+  stdout.write(`${dim(line)}\n`);
+  if (outcome.passed) {
+    stdout.write(`${butter('✓ COMMISSIONED')} — ${bold(def.name)} is now runnable: ${bold(`comb run --saved "${def.name}" "<request>"`)}\n`);
+  } else {
+    stdout.write(`${coral('✗ STILL A DRAFT')} — fix the data (ingest more) or the definition, then re-run ${bold('comb commission')}.\n`);
+    process.exit(1);
+  }
+}
+
 /** `comb forget <id|name>` — wipe a saved agent's conversation memory. */
 async function forgetAgent(idOrName: string | undefined): Promise<void> {
   const needle = (idOrName ?? '').trim();
@@ -442,7 +500,8 @@ async function listAgents(): Promise<void> {
   }
   stdout.write(`\n${butter('◆')} ${bold('Saved agents')} ${dim(`· ${agents.length}`)}\n`);
   for (const a of agents) {
-    stdout.write(`  ${coral('•')} ${bold(a.name)}  ${dim(a.id)}\n`);
+    const badge = !a.enabled ? coral('✗ disabled') : a.commissioned ? '✓' : butter('● draft — comb commission');
+    stdout.write(`  ${coral('•')} ${bold(a.name)}  ${dim(a.id)}  ${badge}\n`);
     stdout.write(`    ${gray(a.instruction.replace(/\s+/g, ' ').slice(0, 72))}\n`);
   }
   stdout.write(`\n${dim('Run one:')} ${bold('comb run --saved "<name>" "<request>"')}\n`);
@@ -495,23 +554,27 @@ async function newAgent(wish: string): Promise<void> {
   stdout.write(`\n${butter('◆')} ${bold('Build an agent from a prompt')}\n${dim(line)}\n`);
 
   const draft = await draftAgent(trimmed);
+  // v2 creation spine: born as a DRAFT with its birth kit; commissioning gates.
   const agent = await getCustomAgentStore().save({
     name: draft.name,
     instruction: draft.instruction,
     query: draft.query,
+    commissioned: false,
   });
+  await saveBirthKit(buildBirthKit(agent, draft.labels));
   const slug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const labelsPath = `calibration-${slug}.json`;
   await writeFile(labelsPath, JSON.stringify(draft.labels, null, 2) + '\n', 'utf8');
 
-  stdout.write(`${butter('✓')} ${bold(agent.name)}  ${dim(agent.id)}  ${dim(`· drafted by ${draft.draftedBy}`)}\n`);
+  stdout.write(`${butter('✓')} ${bold(agent.name)}  ${dim(agent.id)}  ${dim(`· drafted by ${draft.draftedBy}`)}  ${butter('● draft')}\n`);
   stdout.write(`  ${dim('does')}        ${gray(agent.instruction.replace(/\s+/g, ' ').slice(0, 76))}\n`);
   stdout.write(`  ${dim('grounds on')}  ${gray(agent.query)}\n`);
   stdout.write(`  ${dim('labels')}      ${gray(labelsPath)} ${dim(`(${draft.labels.length} starter queries — edit to match your data)`)}\n`);
   stdout.write(`${dim(line)}\n${bold('Your surface:')}\n`);
   stdout.write(`  1. add data      ${dim('npm run demo → paste at :4000, or POST /api/ingest')}\n`);
   stdout.write(`  2. calibrate     ${dim(`comb calibrate --labels ${labelsPath}`)}\n`);
-  stdout.write(`  3. talk          ${dim(`comb chat --saved "${agent.name}"   (/model, /forget, /budget inside)`)}\n`);
+  stdout.write(`  3. commission   ${dim(`comb commission "${agent.name}"   (must pass its birth evals to run)`)}\n`);
+  stdout.write(`  4. talk          ${dim(`comb chat --saved "${agent.name}"   (/model, /forget, /budget inside)`)}\n`);
   stdout.write(`  4. watch         ${dim('comb runs · comb trace <id> · comb runs --failed')}\n`);
   stdout.write(`  5. harden        ${dim('comb promote <run id> → comb eval --suite comb-regressions.json')}\n`);
 }
@@ -606,6 +669,7 @@ async function main(): Promise<void> {
   if (mode === 'create') return createAgent(argv);
   if (mode === 'agents') return listAgents();
   if (mode === 'forget') return forgetAgent(rest[0]);
+  if (mode === 'commission') return commissionAgent(rest.join(' '));
   if (mode === 'budget') return showBudget(scopes);
   if (mode === 'runs') {
     const li = argv.indexOf('--limit');
