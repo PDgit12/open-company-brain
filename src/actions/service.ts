@@ -91,6 +91,38 @@ export class ActionService {
   }
 
   /**
+   * Propose with a PREBUILT body — for system-originated actions whose content
+   * is already a typed, evidenced record (e.g. a divergence flag: the flag IS
+   * the content; code renders it, no generation, no grounding round-trip).
+   * Same queue, same idempotency, same audit, same L2 policy path.
+   */
+  async proposeDirect(input: {
+    title: string;
+    body: string;
+    sources: { text: string; source: string }[];
+    by?: string;
+    idempotencyKey?: string;
+  }): Promise<ProposeResult> {
+    const title = input.title.trim() || 'Untitled action';
+    const action: ProposedAction = {
+      id: randomUUID(),
+      title,
+      body: input.body,
+      sources: input.sources,
+      status: 'proposed',
+      idempotencyKey: input.idempotencyKey?.trim() || `${title}:${hash(input.body)}`,
+      createdAt: nowIso(),
+    };
+    await this.store.save(action);
+    await this.log(action, 'proposed', `proposed: ${title}${input.by ? ` (by ${input.by})` : ''}`);
+    if (this.policy.enabled && (await this.executedLastHour()) < this.policy.perHour) {
+      const decided = await this.approve(action.id, { by: 'policy' });
+      if (decided.ok) return { ok: true, action: decided.action };
+    }
+    return { ok: true, action };
+  }
+
+  /**
    * Propose a grounded action. The draft is generated from retrieved context via
    * the same trust contract as ask/brief: if nothing grounds it, we refuse rather
    * than invent. Nothing is delivered until a human approves.

@@ -50,3 +50,22 @@ describe('runDivergenceWatch — the ingest hook', () => {
     expect(calls).toBe(0);
   });
 });
+
+import { renderDivergenceAlert, type DivergenceRecord } from '../src/divergence/engine.js';
+
+describe('renderDivergenceAlert — the flag IS the content (model-free)', () => {
+  it('renders intent + evidence + rationale into the alert body', () => {
+    const rec: DivergenceRecord = {
+      id: 'div_1', status: 'diverged', intentRef: 'intent_1',
+      intentStatement: 'Ship export API by June 20',
+      evidence: ['Standup: export API will slip to July'],
+      rationale: 'deadline contradicted', source: 'standup-notes',
+      scope: 'team', at: '2026-06-13T10:00:00Z',
+    };
+    const body = renderDivergenceAlert(rec);
+    expect(body).toContain('DIVERGENCE DETECTED');
+    expect(body).toContain('Ship export API by June 20');
+    expect(body).toContain('will slip to July');
+    expect(body).toContain('deadline contradicted');
+  });
+});

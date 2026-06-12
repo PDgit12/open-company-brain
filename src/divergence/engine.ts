@@ -91,6 +91,24 @@ Reply ONLY with JSON: {"status": "...", "evidence": [item numbers], "rationale":
 
 const nextId = (): string => `div_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
+/** THE EDGE for divergence: record → human-readable alert. Pure, model-free. */
+export function renderDivergenceAlert(rec: DivergenceRecord): string {
+  return [
+    `⚑ DIVERGENCE DETECTED`,
+    ``,
+    `Intent (what should be happening):`,
+    `  ${rec.intentStatement}`,
+    ``,
+    `Observed reality (${rec.source}, ${rec.at.slice(0, 16).replace('T', ' ')}):`,
+    `  ${rec.evidence[0] ?? '(see record)'}`,
+    ``,
+    `Why this diverges: ${rec.rationale}`,
+    ``,
+    `Decision needed: confirm the drift and adjust the plan, or update/retire`,
+    `the intent if it no longer reflects what should happen.`,
+  ].join('\n');
+}
+
 /** Pure core: check ONE intent against new items via the injected model. */
 export async function checkIntent(
   llm: Llm,
@@ -165,19 +183,17 @@ export async function runDivergenceWatch(
       const rec = await checkIntent(model, intent, items, { source: event.source, scope: event.scope });
       if (rec.status === 'diverged') {
         try {
-          // Ground the alert on the EVIDENCE (just embedded → retrieves above
-          // the floor), not the intent statement (often retrieves nothing).
-          const r = await ActionService.create(brain).propose(
-            {
-              title: `Divergence: ${intent.statement.slice(0, 60)}`,
-              instruction: `Draft a short, factual divergence alert. The intent it endangers: "${intent.statement}". State what diverged per the context and what decision is needed.`,
-              query: rec.evidence[0]?.slice(0, 300) ?? intent.statement,
-              by: 'divergence-engine',
-            },
-            [event.scope],
-          );
+          // THE FLAG IS THE CONTENT: the alert body is rendered from the typed
+          // record (intent + evidence + rationale) in code — no model call, no
+          // grounding round-trip, nothing to refuse. Deterministic by design.
+          const r = await ActionService.create(brain).proposeDirect({
+            title: `Divergence: ${intent.statement.slice(0, 60)}`,
+            body: renderDivergenceAlert(rec),
+            sources: [{ text: rec.evidence[0] ?? '', source: rec.source }],
+            by: 'divergence-engine',
+            idempotencyKey: `div:${intent.id}:${rec.evidence[0]?.slice(0, 80) ?? ''}`,
+          });
           if (r.ok) rec.actionId = r.action.id;
-          else rec.rationale += ` [alert draft refused: ${r.reason.slice(0, 60)}]`;
         } catch (err) {
           // The flag stands; the failure is visible, never swallowed silently.
           rec.rationale += ` [alert proposal failed: ${err instanceof Error ? err.message.slice(0, 60) : 'error'}]`;
