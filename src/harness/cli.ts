@@ -481,7 +481,17 @@ async function commissionAgent(idOrName: string | undefined): Promise<void> {
  * WHAT SHOULD BE HAPPENING. Intents are the closed loop's reference signal:
  * the divergence engine compares reality streams against them.
  */
-async function declareIntent(statement: string, argv: string[], scopes: string[]): Promise<void> {
+async function declareIntent(rest: string[], argv: string[], scopes: string[]): Promise<void> {
+  // parseFlags only consumes known global flags; strip intent-local ones here
+  // so "--kind goal" never leaks into the statement text.
+  const statement: string = (() => {
+    const out: string[] = [];
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === '--kind') { i++; continue; }
+      out.push(rest[i]!);
+    }
+    return out.join(' ');
+  })();
   if (!statement.trim()) {
     stdout.write(gray('usage: comb intent "<what should happen>" [--kind goal|spec|policy|procedure] [--scopes a,b]\n'));
     process.exit(1);
@@ -700,7 +710,7 @@ async function main(): Promise<void> {
   if (mode === 'agents') return listAgents();
   if (mode === 'forget') return forgetAgent(rest[0]);
   if (mode === 'commission') return commissionAgent(rest.join(' '));
-  if (mode === 'intent') return declareIntent(rest.join(' '), argv, scopes);
+  if (mode === 'intent') return declareIntent(rest, argv, scopes);
   if (mode === 'intents') return listIntents(scopes);
   if (mode === 'budget') return showBudget(scopes);
   if (mode === 'runs') {
