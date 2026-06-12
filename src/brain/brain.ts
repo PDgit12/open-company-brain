@@ -154,7 +154,7 @@ export class Brain {
     // Phase 2: constrained decoding — the model fills the record schema and
     // code validates it (status enum + citation subset proof). Falls back to
     // the legacy prose path when unsupported or twice-invalid.
-    const structured = await generateStructured(prompt, chunks);
+    const structured = await generateStructured(question, chunks);
     if (structured) return toBrainAnswer(structured);
     const answer = await this.generator.generate({ prompt, chunks });
     return toBrainAnswer(answered(answer, chunks));
@@ -178,7 +178,7 @@ export class Brain {
     }
     const context = buildContextBlock(chunks);
     const prompt = `${instruction}\n\nCONTEXT:\n${context}`;
-    const structured = await generateStructured(prompt, chunks);
+    const structured = await generateStructured(instruction, chunks);
     if (structured) return { text: structured.answer, sources: structured.citations, record: structured };
     const text = await this.generator.generate({ prompt, chunks });
     const r = answered(text, chunks);

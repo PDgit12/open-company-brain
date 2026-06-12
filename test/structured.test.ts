@@ -37,3 +37,47 @@ describe('generateStructured — repair loop + graceful degradation', () => {
     expect(await generateStructured('p', chunks)).toBeNull(); // tests run on mock
   });
 });
+
+import { runStructuredPipeline, parseSelect, type Llm } from '../src/brain/structured.js';
+
+describe('parseSelect — selection validation', () => {
+  it('accepts in-range unique indexes incl. empty; rejects junk', () => {
+    expect(parseSelect('{"relevant":[1,2,1]}', 2)).toEqual([1, 2]);
+    expect(parseSelect('{"relevant":[]}', 2)).toEqual([]);
+    expect(parseSelect('{"relevant":[3]}', 2)).toBeNull();
+    expect(parseSelect('{"relevant":"x"}', 2)).toBeNull();
+    expect(parseSelect('nope', 2)).toBeNull();
+  });
+});
+
+describe('runStructuredPipeline — SELECT then COMPOSE (injected model)', () => {
+  it('empty selection → STRUCTURAL refusal, compose never called', async () => {
+    const calls: string[] = [];
+    const llm: Llm = async (sys) => { calls.push(sys.slice(0, 10)); return '{"relevant":[]}'; };
+    const r = await runStructuredPipeline(llm, 'q', chunks);
+    expect(r?.status).toBe('insufficient_context');
+    expect(calls).toHaveLength(1); // SELECT only
+  });
+
+  it('selection narrows the compose context; citations map back to ORIGINAL chunks', async () => {
+    const seen: string[] = [];
+    const llm: Llm = async (_sys, prompt, schema) => {
+      seen.push(prompt);
+      if ((schema as { properties: object }).properties.hasOwnProperty('relevant')) return '{"relevant":[2]}';
+      return '{"status":"answered","answer":"leave info","citations":[1]}'; // #1 of the SELECTED set
+    };
+    const r = await runStructuredPipeline(llm, 'q', chunks);
+    expect(r?.status).toBe('answered');
+    expect(r?.citations[0]!.source).toBe('leave'); // original chunk #2
+    expect(seen[1]).not.toContain('Meals up to $60'); // distractor excluded from compose
+  });
+
+  it('invalid SELECT degrades to single-shot compose over ALL chunks', async () => {
+    const llm: Llm = async (_sys, _p, schema) =>
+      (schema as { properties: object }).properties.hasOwnProperty('relevant')
+        ? 'garbage'
+        : '{"status":"answered","answer":"x","citations":[1]}';
+    const r = await runStructuredPipeline(llm, 'q', chunks);
+    expect(r?.citations[0]!.source).toBe('expense'); // indexed against the FULL set
+  });
+});
