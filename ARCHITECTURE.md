@@ -240,8 +240,30 @@ deep technical explanation.
 
 Connector marathon (Onyx's ground) · our-own-runtime ambitions · DAG
 orchestration engine (delegation = envelopes between inboxes) · dashboards
-before operators ask · Expectations/business-monitoring object, machine
-output contracts, n8n node — all DEFERRED until a real user pulls them.
+before operators ask · machine output contracts, n8n node — DEFERRED until
+a real user pulls them.
+
+## 11.5 THE DIVERGENCE ENGINE (promoted from deferred — the RFS's center)
+
+"Queryable" is the substrate; the PRODUCT is Hu's sentence: monitor what's
+happening, compare it to what SHOULD be happening, adjust. Phase 9 (after the
+pilot validates the substrate):
+- **Intent objects** — first-class records of "should": specs, sprint goals,
+  policies, decisions (rides the industry's spec-driven-development turn).
+- **Stream watchers** — fan-out generalized: reality (tickets, commits,
+  meeting notes) flows in continuously via MCP/webhooks. Door A's existing
+  tools ARE the sensors — no connector marathon.
+- **DivergenceRecord** (typed, sibling of AnswerRecord):
+  `{status: diverged | aligned | insufficient_signal, intentRef, evidence[]}`
+  — CALIBRATED flag-or-silent: the refusal machinery generalized. Alert
+  fatigue is this category's killer; enforcement/calibration is the cure.
+- Flag → approvable action / generated spec in the queue (executable by their
+  agents). False flags → promoted evals → the flagger ratchets.
+
+Market basis: 30–50% of engineering effort is misalignment rework (~$2.25M/yr
+per 50 engineers) · 84% of product teams fear building the wrong thing ·
+~16 h/week lost to clarification meetings. Q&A over the brain is the
+BYPRODUCT; divergence detection is the proposition.
 
 ## 12. How we know it's working (product validation)
 
