@@ -25,6 +25,7 @@ import { assessGrounding, resolveGroundingPolicy, type GroundingPolicy } from '.
 import { answered, refusal, type AnswerRecord } from './record.js';
 import { generateStructured } from './structured.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
+import { cleanDocuments } from './clean.js';
 import { runReactions, type FanoutResult } from '../fanout/engine.js';
 import { demoDocuments } from '../seed/seed-data.js';
 import { candidateCasesFromFeedback, type GoldenCase } from '../eval/golden.js';
@@ -236,7 +237,10 @@ export class Brain {
         ? input.scope
         : (callerScopes[0] ?? config.demoUserAccessScope);
     const source = normalizeSource(input.source ?? 'notes');
-    const docs = buildDocuments({ format: input.format, content: input.content, source, access });
+    // Refinery CLEAN stage: strip boilerplate, drop exact duplicates (per
+    // scope) BEFORE embedding — dirty data costs embed spend, wastes topK
+    // retrieval slots, and feeds composition conflicting near-copies.
+    const docs = cleanDocuments(buildDocuments({ format: input.format, content: input.content, source, access }));
     const ingested = docs.length ? await this.memory.upsert(docs) : 0;
     // Fan-out: configured reaction agents run automatically over the new data
     // (no-op + zero generations when none are configured). Both the library

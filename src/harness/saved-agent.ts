@@ -15,6 +15,7 @@
 import type { CustomAgent } from '../agents/registry.js';
 import { formatMemory, type AgentMemory } from '../agents/conversation.js';
 import { memoryReply, renderAnswer } from '../brain/record.js';
+import { compileContext } from './context-compiler.js';
 import { cacheKey, type ResponseCache } from './cache.js';
 import { estimateTokens, scopeKey, type TokenBudget } from './tokens.js';
 import type { Agent, AgentContext, AgentResult } from './agent.js';
@@ -43,10 +44,18 @@ export function runQuery(def: CustomAgent, task: string): string {
  */
 export function runInstruction(def: CustomAgent, task: string, memoryBlock = ''): string {
   const t = task.trim();
-  const parts = [def.instruction];
-  if (memoryBlock) parts.push(memoryBlock);
-  if (t) parts.push(`User request: ${t}`);
-  return parts.join('\n\n');
+  // ONE assembler: typed sections through the context compiler. Priorities
+  // encode survival order under a budget (instruction > task > memory);
+  // render order stays authorial. Unbounded here — the caller already
+  // budgeted memory via fitTurns; full window-threading lands with v2 ops.
+  return compileContext(
+    [
+      { id: 'instruction', content: def.instruction, priority: 10 },
+      { id: 'memory', content: memoryBlock, priority: 5 },
+      { id: 'task', content: t ? `User request: ${t}` : '', priority: 9 },
+    ],
+    Number.MAX_SAFE_INTEGER,
+  ).prompt;
 }
 
 export interface SavedAgentOptions {
