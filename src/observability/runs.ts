@@ -19,7 +19,7 @@ import { config } from '../config.js';
 import { JsonFileCollection } from '../storage/json-file.js';
 import { estimateTokens } from '../harness/tokens.js';
 import { NO_CONTEXT_REPLY } from '../agents/generator.js';
-import { MEMORY_REPLY_NOTE } from '../harness/saved-agent.js';
+import { MEMORY_NOTE, type AnswerStatus } from '../brain/record.js';
 import type { Agent, AgentContext, AgentResult, AgentStep } from '../harness/agent.js';
 
 export interface RunRecord {
@@ -31,6 +31,8 @@ export interface RunRecord {
   input: string;
   output: string;
   steps: AgentStep[];
+  /** AnswerRecord status when the run carried the typed contract. */
+  status?: AnswerStatus;
   promptTokens: number;
   outputTokens: number;
   latencyMs: number;
@@ -57,11 +59,14 @@ const nextRunId = (): string => `run_${Date.now().toString(36)}_${Math.random().
  */
 export type RunConcern = 'ok' | 'refused' | 'ungrounded';
 
-export function classifyRun(r: Pick<RunRecord, 'output' | 'steps'>): RunConcern {
+export function classifyRun(r: Pick<RunRecord, 'output' | 'steps' | 'status'>): RunConcern {
+  // Typed contract first: when the run carries an AnswerRecord status, the
+  // classification is a FIELD READ — infallible, model-independent.
+  if (r.status === 'insufficient_context') return 'refused';
+  if (r.status === 'memory_reply' || r.status === 'answered') return 'ok';
+  // Fallback for recordless agents (external/tool-loop): prose heuristics.
   if (r.output.includes(NO_CONTEXT_REPLY)) return 'refused';
-  // A marked memory-derived answer is intentional behavior (the memory-vs-
-  // grounding policy), not an ungrounded answer masquerading as fact.
-  if (r.output.includes(MEMORY_REPLY_NOTE)) return 'ok';
+  if (r.output.includes(MEMORY_NOTE)) return 'ok';
   const grounded = /Sources:\s*\[/.test(r.output) || r.steps.length > 0;
   return grounded ? 'ok' : 'ungrounded';
 }
@@ -83,6 +88,7 @@ export function toRecord(
     input,
     output: result.output,
     steps: result.steps,
+    status: result.record?.status,
     promptTokens: estimateTokens(input),
     outputTokens: estimateTokens(result.output),
     latencyMs: Math.round(latencyMs),
@@ -144,18 +150,21 @@ export class PgRunStore implements RunStore {
          steps jsonb NOT NULL DEFAULT '[]',
          prompt_tokens int NOT NULL DEFAULT 0,
          output_tokens int NOT NULL DEFAULT 0,
-         latency_ms int NOT NULL DEFAULT 0
+         latency_ms int NOT NULL DEFAULT 0,
+         status text
        )`,
     );
+    // v2 migration: legacy tables gain the typed-contract status column.
+    await this.pool.query(`ALTER TABLE ${this.table} ADD COLUMN IF NOT EXISTS status text`);
     this.ready = true;
   }
   async append(r: RunRecord): Promise<void> {
     await this.ensure();
     await this.pool.query(
       `INSERT INTO ${this.table}
-         (id, at, agent, backend, scopes, input, output, steps, prompt_tokens, output_tokens, latency_ms)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [r.id, r.at, r.agent, r.backend, r.scopes, r.input, r.output, JSON.stringify(r.steps), r.promptTokens, r.outputTokens, r.latencyMs],
+         (id, at, agent, backend, scopes, input, output, steps, prompt_tokens, output_tokens, latency_ms, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [r.id, r.at, r.agent, r.backend, r.scopes, r.input, r.output, JSON.stringify(r.steps), r.promptTokens, r.outputTokens, r.latencyMs, r.status ?? null],
     );
   }
   async list(limit = 20): Promise<RunRecord[]> {
@@ -184,6 +193,7 @@ function rowToRecord(r: Record<string, unknown>): RunRecord {
     input: String(r.input),
     output: String(r.output),
     steps: (typeof r.steps === 'string' ? JSON.parse(r.steps) : r.steps) as AgentStep[],
+    status: (r.status as RunRecord['status']) ?? undefined,
     promptTokens: Number(r.prompt_tokens),
     outputTokens: Number(r.output_tokens),
     latencyMs: Number(r.latency_ms),

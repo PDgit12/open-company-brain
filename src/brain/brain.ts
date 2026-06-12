@@ -20,8 +20,9 @@
 
 import { config } from '../config.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCount } from './memory.js';
-import { createGenerator, NO_CONTEXT_REPLY, OllamaGenerator, type Generator } from '../agents/generator.js';
+import { createGenerator, OllamaGenerator, type Generator } from '../agents/generator.js';
 import { assessGrounding, resolveGroundingPolicy, type GroundingPolicy } from './grounding.js';
+import { answered, refusal, type AnswerRecord } from './record.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
 import { runReactions, type FanoutResult } from '../fanout/engine.js';
 import { demoDocuments } from '../seed/seed-data.js';
@@ -42,6 +43,13 @@ export interface BrainAnswer {
   answer: string;
   /** The records that grounded the answer — for the "show your sources" UI. */
   sources: RetrievedChunk[];
+  /** The typed contract — downstream consumers read THIS, not the prose. */
+  record: AnswerRecord;
+}
+
+/** Wire-compatible view of a record ({answer, sources} edges keep working). */
+function toBrainAnswer(record: AnswerRecord): BrainAnswer {
+  return { answer: record.answer, sources: record.citations, record };
 }
 
 export class Brain {
@@ -135,7 +143,7 @@ export class Brain {
     const chunks = await this.rerank(retrieved, accessScopes);
     // Grounding gate: refuse in code before generation when retrieval is thin.
     if (!this.refuseUnlessGrounded(chunks)) {
-      return { answer: NO_CONTEXT_REPLY, sources: [] };
+      return toBrainAnswer(refusal());
     }
     const context = buildContextBlock(chunks);
     // Few-shot learning loop: inject approved past answers (scope-gated) as
@@ -143,7 +151,7 @@ export class Brain {
     const examples = await this.feedback.approvedExamples(question, accessScopes, 2);
     const prompt = buildAskPrompt(question, context, examples);
     const answer = await this.generator.generate({ prompt, chunks });
-    return { answer, sources: chunks };
+    return toBrainAnswer(answered(answer, chunks));
   }
 
   /**
@@ -155,18 +163,20 @@ export class Brain {
     query: string,
     instruction: string,
     accessScopes: string[],
-  ): Promise<{ text: string; sources: RetrievedChunk[] }> {
+  ): Promise<{ text: string; sources: RetrievedChunk[]; record: AnswerRecord }> {
     const chunks = await this.memory.retrieve({ query, accessScopes, topK: 8 });
     // Same grounding gate as ask(): every no-code agent inherits it for free.
     if (!this.refuseUnlessGrounded(chunks)) {
-      return { text: NO_CONTEXT_REPLY, sources: [] };
+      const r = refusal();
+      return { text: r.answer, sources: [], record: r };
     }
     const context = buildContextBlock(chunks);
     const text = await this.generator.generate({
       prompt: `${instruction}\n\nCONTEXT:\n${context}`,
       chunks,
     });
-    return { text, sources: chunks };
+    const r = answered(text, chunks);
+    return { text, sources: chunks, record: r };
   }
 
   /**
@@ -202,7 +212,7 @@ export class Brain {
     const chunks = await this.rerank(retrieved, accessScopes);
     const prompt = buildHealthPrompt(buildContextBlock(chunks));
     const answer = await this.generator.generate({ prompt, chunks });
-    return { answer, sources: chunks };
+    return toBrainAnswer(answered(answer, chunks));
   }
 
   /**

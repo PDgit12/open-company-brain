@@ -12,6 +12,10 @@
  */
 
 export { Brain, type BrainAnswer } from './brain/brain.js';
+export {
+  renderAnswer, answered, refusal, memoryReply, isValidRecord,
+  type AnswerRecord, type AnswerStatus,
+} from './brain/record.js';
 export { createApp, asyncRoute } from './server/app.js';
 
 // Data-in: the universal ingest path (text / CSV / JSON, any shape).

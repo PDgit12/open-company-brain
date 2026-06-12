@@ -13,6 +13,7 @@ import {
 import { InMemoryResponseCache } from '../src/harness/cache.js';
 import { InMemoryTokenBudget } from '../src/harness/tokens.js';
 import { SavedAgent } from '../src/harness/saved-agent.js';
+import { answered, refusal } from '../src/brain/record.js';
 import type { CustomAgent } from '../src/agents/registry.js';
 import type { AgentContext } from '../src/harness/agent.js';
 
@@ -32,7 +33,8 @@ function spyBrain() {
   const brain = {
     draft: vi.fn(async (_q: string, instruction: string) => {
       seen.push(instruction);
-      return { text: `answer ${seen.length}`, sources: [{ source: 'doc' }] };
+      const chunks = [{ text: 'x', source: 'doc', metadata: {}, score: 1 }];
+      return { text: `answer ${seen.length}`, sources: chunks, record: answered(`answer ${seen.length}`, chunks) };
     }),
   };
   return { brain: brain as unknown as AgentContext['brain'], seen };
@@ -183,9 +185,12 @@ describe('SavedAgent — context retention across runs', () => {
     // Brain stub: first draft grounds; second REFUSES (no sources); converse echoes.
     let calls = 0;
     const brain = {
-      draft: async () => (++calls === 1
-        ? { text: 'grounded answer', sources: [{ source: 'doc' }] }
-        : { text: "I don't have that in the brain yet.", sources: [] }),
+      draft: async () => {
+        const chunks = [{ text: 'x', source: 'doc', metadata: {}, score: 1 }];
+        return ++calls === 1
+          ? { text: 'grounded answer', sources: chunks, record: answered('grounded answer', chunks) }
+          : { text: "I don't have that in the brain yet.", sources: [], record: refusal() };
+      },
       converse: async (_i: string, conversation: string) => `you asked about: ${conversation.includes('first question') ? 'first question' : '?'}`,
     } as unknown as AgentContext['brain'];
     const ctx = { brain, fabric: { list: () => [] }, scopes: ['default-team'] } as unknown as AgentContext;
@@ -203,7 +208,7 @@ describe('SavedAgent — context retention across runs', () => {
     const store = new InMemoryConversationStore();
     const agent = new SavedAgent(def, { memory: bindMemory(store, def.id) });
     const brain = {
-      draft: async () => ({ text: "I don't have that in the brain yet.", sources: [] }),
+      draft: async () => ({ text: "I don't have that in the brain yet.", sources: [], record: refusal() }),
       converse: async () => { throw new Error('must not be called with empty memory'); },
     } as unknown as AgentContext['brain'];
     const ctx = { brain, fabric: { list: () => [] }, scopes: ['default-team'] } as unknown as AgentContext;

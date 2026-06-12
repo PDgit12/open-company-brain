@@ -103,15 +103,24 @@ const CITES_RE = /Sources:\s*\[/;
  * structural check; the semantic `judge` check is handled separately (async).
  */
 export function gradeStructural(check: AgentCheck, result: AgentResult): CheckResult {
-  const { output, steps } = result;
+  const { output, steps, record } = result;
   const tools = steps.map((s) => s.tool);
   switch (check.check) {
     case 'output_includes':
       return verdict(check.check, !!check.value && output.includes(check.value), `missing "${check.value}"`);
     case 'cites_sources':
-      return verdict(check.check, CITES_RE.test(output), 'no Sources: footer');
+      // Typed contract first (a field read); prose regex only for recordless agents.
+      return verdict(
+        check.check,
+        record ? record.citations.length > 0 : CITES_RE.test(output),
+        'no citations',
+      );
     case 'refuses':
-      return verdict(check.check, output.includes(NO_CONTEXT_REPLY), 'expected a refusal');
+      return verdict(
+        check.check,
+        record ? record.status === 'insufficient_context' : output.includes(NO_CONTEXT_REPLY),
+        'expected a refusal',
+      );
     case 'uses_tool':
       // No trace at all → the backend can't call tools here; skip rather than fail.
       if (steps.length === 0) return skip(check.check, 'no tool-capable backend in this run');

@@ -16,6 +16,7 @@
 
 import { config } from '../config.js';
 import { postJson } from './http.js';
+import { renderAnswer, type AnswerRecord } from '../brain/record.js';
 import type { Brain } from '../brain/brain.js';
 import type { ToolFabric, ToolSpec } from '../tools/fabric.js';
 
@@ -37,6 +38,9 @@ export interface AgentStep {
 export interface AgentResult {
   output: string;
   steps: AgentStep[];
+  /** The typed contract, when the agent ran the governed pipeline. External
+   * (bring-your-own) agents may omit it; consumers fall back to output. */
+  record?: AnswerRecord;
 }
 
 export interface Agent {
@@ -49,10 +53,9 @@ export class BuiltinAgent implements Agent {
   readonly name = 'builtin';
   async run(task: string, ctx: AgentContext): Promise<AgentResult> {
     ctx.onStatus?.('thinking');
-    const { answer, sources } = await ctx.brain.ask(task, ctx.scopes);
-    const cites = [...new Set(sources.map((s) => s.source))];
-    const output = cites.length ? `${answer}\n\nSources: ${cites.map((s) => `[${s}]`).join(' ')}` : answer;
-    return { output, steps: [] };
+    const { record } = await ctx.brain.ask(task, ctx.scopes);
+    // Prose is RENDERED from the record at this edge — never assembled ad hoc.
+    return { output: renderAnswer(record), steps: [], record };
   }
 }
 

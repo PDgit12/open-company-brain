@@ -8,7 +8,6 @@
  */
 
 import { Brain } from '../brain/brain.js';
-import { NO_CONTEXT_REPLY } from '../agents/generator.js';
 import { GOLDEN_SET, type GoldenCase } from './golden.js';
 import type { BrainAnswer } from '../brain/brain.js';
 
@@ -23,18 +22,20 @@ export async function evaluateCase(brain: Brain, c: GoldenCase): Promise<CaseRes
   const failures: string[] = [];
 
   for (const { check, value } of c.checks) {
+    // v2: checks read the typed record's FIELDS — refusal is a status enum,
+    // grounding is the citations array. No prose parsing.
     switch (check) {
       case 'has_sources':
-        if (res.sources.length === 0) failures.push('expected sources, got none');
+        if (res.record.citations.length === 0) failures.push('expected sources, got none');
         break;
       case 'no_sources':
-        if (res.sources.length > 0) failures.push(`expected no sources, got ${res.sources.length}`);
+        if (res.record.citations.length > 0) failures.push(`expected no sources, got ${res.record.citations.length}`);
         break;
       case 'answer_includes':
-        if (value && !res.answer.includes(value)) failures.push(`answer missing "${value}"`);
+        if (value && !res.record.answer.includes(value)) failures.push(`answer missing "${value}"`);
         break;
       case 'answer_refuses':
-        if (!res.answer.includes(NO_CONTEXT_REPLY)) failures.push('expected a refusal');
+        if (res.record.status !== 'insufficient_context') failures.push('expected a refusal');
         break;
     }
   }

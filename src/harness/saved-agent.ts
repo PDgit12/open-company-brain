@@ -14,16 +14,10 @@
 
 import type { CustomAgent } from '../agents/registry.js';
 import { formatMemory, type AgentMemory } from '../agents/conversation.js';
+import { memoryReply, renderAnswer } from '../brain/record.js';
 import { cacheKey, type ResponseCache } from './cache.js';
 import { estimateTokens, scopeKey, type TokenBudget } from './tokens.js';
 import type { Agent, AgentContext, AgentResult } from './agent.js';
-
-/**
- * Marker appended to a memory-derived answer. It signals "this came from the
- * conversation, not company records" to both humans and the run classifier —
- * a memory answer must never masquerade as grounded knowledge.
- */
-export const MEMORY_REPLY_NOTE = '(from conversation memory — no brain records matched)';
 
 /** Stitch the cited sources onto generated text, matching BuiltinAgent's shape. */
 export function withSources(text: string, sources: { source: string }[]): string {
@@ -110,8 +104,8 @@ export class SavedAgent implements Agent {
       const k = cacheKey({ model: this.opts.cacheModel ?? '', scopes: ctx.scopes, query, instruction });
       const hit = await cache.get(k);
       if (hit !== undefined) return { output: hit, steps: [] }; // cache hit: zero token spend
-      const { text, sources } = await ctx.brain.draft(query, instruction, ctx.scopes);
-      const output = withSources(text, sources);
+      const { record, text } = await ctx.brain.draft(query, instruction, ctx.scopes);
+      const output = renderAnswer(record);
       await cache.set(k, output);
       if (budget) await budget.record(key, estimateTokens(`${query}\n${instruction}\n${text}`));
       return { output, steps: [] };
@@ -120,8 +114,8 @@ export class SavedAgent implements Agent {
     // Context-retaining path: generate, persist the exchange, meter usage.
     // Memory hygiene: only a GROUNDED exchange is remembered (sources prove
     // grounding post-gate; refusals carry none) — poison never enters memory.
-    const { text, sources } = await ctx.brain.draft(query, instruction, ctx.scopes);
-    const grounded = sources.length > 0;
+    const { record, text } = await ctx.brain.draft(query, instruction, ctx.scopes);
+    const grounded = record.status === 'answered';
 
     // Memory-vs-grounding policy: a conversational meta-question ("what did I
     // just ask you?") has no corpus grounding, so the gate refuses — but the
@@ -130,14 +124,14 @@ export class SavedAgent implements Agent {
     // stored back (a derivative answer must not compound into future prompts).
     if (!grounded && memoryBlock) {
       const fromMemory = await ctx.brain.converse(runInstruction(this.def, task), memoryBlock);
-      const output = `${fromMemory.trim()}\n\n${MEMORY_REPLY_NOTE}`;
+      const rec = memoryReply(fromMemory);
       if (budget) await budget.record(key, estimateTokens(`${instruction}\n${fromMemory}`));
-      return { output, steps: [] };
+      return { output: renderAnswer(rec), steps: [], record: rec };
     }
 
-    const output = withSources(text, sources);
+    const output = renderAnswer(record);
     if (memory && task.trim()) await memory.remember(task.trim(), text, grounded);
     if (budget) await budget.record(key, estimateTokens(`${query}\n${instruction}\n${text}`));
-    return { output, steps: [] };
+    return { output, steps: [], record };
   }
 }
