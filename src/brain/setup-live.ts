@@ -80,11 +80,14 @@ export async function setupLive(): Promise<void> {
   });
   console.log(`✓ Pipe "${config.langbase.pipeName}" ready (${config.langbase.generationModel}).`);
 
-  // 3. Seed the recall layer with the generic demo notes so a fresh workspace
-  //    isn't empty. In real use you replace these by ingesting your own data
-  //    (dashboard / upload / the ingest webhook).
-  const seeded = await createMemoryStore().upsert(demoDocuments());
-  console.log(`✓ Seeded ${seeded} demo document(s) into recall (replace with your data via ingest).`);
+  // 3. DEMO DATA IS OPT-IN: a real backend boots EMPTY and is fed by ingest.
+  //    Demo notes only land if you explicitly pass --seed-demo.
+  if (process.argv.includes('--seed-demo')) {
+    const seeded = await createMemoryStore().upsert(demoDocuments());
+    console.log(`✓ Seeded ${seeded} demo document(s) into recall (--seed-demo).`);
+  } else {
+    console.log('✓ Recall ready — brain is EMPTY. Feed it via ingest (demo notes: --seed-demo).');
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

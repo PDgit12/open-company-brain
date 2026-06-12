@@ -54,12 +54,21 @@ export async function setupLocal(): Promise<void> {
     else pull(model);
   }
 
-  // 2 + 3. Embed the generic demo notes into pgvector (the store provisions the
-  //        extension + table on first write; throws clearly if PG is down). In
-  //        real use you replace these by ingesting your own data.
+  // 2 + 3. Provision pgvector (the store creates the extension + table on first
+  //        write; throws clearly if PG is down). DEMO DATA IS OPT-IN: a real
+  //        backend boots EMPTY and is fed by `comb ingest` / the webhook — demo
+  //        notes only land if you explicitly pass --seed-demo.
+  const seedDemo = process.argv.includes('--seed-demo');
   try {
-    const seeded = await createMemoryStore().upsert(demoDocuments());
-    console.log(`✓ Seeded ${seeded} demo document(s) into pgvector (local embeddings).`);
+    const store = createMemoryStore();
+    if (seedDemo) {
+      const seeded = await store.upsert(demoDocuments());
+      console.log(`✓ Seeded ${seeded} demo document(s) into pgvector (--seed-demo).`);
+    } else {
+      // Touch the store so provisioning still happens (and PG errors surface).
+      await store.stats([config.demoUserAccessScope]);
+      console.log('✓ pgvector ready — brain is EMPTY. Feed it: `comb ingest <file>` (demo notes: --seed-demo).');
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/ECONNREFUSED|connect|password|database .* does not exist/i.test(msg)) {

@@ -82,6 +82,11 @@ export class OllamaGenerator implements Generator {
         model: this.model,
         stream: false,
         keep_alive: config.ollama.keepAlive,
+        // Deterministic generation: grounded Q&A is a fact pipeline, not
+        // creative writing. Ollama's default temperature (0.8) makes the SAME
+        // question flip between answer and refusal across runs — untestable
+        // and untrustworthy. Greedy decoding pins it.
+        options: { temperature: 0 },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: prompt },

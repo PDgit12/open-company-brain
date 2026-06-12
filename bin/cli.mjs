@@ -178,51 +178,59 @@ async function evalCmd(forwarded) {
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 
+// ── palette (TTY-only; degrades to plain text when piped) ────────────────────
+const tty = process.stdout.isTTY;
+const wrap = (open) => (s) => (tty ? `\x1b[${open}m${s}\x1b[0m` : s);
+const dim = wrap('2');
+const bold = wrap('1');
+const coral = wrap('38;5;209');
+const butter = wrap('38;5;222');
+
 function help() {
+  const c = (cmd) => bold(cmd);
+  const d = (s) => dim(s);
+  const h = (s) => `\n  ${butter('◆')} ${bold(s)}\n  ${dim('─'.repeat(60))}`;
   console.log(`
-  comb — your company's agentic OS harness (Claude Code, for your own agents)
+  ${butter('◆')} ${bold('comb')} ${dim('· your company’s agentic OS harness')}
+  ${dim('Claude Code, but for your own agents — governed, cited, evaluated.')}
 
-  Usage: comb <command> [options]
+  ${dim('Usage:')} comb ${coral('<command>')} [options]
+${h('Build agents')}
+    ${c('new "<wish>"')}         ${d('ONE PROMPT builds the whole agent + calibration labels')}
+    ${c('create')}               ${d('manual build — wizard (TTY) or CI flags:')}
+                         ${d('--name N --instruction I [--query Q]')}
+    ${c('agents')}               ${d('list your saved agents')}
+    ${c('forget <name>')}        ${d('wipe a saved agent’s conversation memory')}
+${h('Run them')}
+    ${c('run "<task>"')}         ${d('one governed, cited run')}
+                         ${d('[--agent auto|builtin|tools] [--saved <name>] [--fresh] [--scopes a,b]')}
+    ${c('chat')}                 ${d('REPL — /agent /model /budget /forget inside')} ${d('[--saved <name>]')}
+    ${c('budget')}               ${d('token usage vs the per-scope cap  [--scopes a,b]')}
+${h('Approve their actions (human-in-the-loop)')}
+    ${c('actions')}              ${d('what awaits YOUR approval  [--all = decided history]')}
+    ${c('approve <id>')}         ${d('approve — executes + delivers (idempotent)')}
+    ${c('reject <id> [why]')}    ${d('decline — the draft becomes negative feedback')}
+${h('Watch · test · harden')}
+    ${c('runs')}                 ${d('recent runs: tokens · latency · tools  [--limit N] [--failed]')}
+    ${c('trace <id>')}           ${d('full tool-call autopsy for one run')}
+    ${c('promote <run id>')}     ${d('turn a run into a permanent regression test')}
+                         ${d('[--suite file.json] [--expect-refusal]')}
+    ${c('eval')}                 ${d('agentic eval suite: grounds · refuses · tools · scope')}
+                         ${d('[--suite file.json]')}
+    ${c('calibrate')}            ${d('place the grounding floor from YOUR labeled queries')}
+                         ${d('--labels labels.json [--scopes a,b]')}
+${h('Data & tools')}
+    ${c('ingest <file>')}        ${d('feed the brain from the CLI (.txt/.md/.csv/.json)')}
+                         ${d('[--source name] [--scope s]')}
+    ${c('tools')}                ${d('every tool an agent can use (brain + connected)')}
+    ${c('connect <name> -- <cmd>')} ${d('plug in any MCP server or API')}
+${h('Setup')}
+    ${c('init')}                 ${d('guided setup — create .env, add your keys')}
+    ${c('doctor')}               ${d('which backend is live and what’s missing')}
+    ${c('demo')}                 ${d('(npm run demo) web console + HTTP API at :4000')}
+    ${c('mcp')}                  ${d('expose this brain to other agents over MCP')}
 
-  Build & run agents (the harness)
-    new "<wish>"         ONE PROMPT builds the whole agent: definition +
-                         calibration labels + every next step, ready to run
-    create               build a saved agent manually
-                         wizard (a TTY) or flags for CI:
-                         --name N --instruction I [--query Q]
-    agents               list your saved agents
-    forget <name>        wipe a saved agent's conversation memory
-    run "<task>"         run an agent over your governed brain + connected tools
-                         [--agent auto|builtin|tools] [--saved <name>] [--fresh] [--scopes a,b]
-    chat                 interactive agent REPL   [--saved <name>]
-    budget               show token usage against the per-scope cap  [--scopes a,b]
-    actions              the human-in-the-loop queue — what awaits your approval
-                         [--all includes decided history]
-    approve <id>         approve a proposed action (executes + delivers)
-    reject <id> [why]    decline it (the draft becomes negative feedback)
-    runs                 recent agent runs with token + latency metrics
-                         [--limit N] [--failed]  (--failed = refused/ungrounded)
-    trace <id>           full tool-call trace + metrics for one run
-    promote <run id>     turn a run into a regression eval case (prod → eval)
-                         [--suite file.json] [--expect-refusal]
-    eval                 run the agentic eval suite (grounding, refusal, tools,
-                         budget, scope, recall)   [--suite file.json]
-    calibrate            place the grounding floor from labeled queries
-                         --labels labels.json [--scopes a,b]
-    tools                list every tool an agent can use (brain + connected)
-    connect <name> -- <cmd> [args…]
-                         connect a tool/MCP (e.g. your knit MCP) or an API
-
-  Setup & data
-    init                 guided setup — create .env and add your keys
-    doctor               report the active backend and what's still needed
-    ingest <file>        feed the brain from the CLI (.txt/.md/.csv/.json)
-                         [--source name] [--scope s]
-    demo                 (npm run demo) web console + HTTP API at :4000
-
-  Advanced
-    mcp                  also expose this brain to other agents over MCP (optional)
-    help                 show this
+  ${dim('Start here:')}  comb ingest <your-file.md>  ${dim('→')}  comb new "<what you want>"  ${dim('→')}  comb chat
 `);
 }
 
