@@ -214,6 +214,7 @@ ${h('Approve their actions (human-in-the-loop)')}
 ${h('The closed loop (intent → compare → adjust)')}
     ${c('intent "<should>"')}    ${d('declare what SHOULD be happening (goal|spec|policy|procedure)')}
     ${c('intents')}              ${d('list the reference signals reality is compared against')}
+    ${c('divergences')}          ${d('the verdicts: ⚑ diverged (flag→approval queue) · aligned · silent')}
 ${h('Watch · test · harden')}
     ${c('runs')}                 ${d('recent runs: tokens · latency · tools  [--limit N] [--failed]')}
     ${c('trace <id>')}           ${d('full tool-call autopsy for one run')}
@@ -255,6 +256,7 @@ const run = () => {
   if (cmd === 'commission') return harnessCmd(['commission', ...process.argv.slice(3)]);
   if (cmd === 'intent') return harnessCmd(['intent', ...process.argv.slice(3)]);
   if (cmd === 'intents') return harnessCmd(['intents', ...process.argv.slice(3)]);
+  if (cmd === 'divergences') return harnessCmd(['divergences', ...process.argv.slice(3)]);
   if (cmd === 'budget') return harnessCmd(['budget', ...process.argv.slice(3)]);
   if (cmd === 'runs') return harnessCmd(['runs', ...process.argv.slice(3)]);
   if (cmd === 'trace') return harnessCmd(['trace', ...process.argv.slice(3)]);

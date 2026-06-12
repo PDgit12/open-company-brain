@@ -21,6 +21,7 @@ import { ToolLoopAgent } from './agent.js';
 import { draftAgent } from '../agents/architect.js';
 import { buildBirthKit, saveBirthKit, commission } from '../agents/lifecycle.js';
 import { getIntentStore, type IntentKind } from '../intents/registry.js';
+import { listDivergences } from '../divergence/engine.js';
 import { runAgentEval } from '../eval/agent-run.js';
 import { resolveContextWindow, FALLBACK_WINDOW, type ResolvedWindow } from './context-window.js';
 import { ActionService } from '../actions/service.js';
@@ -515,6 +516,24 @@ async function listIntents(scopes: string[]): Promise<void> {
   }
 }
 
+/** `comb divergences` — the COMPARE stage's verdicts (flags + silent record). */
+async function showDivergences(): Promise<void> {
+  const all = await listDivergences(20);
+  if (!all.length) {
+    stdout.write(`${dim('No divergence checks yet — declare an intent, then ingest reality.')}\n`);
+    return;
+  }
+  stdout.write(`\n${butter('◆')} ${bold('Divergence verdicts')} ${dim(`· ${all.length} recent`)}\n`);
+  for (const d of all) {
+    const badge = d.status === 'diverged' ? coral('⚑ DIVERGED') : d.status === 'aligned' ? butter('✓ aligned') : gray('· silent');
+    stdout.write(`  ${badge}  ${dim(d.at.slice(0, 19).replace('T', ' '))}  ${gray(`intent: ${d.intentStatement.slice(0, 48)}`)}\n`);
+    if (d.status === 'diverged') {
+      stdout.write(`    ${dim('evidence')} ${gray((d.evidence[0] ?? '').slice(0, 70))}\n`);
+      stdout.write(`    ${dim('why')} ${gray(d.rationale.slice(0, 76))}${d.actionId ? dim(`  → action ${d.actionId.slice(0, 8)} (comb actions)`) : ''}\n`);
+    }
+  }
+}
+
 /** `comb forget <id|name>` — wipe a saved agent's conversation memory. */
 async function forgetAgent(idOrName: string | undefined): Promise<void> {
   const needle = (idOrName ?? '').trim();
@@ -712,6 +731,7 @@ async function main(): Promise<void> {
   if (mode === 'commission') return commissionAgent(rest.join(' '));
   if (mode === 'intent') return declareIntent(rest, argv, scopes);
   if (mode === 'intents') return listIntents(scopes);
+  if (mode === 'divergences') return showDivergences();
   if (mode === 'budget') return showBudget(scopes);
   if (mode === 'runs') {
     const li = argv.indexOf('--limit');

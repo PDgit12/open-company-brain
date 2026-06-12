@@ -27,6 +27,7 @@ import { generateStructured } from './structured.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
 import { cleanDocuments } from './clean.js';
 import { runReactions, type FanoutResult } from '../fanout/engine.js';
+import { runDivergenceWatch } from '../divergence/engine.js';
 import { demoDocuments } from '../seed/seed-data.js';
 import { candidateCasesFromFeedback, type GoldenCase } from '../eval/golden.js';
 import {
@@ -231,7 +232,7 @@ export class Brain {
   async ingest(
     input: { format: IngestFormat; content: string; source?: string; scope?: string },
     callerScopes: string[],
-  ): Promise<{ ingested: number; source: string; scope: string; reactions: FanoutResult[] }> {
+  ): Promise<{ ingested: number; source: string; scope: string; reactions: FanoutResult[]; divergences: number }> {
     const access =
       input.scope && callerScopes.includes(input.scope)
         ? input.scope
@@ -248,7 +249,13 @@ export class Brain {
     const reactions = ingested
       ? await runReactions(this, { source, scope: access, query: input.content.slice(0, 500) })
       : [];
-    return { ingested, source, scope: access, reactions };
+    // THE LOOP'S COMPARE STAGE: new reality vs every enabled Intent in scope.
+    // Flag-or-silent; a diverged flag lands in the approval queue. Best-effort.
+    const divergences = ingested
+      ? (await runDivergenceWatch(this, { content: input.content, source, scope: access }))
+          .filter((d) => d.status === 'diverged').length
+      : 0;
+    return { ingested, source, scope: access, reactions, divergences };
   }
 
   /** Real per-source document counts the caller can see — for honest viz. */
