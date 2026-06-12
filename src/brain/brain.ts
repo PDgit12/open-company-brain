@@ -23,6 +23,7 @@ import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCo
 import { createGenerator, OllamaGenerator, type Generator } from '../agents/generator.js';
 import { assessGrounding, resolveGroundingPolicy, type GroundingPolicy } from './grounding.js';
 import { answered, refusal, type AnswerRecord } from './record.js';
+import { generateStructured } from './structured.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
 import { runReactions, type FanoutResult } from '../fanout/engine.js';
 import { demoDocuments } from '../seed/seed-data.js';
@@ -150,6 +151,11 @@ export class Brain {
     // exemplars so the brain's style/rigor compounds with usage.
     const examples = await this.feedback.approvedExamples(question, accessScopes, 2);
     const prompt = buildAskPrompt(question, context, examples);
+    // Phase 2: constrained decoding — the model fills the record schema and
+    // code validates it (status enum + citation subset proof). Falls back to
+    // the legacy prose path when unsupported or twice-invalid.
+    const structured = await generateStructured(prompt, chunks);
+    if (structured) return toBrainAnswer(structured);
     const answer = await this.generator.generate({ prompt, chunks });
     return toBrainAnswer(answered(answer, chunks));
   }
@@ -171,10 +177,10 @@ export class Brain {
       return { text: r.answer, sources: [], record: r };
     }
     const context = buildContextBlock(chunks);
-    const text = await this.generator.generate({
-      prompt: `${instruction}\n\nCONTEXT:\n${context}`,
-      chunks,
-    });
+    const prompt = `${instruction}\n\nCONTEXT:\n${context}`;
+    const structured = await generateStructured(prompt, chunks);
+    if (structured) return { text: structured.answer, sources: structured.citations, record: structured };
+    const text = await this.generator.generate({ prompt, chunks });
     const r = answered(text, chunks);
     return { text, sources: chunks, record: r };
   }
