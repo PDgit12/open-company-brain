@@ -22,6 +22,7 @@ import { config } from '../config.js';
 import { postJson } from '../harness/http.js';
 import { JsonFileCollection } from '../storage/json-file.js';
 import { getIntentStore, type Intent } from '../intents/registry.js';
+import { tokens } from '../skills/registry.js';
 import { ActionService } from '../actions/service.js';
 import type { Llm } from '../brain/structured.js';
 import type { Brain } from '../brain/brain.js';
@@ -159,6 +160,68 @@ const ollamaLlm: Llm = async (system, prompt, schema) => {
   );
   return json.message?.content ?? '';
 };
+
+export interface DivergenceCandidate {
+  id: string;
+  intentRef: string;
+  intentStatement: string;
+  evidence: string; // the new-data excerpt that overlaps the intent
+  overlap: number; // keyword-overlap score 0..1
+  source: string;
+  scope: string;
+  at: string;
+  /** Set once a host judges it and submits an action. */
+  resolvedActionId?: string;
+}
+
+const candStore = (): JsonFileCollection<DivergenceCandidate> =>
+  new JsonFileCollection<DivergenceCandidate>(path.join(config.comb.dataDir, 'divergence-candidates.json'));
+
+/**
+ * MODEL-FREE candidate detection: does new data bear on an intent enough to be
+ * worth a host's judgment? Pure keyword overlap of the new data against the
+ * intent statement — NO model. Comb surfaces candidates; the HOST agent judges
+ * whether it's a real divergence and calls submit_action. (The model-based
+ * verdict path below stays available for deployments that run a model.)
+ */
+export function intentOverlap(intentStatement: string, content: string): number {
+  const it = new Set(tokens(intentStatement));
+  if (!it.size) return 0;
+  const c = new Set(tokens(content));
+  let hits = 0;
+  for (const t of it) if (c.has(t)) hits++;
+  return hits / it.size;
+}
+
+export async function detectCandidates(
+  event: { content: string; source: string; scope: string },
+  threshold = 0.25,
+): Promise<DivergenceCandidate[]> {
+  const intents = (await getIntentStore().list([event.scope])).filter((i) => i.enabled);
+  const out: DivergenceCandidate[] = [];
+  for (const intent of intents) {
+    const overlap = intentOverlap(intent.statement, event.content);
+    if (overlap < threshold) continue;
+    const cand: DivergenceCandidate = {
+      id: `cand_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      intentRef: intent.id,
+      intentStatement: intent.statement,
+      evidence: event.content.slice(0, 400),
+      overlap,
+      source: event.source,
+      scope: event.scope,
+      at: new Date().toISOString(),
+    };
+    await candStore().append(cand);
+    out.push(cand);
+  }
+  return out;
+}
+
+export async function listCandidates(scope?: string, limit = 20): Promise<DivergenceCandidate[]> {
+  const all = (await candStore().read()).filter((c) => !c.resolvedActionId && (!scope || c.scope === scope));
+  return all.slice(-limit).reverse();
+}
 
 /**
  * The watcher — called on every ingest. Checks the new content against every

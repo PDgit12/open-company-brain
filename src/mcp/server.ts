@@ -26,6 +26,7 @@ import { Brain } from '../brain/brain.js';
 import { config, describeMode } from '../config.js';
 import { ActionService } from '../actions/service.js';
 import { getIntentStore, type IntentKind } from '../intents/registry.js';
+import { listCandidates } from '../divergence/engine.js';
 import { getSkillStore } from '../skills/registry.js';
 import { ServingOptimizer } from '../optimizer/serving.js';
 import { getRunStore, classifyRun } from '../observability/runs.js';
@@ -150,6 +151,21 @@ export async function createMcpServer(): Promise<McpServer> {
       const a = all.find((x) => x.id === id) ?? all.find((x) => x.id.startsWith(id));
       if (!a) return { content: [{ type: 'text', text: `No action ${id}.` }] };
       return { content: [{ type: 'text', text: `${a.title}: ${a.status}${a.effect ? ` — ${a.effect}` : ''}` }] };
+    },
+  );
+
+  // ── COMPARE: divergence candidates for the HOST to judge (model-free) ───────
+  server.tool(
+    'list_divergence_candidates',
+    "New reality that OVERLAPS a declared intent (model-free keyword detection) — YOU judge whether each is a real divergence from how things should be. If it is, draft an alert with submit_action. Comb detects candidates; you do the reasoning.",
+    { scope: z.string().optional() },
+    async ({ scope }) => {
+      const cands = await listCandidates(scope ? resolveScopes(scope)[0] : undefined);
+      if (!cands.length) return { content: [{ type: 'text', text: 'No open divergence candidates.' }] };
+      const text = cands
+        .map((c) => `• intent: ${c.intentStatement}\n  reality (${c.source}): ${c.evidence.slice(0, 200)}\n  overlap: ${(c.overlap * 100).toFixed(0)}%`)
+        .join('\n\n');
+      return { content: [{ type: 'text', text }] };
     },
   );
 

@@ -27,7 +27,7 @@ import { generateStructured } from './structured.js';
 import { buildDocuments, normalizeSource, type IngestFormat } from './ingest.js';
 import { cleanDocuments } from './clean.js';
 import { runReactions, type FanoutResult } from '../fanout/engine.js';
-import { runDivergenceWatch } from '../divergence/engine.js';
+import { runDivergenceWatch, detectCandidates } from '../divergence/engine.js';
 import { demoDocuments } from '../seed/seed-data.js';
 import { candidateCasesFromFeedback, type GoldenCase } from '../eval/golden.js';
 import {
@@ -237,7 +237,7 @@ export class Brain {
   async ingest(
     input: { format: IngestFormat; content: string; source?: string; scope?: string },
     callerScopes: string[],
-  ): Promise<{ ingested: number; source: string; scope: string; reactions: FanoutResult[]; divergences: number }> {
+  ): Promise<{ ingested: number; source: string; scope: string; reactions: FanoutResult[]; divergences: number; candidates: number }> {
     const access =
       input.scope && callerScopes.includes(input.scope)
         ? input.scope
@@ -256,11 +256,15 @@ export class Brain {
       : [];
     // THE LOOP'S COMPARE STAGE: new reality vs every enabled Intent in scope.
     // Flag-or-silent; a diverged flag lands in the approval queue. Best-effort.
-    const divergences = ingested
+    // MODEL-FREE candidate detection (always; pure keyword overlap, no model) —
+    // surfaces what the host should judge via list_divergence_candidates.
+    const candidates = ingested ? (await detectCandidates({ content: input.content, source, scope: access })).length : 0;
+    // Model-based verdict path runs only when a model is configured (best-effort).
+    const divergences = ingested && config.backend === 'local'
       ? (await runDivergenceWatch(this, { content: input.content, source, scope: access }))
           .filter((d) => d.status === 'diverged').length
       : 0;
-    return { ingested, source, scope: access, reactions, divergences };
+    return { ingested, source, scope: access, reactions, divergences, candidates };
   }
 
   /** Real per-source document counts the caller can see — for honest viz. */
