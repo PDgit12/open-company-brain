@@ -2,29 +2,62 @@
 
 # 🐝 Comb
 
-### Your company's agentic OS harness — Claude Code, but for your *own* agents.
+### The company brain that powers a closed loop — model‑free, over MCP.
 
-Pipe in your data, build agents by answering a few questions, and run them from one
-CLI — over a **governed brain** that cites its sources or refuses, respects access
-scopes, and never plays yes‑man. Bring any model (local or cloud) and connect any
-tool, API, or MCP server — including your own.
+Comb makes a company's know‑how legible to AI — *what is true* (facts) and *how work
+is actually done* (skills) — then runs the loop: monitor what's happening, compare it
+to what should be happening, adjust through **approved** actions. **Comb runs no
+model.** The AI you already use (Claude, Copilot, Cursor) connects over **MCP** and
+brings the intelligence; Comb is the governed substrate underneath.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](./tsconfig.json)
-[![Tests](https://img.shields.io/badge/tests-176%20passing-brightgreen.svg)](#development)
-[![$0 local](https://img.shields.io/badge/local-%240%2Fquery-brightgreen.svg)](#backends)
+[![Tests](https://img.shields.io/badge/tests-218%20passing-brightgreen.svg)](#development)
+[![model-free](https://img.shields.io/badge/model--free-%240%2Fquery-brightgreen.svg)](#run-it-model-free)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#roadmap)
 
 </div>
 
 ---
 
+## Run it model‑free
+
+No model, no database, no Docker — just Node. Retrieval is keyword‑based; **your AI
+host does the thinking** over MCP.
+
+```bash
+npm i -g open-company-brain                       # the `comb` command
+export LLM_BACKEND=mock COMB_RETRIEVAL=keyword     # model-free mode
+comb ingest ./your-docs.md --source handbook       # build the brain
+comb skill "Handle a refund" --body "verify order → check policy → credit ≤ \$2k → else Finance"
+comb run --agent builtin "what does our handbook say about X?"   # grounded or refused
+```
+
+### Connect your AI over MCP (the product)
+
+```jsonc
+// Claude Desktop / Cursor MCP config
+{ "mcpServers": { "comb": {
+  "command": "comb", "args": ["mcp"],
+  "env": { "LLM_BACKEND": "mock", "COMB_RETRIEVAL": "keyword",
+           "MCP_PRINCIPAL": "you", "MCP_SCOPES": "default-team" } } } }
+```
+
+Your agent gains governed tools — **read** (`search_brain`, `find_skill`), **write**
+(`ingest`, `record_skill`, `record_fact`), **act** (`submit_action` — you draft, Comb
+governs approval → execute → audit), **prove** (`query_runs`,
+`list_divergence_candidates`). Semantic (vector) recall + a local/cloud model are an
+**opt‑in upgrade** (`LLM_BACKEND=local` / `openai`), never required.
+
+---
+
 ## What is Comb?
 
-Comb is an open‑source, self‑hosted **agentic operating system harness**. Think of
-**Claude Code** — a CLI agent that works on your codebase — but generalized so a
-**company (or one person) can build and run their own agents over their own
-knowledge**, governed.
+The **company brain** (Blomfield) that **powers a closed loop** (Hu): a governed,
+model‑free substrate any AI plugs into to query truthfully and act safely. Not a
+chatbot over docs — a living map of *how the company works* (facts + skills), with a
+loop that flags drift and turns it into approved action. Comb is the governance,
+memory, and accountability; the connected agent is the intelligence.
 
 It maps cleanly onto an OS:
 

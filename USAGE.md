@@ -1,34 +1,41 @@
-# Using Comb (hands-on)
+# Using Comb — model-free (no model required)
 
-`comb` is the command (run `npm link` once in this repo if "command not found").
-Local backend = $0/query, nothing leaves your machine.
+`comb` is the command (`npm i -g open-company-brain`, or `npm link` in this repo).
+Model-free mode: keyword retrieval, your AI host does the thinking over MCP.
 
-## Start clean, ingest YOUR data
-    comb reset                       # wipe knowledge + loop state (keeps agents)
-    comb reset --all                 # wipe everything
-    comb ingest ./your-doc.md --source handbook
-    comb ingest ./data.csv --source pricing
-    comb ingest "https://your-wiki/page" --source wiki
-    # sample files to try or template from: sample-data/
-    comb calibrate --labels labels.json   # tune cite-or-refuse to your corpus
+    export LLM_BACKEND=mock COMB_RETRIEVAL=keyword   # no model, no DB, no Docker
 
-## Ask (grounded or honestly refused)
-    comb run --agent builtin "your question"
+## Build the brain (facts + skills)
+    comb reset                                  # clean slate for your data
+    comb ingest ./doc.md --source handbook      # facts (file, .md/.txt/.csv/.json)
+    comb ingest "https://wiki/page" --source wiki   # a link
+    comb skill "Handle a refund request" \
+      --body "verify order → check policy → goodwill credit ≤ $2k → else Finance" \
+      --triggers "refund,return,money back"     # HOW work is done
+    comb skills "customer wants money back"      # trigger-match the living map
 
-## Make your own agent, then let it DO tasks
-    comb new "an agent that answers HR and benefits questions"
-    comb commission "<name>"                       # must pass its birth evals to run
-    comb run --saved "<name>" "a question"         # answer
-    comb run --saved "<name>" --act "draft a benefits summary notice"   # DO a task -> approval queue
-    comb actions                                   # review what it drafted
-    comb approve <id>                              # approve -> executes + delivers
+## Query (grounded or honestly refused)
+    comb run --agent builtin "what is the refund approval over $10,000?"
 
-## The closed loop (intent -> reality -> flag -> action)
-    comb intent "Onboarding ships first feature in under 4 weeks" --kind goal
-    comb ingest ./retro.md --source retro          # feed reality
-    comb divergences                               # diverged / aligned / silent
-    comb actions                                   # a flag becomes an approvable action
+## The closed loop (intent → reality → candidate → action)
+    comb intent "On-call acks every SEV1 within 15 minutes" --kind policy
+    comb ingest ./incident-review.md --source incidents     # reality
+    # Comb detects a divergence CANDIDATE (model-free keyword overlap);
+    # your AI host judges it (list_divergence_candidates over MCP) and:
+    comb actions                                 # the host's submitted alert
+    comb approve <id>                            # approve → execute → deliver
 
-## See the receipts
-    comb runs            comb trace <id>           comb runs --failed
-    comb intents         comb divergences          comb budget   comb doctor
+## Connect your AI (the real product) — MCP
+    Claude Desktop / Cursor config:
+    { "mcpServers": { "comb": { "command": "comb", "args": ["mcp"],
+      "env": { "COMB_RETRIEVAL": "keyword", "MCP_PRINCIPAL": "you",
+               "MCP_SCOPES": "default-team" } } } }
+    Tools: search_brain · find_skill · ingest · record_skill · record_fact ·
+           submit_action · list_intents · list_divergence_candidates · query_runs
+
+## Opt-in upgrade: semantic recall + a model (NOT required)
+    export LLM_BACKEND=local      # Ollama + pgvector → vector retrieval + answers
+    # or LLM_BACKEND=openai with your key. Same governance, dense retrieval.
+
+## Receipts
+    comb runs · comb trace <id> · comb intents · comb skills · comb divergences · comb doctor
