@@ -41,7 +41,8 @@ import {
   type CalibrationPoint,
   type LabeledQuery,
 } from '../brain/grounding.js';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, rm } from 'node:fs/promises';
+import pg from 'pg';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
 
@@ -614,6 +615,42 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
 }
 
 /**
+ * `comb reset [--all] [--yes]` — clean slate so you can ingest YOUR data.
+ * Default: wipe knowledge + the closed-loop state (chunks, intents,
+ * divergences, runs, conversations), KEEP your saved agents + calibration.
+ * --all also wipes agents, birth kits, budgets, cache, and calibration.
+ */
+async function resetBrain(argv: string[]): Promise<void> {
+  const all = argv.includes('--all');
+  const yes = argv.includes('--yes');
+  if (!yes && stdin.isTTY) {
+    const rl = createInterface({ input: stdin, output: stdout });
+    const what = all ? 'EVERYTHING (knowledge, agents, calibration, history)' : 'knowledge + loop state (agents kept)';
+    const ans = (await rl.question(`${coral('⚠')}  Reset ${bold(what)}? type ${bold('yes')}: `)).trim();
+    await rl.close();
+    if (ans !== 'yes') { stdout.write(dim('aborted.\n')); return; }
+  }
+  // Postgres tables (local/openai backend).
+  const pgUrl = config.ollama.vectorDatabaseUrl;
+  if (pgUrl) {
+    const pool = new pg.Pool({ connectionString: pgUrl });
+    const tables = ['brain_chunks', 'intents', 'agent_runs', 'agent_conversations', ...(all ? ['custom_agents'] : [])];
+    for (const t of tables) {
+      try { await pool.query(`TRUNCATE ${t}`); } catch { /* table may not exist yet */ }
+    }
+    await pool.end();
+  }
+  // File-tier state under the data dir.
+  const dir = config.comb.dataDir;
+  const always = ['divergences.json', 'runs.json', 'intents.json', 'conversations.json', 'actions.json', 'action-audit.json', 'brain_chunks.json'];
+  const allOnly = ['agents.json', 'calibration.json', 'token-usage.json', 'response-cache.json', 'birthkits'];
+  for (const f of [...always, ...(all ? allOnly : [])]) {
+    await rm(`${dir}/${f}`, { recursive: true, force: true });
+  }
+  stdout.write(`${butter('✓')} reset complete — ${all ? 'everything wiped' : 'knowledge + loop cleared, agents kept'}. Ingest your data: ${bold('comb ingest <file|url>')}\n`);
+}
+
+/**
  * `comb demo-data [--scope s]` — load the Northwind Robotics sample corpus
  * (12 docs, mixed formats) into the REAL backend so the pipeline can be tried
  * at slightly larger scale without your own data. Replace it with yours later.
@@ -764,6 +801,7 @@ async function main(): Promise<void> {
   // Registry-only commands: no brain/fabric assembly needed.
   if (mode === 'ingest') return ingestFile(argv, scopes);
   if (mode === 'demo-data') return loadDemoData(scopes);
+  if (mode === 'reset') return resetBrain(argv);
   if (mode === 'new') return newAgent(rest.join(' '));
   if (mode === 'create') return createAgent(argv);
   if (mode === 'agents') return listAgents();

@@ -1,0 +1,36 @@
+{
+  "accounts": [
+    {
+      "name": "Vertex Logistics",
+      "tier": "enterprise",
+      "robots": 240,
+      "renewal": "2026-10-01",
+      "csm": "Dana Reyes",
+      "health": "green"
+    },
+    {
+      "name": "Helix Foods",
+      "tier": "mid-market",
+      "robots": 60,
+      "renewal": "2026-08-15",
+      "csm": "Sam Okoye",
+      "health": "yellow"
+    },
+    {
+      "name": "Aerie Distribution",
+      "tier": "enterprise",
+      "robots": 410,
+      "renewal": "2027-01-20",
+      "csm": "Dana Reyes",
+      "health": "green"
+    },
+    {
+      "name": "Polar Cold Chain",
+      "tier": "mid-market",
+      "robots": 35,
+      "renewal": "2026-07-30",
+      "csm": "Lee Park",
+      "health": "red"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "departments": [
+    {
+      "name": "Engineering",
+      "head": "Priya Nair",
+      "headcount": 70
+    },
+    {
+      "name": "Sales",
+      "head": "Marcus Hill",
+      "headcount": 35
+    },
+    {
+      "name": "Support",
+      "head": "Aisha Khan",
+      "headcount": 28
+    },
+    {
+      "name": "Operations",
+      "head": "Tom Vega",
+      "headcount": 24
+    },
+    {
+      "name": "Finance",
+      "head": "Rosa Lim",
+      "headcount": 12
+    },
+    {
+      "name": "People Ops",
+      "head": "Jordan Bell",
+      "headcount": 11
+    }
+  ]
+}
