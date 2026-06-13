@@ -20,7 +20,7 @@
 
 import { config } from '../config.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCount } from './memory.js';
-import { createGenerator, OllamaGenerator, type Generator } from '../agents/generator.js';
+import { createGenerator, OllamaGenerator, DRAFT_SYSTEM, type Generator } from '../agents/generator.js';
 import { assessGrounding, resolveGroundingPolicy, type GroundingPolicy } from './grounding.js';
 import { answered, refusal, type AnswerRecord } from './record.js';
 import { generateStructured } from './structured.js';
@@ -185,7 +185,9 @@ export class Brain {
     // data. So draft = grounding gate (above) + direct generation.
     const context = buildContextBlock(chunks);
     const prompt = `${instruction}\n\nCONTEXT:\n${context}`;
-    const text = await this.generator.generate({ prompt, chunks });
+    // Draft = generation under an instruction → the DRAFTING system role, not
+    // the cite-or-refuse Q&A role (which made small models refuse draftable data).
+    const text = await this.generator.generate({ prompt, chunks, system: DRAFT_SYSTEM });
     const r = answered(text, chunks);
     return { text, sources: chunks, record: r };
   }

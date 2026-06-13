@@ -69,3 +69,11 @@ describe('renderDivergenceAlert — the flag IS the content (model-free)', () =>
     expect(body).toContain('deadline contradicted');
   });
 });
+
+import { DRAFT_SYSTEM, NO_CONTEXT_REPLY } from '../src/agents/generator.js';
+describe('DRAFT_SYSTEM — drafting role does not instruct refusal', () => {
+  it('directs production, not refusal (unlike the Q&A system prompt)', () => {
+    expect(DRAFT_SYSTEM).toMatch(/do not refuse/i);
+    expect(DRAFT_SYSTEM).not.toContain(NO_CONTEXT_REPLY);
+  });
+});

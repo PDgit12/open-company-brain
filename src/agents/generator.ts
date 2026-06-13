@@ -16,10 +16,24 @@ import type { RetrievedChunk } from '../brain/memory.js';
 
 export const NO_CONTEXT_REPLY = "I don't have that in the brain yet.";
 
+/**
+ * The DRAFTING system role. Grounding is already verified by the gate before
+ * generation, so this prompt must NOT tell the model to refuse (the Q&A
+ * SYSTEM_PROMPT does — which made small models emit the refusal line on
+ * draft/act tasks). It directs the model to produce the requested artifact
+ * from the context, citing sources.
+ */
+export const DRAFT_SYSTEM = `You write documents and drafts grounded in the provided CONTEXT for an organization.
+- Produce exactly what is asked (a notice, summary, reply, update). Do NOT refuse — the context has been verified to contain relevant facts.
+- Use only facts from the CONTEXT. Cite sources inline like [source-name]. Never invent names, numbers, or dates.
+- Be concise, clear, and ready to send.`;
+
 export interface GenerateInput {
   prompt: string;
   /** The chunks that grounded this prompt — used by the mock to format output. */
   chunks: RetrievedChunk[];
+  /** Override the system role (e.g. a DRAFTING role instead of cite-or-refuse Q&A). */
+  system?: string;
 }
 
 export interface Generator {
@@ -75,20 +89,19 @@ export class OllamaGenerator implements Generator {
     private readonly model: string,
   ) {}
 
-  async generate({ prompt }: GenerateInput): Promise<string> {
+  async generate({ prompt, system }: GenerateInput): Promise<string> {
     const json = await postJson<{ message?: { content?: string } }>(
       `${this.baseUrl}/api/chat`,
       {
         model: this.model,
         stream: false,
         keep_alive: config.ollama.keepAlive,
-        // Deterministic generation: grounded Q&A is a fact pipeline, not
-        // creative writing. Ollama's default temperature (0.8) makes the SAME
-        // question flip between answer and refusal across runs — untestable
-        // and untrustworthy. Greedy decoding pins it.
+        // Deterministic generation: grounded work is a fact pipeline, not
+        // creative writing. Default temperature flips the same input between
+        // outputs run to run — untestable. Greedy decoding pins it.
         options: { temperature: 0 },
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: system ?? SYSTEM_PROMPT },
           { role: 'user', content: prompt },
         ],
       },
@@ -110,13 +123,13 @@ export class OpenAIGenerator implements Generator {
     private readonly model: string,
   ) {}
 
-  async generate({ prompt }: GenerateInput): Promise<string> {
+  async generate({ prompt, system }: GenerateInput): Promise<string> {
     const json = await postJson<{ choices?: Array<{ message?: { content?: string } }> }>(
       `${this.baseUrl}/chat/completions`,
       {
         model: this.model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: system ?? SYSTEM_PROMPT },
           { role: 'user', content: prompt },
         ],
       },
