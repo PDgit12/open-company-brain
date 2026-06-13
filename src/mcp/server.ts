@@ -27,6 +27,7 @@ import { config, describeMode } from '../config.js';
 import { ActionService } from '../actions/service.js';
 import { getIntentStore, type IntentKind } from '../intents/registry.js';
 import { getSkillStore } from '../skills/registry.js';
+import { ServingOptimizer } from '../optimizer/serving.js';
 import { getRunStore, classifyRun } from '../observability/runs.js';
 
 /**
@@ -66,10 +67,12 @@ export async function createMcpServer(): Promise<McpServer> {
       if (chunks.length === 0) {
         return { content: [{ type: 'text', text: 'No matching records in the brain for that query (within the allowed scopes).' }] };
       }
-      const text = chunks
-        .map((c, i) => `[#${i + 1} source=${c.source} score=${c.score.toFixed(2)}]\n${c.text}`)
-        .join('\n\n---\n\n');
-      return { content: [{ type: 'text', text }] };
+      // CCR serving optimizer: compress + dedup against this session's manifest
+      // + cache-align, so the host never re-pays for context it already has.
+      const opt = await new ServingOptimizer(principalName()).serve(
+        chunks.map((c) => ({ text: c.text, source: c.source })),
+      );
+      return { content: [{ type: 'text', text: opt.text }] };
     },
   );
 
