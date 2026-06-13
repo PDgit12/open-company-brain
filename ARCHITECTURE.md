@@ -28,6 +28,21 @@ wedge vertical is chosen by discovery (FIS conversations), not by us in a doc.
 provable, every action authorized, every failure a permanent test — one
 self-hosted kernel any agent connects to over MCP.**
 
+### The Brain has two halves; it POWERS the loop (not a sidecar to it)
+- **Declarative brain (facts — "what is true"):** scoped, embedded, cited-or-
+  refused knowledge. BUILT (phases 0–4): refinery → pgvector/file vectors →
+  grounding gate → typed records. This is the "queryable company" substrate.
+- **Procedural brain (skills — "HOW work is done here"):** the living map
+  Blomfield insists on — how refunds get handled, how pricing exceptions are
+  decided, how engineers respond to incidents. Encoded as Intent/Skill objects
+  + the divergence engine that watches reality against them. PARTIAL: Intent
+  objects + divergence shipped; mining "how X is done" FROM artifacts (process
+  induction + replay validation) is the named frontier (§11.5 / future).
+- **The loop runs on BOTH:** the OS monitors reality (declarative ingest)
+  against how-it-should-be (procedural skills), flags drift with cited
+  evidence, and adjusts through approved actions. No brain → the loop is noise;
+  no loop → the brain is just search. The coupling IS the product.
+
 This is YC RFS "The AI Operating System for Companies" (Diana Hu), with our
 differentiation: **enforcement**. Everyone else *observes* the loop (eval
 dashboards, audit logs, search); our loop **gates** — ungrounded answers are
