@@ -88,7 +88,7 @@ export class ServingOptimizer {
         seen.add(h);
       }
     }
-    for (const r of toRecord) await this.manifest.append(r);
+    await this.manifest.appendMany(toRecord); // ONE write, not k writes (was O(n²))
 
     const optimized = parts.join('\n\n');
     const tokensAfter = estimateTokens(optimized);

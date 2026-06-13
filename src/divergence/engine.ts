@@ -202,7 +202,7 @@ export async function detectCandidates(
   for (const intent of intents) {
     const overlap = intentOverlap(intent.statement, event.content);
     if (overlap < threshold) continue;
-    const cand: DivergenceCandidate = {
+    out.push({
       id: `cand_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
       intentRef: intent.id,
       intentStatement: intent.statement,
@@ -211,10 +211,9 @@ export async function detectCandidates(
       source: event.source,
       scope: event.scope,
       at: new Date().toISOString(),
-    };
-    await candStore().append(cand);
-    out.push(cand);
+    });
   }
+  if (out.length) await candStore().appendMany(out); // ONE write, not k (was O(n²))
   return out;
 }
 

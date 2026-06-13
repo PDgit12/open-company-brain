@@ -45,4 +45,17 @@ export class JsonFileCollection<T> {
     await this.write(items);
     return items;
   }
+
+  /**
+   * Append many records in ONE read + ONE write. Use this instead of calling
+   * append() in a loop — append() rewrites the whole file each call (O(n²) over
+   * a loop); appendMany is a single O(n) write.
+   */
+  async appendMany(newItems: T[]): Promise<T[]> {
+    if (!newItems.length) return this.read();
+    const items = await this.read();
+    items.push(...newItems);
+    await this.write(items);
+    return items;
+  }
 }
