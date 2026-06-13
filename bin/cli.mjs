@@ -211,6 +211,8 @@ ${h('Approve their actions (human-in-the-loop)')}
     ${c('approve <id>')}         ${d('approve — executes + delivers (idempotent)')}
     ${c('reject <id> [why]')}    ${d('decline — the draft becomes negative feedback')}
 ${h('The closed loop (intent → compare → adjust)')}
+    ${c('skill "<name>"')}        ${d('record HOW work is done  --body "..." [--triggers a,b]')}
+    ${c('skills [query]')}         ${d('list or trigger-match the skills (the living map)')}
     ${c('intent "<should>"')}    ${d('declare what SHOULD be happening (goal|spec|policy|procedure)')}
     ${c('intents')}              ${d('list the reference signals reality is compared against')}
     ${c('divergences')}          ${d('the verdicts: ⚑ diverged (flag→approval queue) · aligned · silent')}
@@ -258,6 +260,8 @@ const run = () => {
   if (cmd === 'intent') return harnessCmd(['intent', ...process.argv.slice(3)]);
   if (cmd === 'intents') return harnessCmd(['intents', ...process.argv.slice(3)]);
   if (cmd === 'divergences') return harnessCmd(['divergences', ...process.argv.slice(3)]);
+  if (cmd === 'skill') return harnessCmd(['skill', ...process.argv.slice(3)]);
+  if (cmd === 'skills') return harnessCmd(['skills', ...process.argv.slice(3)]);
   if (cmd === 'budget') return harnessCmd(['budget', ...process.argv.slice(3)]);
   if (cmd === 'runs') return harnessCmd(['runs', ...process.argv.slice(3)]);
   if (cmd === 'trace') return harnessCmd(['trace', ...process.argv.slice(3)]);

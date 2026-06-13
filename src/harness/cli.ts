@@ -21,6 +21,7 @@ import { ToolLoopAgent } from './agent.js';
 import { draftAgent } from '../agents/architect.js';
 import { buildBirthKit, saveBirthKit, commission } from '../agents/lifecycle.js';
 import { getIntentStore, type IntentKind } from '../intents/registry.js';
+import { getSkillStore } from '../skills/registry.js';
 import { listDivergences } from '../divergence/engine.js';
 import { DEMO_COMPANY } from '../seed/demo-company.js';
 import { isUrl, fetchUrl } from '../connectors/url.js';
@@ -510,6 +511,45 @@ async function declareIntent(rest: string[], argv: string[], scopes: string[]): 
   stdout.write(`${butter('✓')} intent ${bold(it.id)} ${dim(`· ${it.kind} · v${it.version} · scopes ${it.scopes.join(',')}`)}\n  ${gray(it.statement)}\n`);
 }
 
+/**
+ * `comb skill "<name>" --body "<how it's done>" [--triggers a,b]` — record HOW
+ * work is done here (Blomfield's executable skill). Trigger-matched, model-free.
+ */
+async function recordSkill(rest: string[], argv: string[], scopes: string[]): Promise<void> {
+  const bi = argv.indexOf('--body');
+  const ti = argv.indexOf('--triggers');
+  const name = (() => {
+    const out: string[] = [];
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === '--body' || rest[i] === '--triggers') { i++; continue; }
+      out.push(rest[i]!);
+    }
+    return out.join(' ');
+  })();
+  const body = bi !== -1 ? (argv[bi + 1] ?? '') : '';
+  if (!name.trim() || !body.trim()) {
+    stdout.write(gray('usage: comb skill "<name>" --body "<how it is done>" [--triggers a,b] [--scopes x]\n'));
+    process.exit(1);
+  }
+  const triggers = ti !== -1 ? (argv[ti + 1] ?? '').split(',').map((t) => t.trim()).filter(Boolean) : undefined;
+  const sk = await getSkillStore().save({ name, body, triggers, scopes });
+  stdout.write(`${butter('✓')} skill ${bold(sk.id)} ${dim(`· triggers: ${sk.triggers.join(', ')}`)}\n  ${gray(sk.name)}\n`);
+}
+
+/** `comb skills [query]` — list, or trigger-match a query against, the skills. */
+async function listSkills(rest: string[], scopes: string[]): Promise<void> {
+  const query = rest.join(' ').trim();
+  const all = query ? await getSkillStore().find(query, scopes) : await getSkillStore().list(scopes);
+  if (!all.length) {
+    stdout.write(query ? `${dim('No skill matches')} ${bold(query)}.\n` : `${dim('No skills recorded.')} ${bold('comb skill "<name>" --body "..."')}\n`);
+    return;
+  }
+  stdout.write(`\n${butter('◆')} ${bold(query ? `Skills for "${query}"` : 'Skills')} ${dim(`· ${all.length} (how work is done)`)}\n`);
+  for (const sk of all) {
+    stdout.write(`  ${coral('•')} ${bold(sk.name)}  ${dim(sk.id)} ${dim(`· uses ${sk.uses}`)}\n    ${gray('triggers: ' + sk.triggers.join(', '))}\n    ${gray(sk.body.replace(/\s+/g, ' ').slice(0, 80))}\n`);
+  }
+}
+
 /** `comb intents` — list the reference signals reality is compared against. */
 async function listIntents(scopes: string[]): Promise<void> {
   const all = await getIntentStore().list(scopes);
@@ -810,6 +850,8 @@ async function main(): Promise<void> {
   if (mode === 'intent') return declareIntent(rest, argv, scopes);
   if (mode === 'intents') return listIntents(scopes);
   if (mode === 'divergences') return showDivergences();
+  if (mode === 'skill') return recordSkill(rest, argv, scopes);
+  if (mode === 'skills') return listSkills(rest, scopes);
   if (mode === 'budget') return showBudget(scopes);
   if (mode === 'runs') {
     const li = argv.indexOf('--limit');

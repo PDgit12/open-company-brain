@@ -26,6 +26,7 @@ import { Brain } from '../brain/brain.js';
 import { config, describeMode } from '../config.js';
 import { ActionService } from '../actions/service.js';
 import { getIntentStore, type IntentKind } from '../intents/registry.js';
+import { getSkillStore } from '../skills/registry.js';
 import { getRunStore, classifyRun } from '../observability/runs.js';
 
 /**
@@ -161,6 +162,64 @@ export async function createMcpServer(): Promise<McpServer> {
         .map((r) => `- ${r.id} [${classifyRun(r)}] ${r.agent} · "${r.input.slice(0, 50)}" · ${r.promptTokens}+${r.outputTokens} tok · ${r.latencyMs}ms`)
         .join('\n');
       return { content: [{ type: 'text', text }] };
+    },
+  );
+
+  // ── WRITE: record a SKILL — how work is done (host-structured, model-free) ──
+  server.tool(
+    'record_skill',
+    "Record a SKILL — HOW something is done at this company (e.g. how a refund is handled, how a pricing exception is decided). YOU (the host agent) structure it from the source; Comb stores and serves it by trigger match. This is the company's executable 'how-to' map.",
+    {
+      name: z.string().describe('Short name, e.g. "Handle a refund request".'),
+      body: z.string().describe('The procedure: steps, decision rules, approvals, exceptions.'),
+      triggers: z.string().optional().describe('Comma-separated keywords that should surface this skill.'),
+      scopes: z.string().optional(),
+    },
+    async ({ name, body, triggers, scopes }) => {
+      const sk = await getSkillStore().save({
+        name, body,
+        triggers: triggers ? triggers.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+        scopes: resolveScopes(scopes),
+      });
+      return { content: [{ type: 'text', text: `Skill ${sk.id} recorded by ${principalName()} (triggers: ${sk.triggers.join(', ')}).` }] };
+    },
+  );
+  server.tool(
+    'find_skill',
+    'Find how-to SKILLS relevant to a task by trigger match (e.g. "customer wants a refund"). Returns the procedures; YOU follow them. Model-free, scoped.',
+    { query: z.string(), scopes: z.string().optional() },
+    async ({ query, scopes }) => {
+      const hits = await getSkillStore().find(query, resolveScopes(scopes));
+      if (!hits.length) return { content: [{ type: 'text', text: `No skill recorded for "${query}".` }] };
+      for (const h of hits) await getSkillStore().bumpUses(h.id);
+      return { content: [{ type: 'text', text: hits.map((s) => `## ${s.name}\n${s.body}`).join('\n\n') }] };
+    },
+  );
+
+  // ── WRITE: record a structured FACT (host-structured knowledge) ─────────────
+  server.tool(
+    'record_fact',
+    'Record a structured fact into the brain (scoped, retrievable). Use when you extract a discrete fact from a source. For bulk/raw text use `ingest` instead.',
+    { text: z.string(), source: z.string().optional(), scope: z.string().optional() },
+    async ({ text, source, scope }) => {
+      const scopes = resolveScopes(scope);
+      const r = await brain.ingest({ format: 'text', content: text, source: source ?? 'recorded', scope }, scopes);
+      return { content: [{ type: 'text', text: `Recorded ${r.ingested} fact(s) under "${r.source}" / scope "${r.scope}".` }] };
+    },
+  );
+
+  // ── ACT: submit a HOST-DRAFTED action (Comb governs; Comb does NOT draft) ───
+  server.tool(
+    'submit_action',
+    'Submit an action YOU have drafted for governed approval. Comb does NOT generate it — you provide the title and body; Comb queues it for human (or policy) approval, then executes + delivers + audits. Use for any real-world side effect (a notice, an update, a reply).',
+    {
+      title: z.string().describe('Short label.'),
+      body: z.string().describe('The full drafted content you want approved and sent.'),
+      scopes: z.string().optional(),
+    },
+    async ({ title, body }) => {
+      const r = await actions.proposeDirect({ title, body, sources: [], by: principalName() });
+      return { content: [{ type: 'text', text: r.ok ? `Submitted (${r.action.status}): id=${r.action.id} — awaits approval (comb actions).` : `Rejected: ${r.reason}` }] };
     },
   );
 
