@@ -1,7 +1,7 @@
 {
   "name": "open-company-brain",
-  "version": "0.6.0",
-  "description": "An open-source, governed AI brain framework: pipe ANY data in (paste, upload, or a workflow webhook like n8n), it becomes scoped, embedded, cited, retrievable knowledge — then ask grounded questions, build no-code agents, and fan agents out automatically over new data, all cite-or-refuse with a human-approved action layer. Embeddable as a library or run as a server. Three backends — mock (no creds), managed (Langbase), and fully local (Ollama + pgvector, $0/query).",
+  "version": "0.6.1",
+  "description": "An open-source, governed AI brain framework: pipe ANY data in (paste, upload, or a workflow webhook like n8n), it becomes scoped, embedded, cited, retrievable knowledge \u2014 then ask grounded questions, build no-code agents, and fan agents out automatically over new data, all cite-or-refuse with a human-approved action layer. Embeddable as a library or run as a server. Three backends \u2014 mock (no creds), managed (Langbase), and fully local (Ollama + pgvector, $0/query).",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
