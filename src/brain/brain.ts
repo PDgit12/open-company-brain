@@ -178,10 +178,13 @@ export class Brain {
       const r = refusal();
       return { text: r.answer, sources: [], record: r };
     }
+    // NOTE: draft is GENERATION under an instruction (actions, fan-out, no-code
+    // agents) — NOT question-answering. The SELECT/COMPOSE answerability
+    // pipeline belongs only to ask(); applied here it wrongly judges a drafting
+    // instruction ("Draft a notice…") as unanswerable and refuses grounded
+    // data. So draft = grounding gate (above) + direct generation.
     const context = buildContextBlock(chunks);
     const prompt = `${instruction}\n\nCONTEXT:\n${context}`;
-    const structured = await generateStructured(instruction, chunks);
-    if (structured) return { text: structured.answer, sources: structured.citations, record: structured };
     const text = await this.generator.generate({ prompt, chunks });
     const r = answered(text, chunks);
     return { text, sources: chunks, record: r };

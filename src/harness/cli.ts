@@ -22,6 +22,9 @@ import { draftAgent } from '../agents/architect.js';
 import { buildBirthKit, saveBirthKit, commission } from '../agents/lifecycle.js';
 import { getIntentStore, type IntentKind } from '../intents/registry.js';
 import { listDivergences } from '../divergence/engine.js';
+import { DEMO_COMPANY } from '../seed/demo-company.js';
+import { isUrl, fetchUrl } from '../connectors/url.js';
+import { ActionService as ActionSvc } from '../actions/service.js';
 import { runAgentEval } from '../eval/agent-run.js';
 import { resolveContextWindow, FALLBACK_WINDOW, type ResolvedWindow } from './context-window.js';
 import { ActionService } from '../actions/service.js';
@@ -102,21 +105,24 @@ function parseFlags(argv: string[]): {
   scopes: string[];
   saved: string | null;
   fresh: boolean;
+  act: boolean;
   rest: string[];
 } {
   let agent: AgentKind = 'auto';
   let scopes = [config.demoUserAccessScope];
   let saved: string | null = null;
   let fresh = false;
+  let act = false;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--agent') agent = (argv[++i] as AgentKind) ?? 'auto';
     else if (argv[i] === '--scopes') scopes = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     else if (argv[i] === '--saved') saved = (argv[++i] ?? '').trim() || null;
     else if (argv[i] === '--fresh') fresh = true;
+    else if (argv[i] === '--act') act = true;
     else rest.push(argv[i]!);
   }
-  return { agent, scopes, saved, fresh, rest };
+  return { agent, scopes, saved, fresh, act, rest };
 }
 
 /**
@@ -583,18 +589,51 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
   const sci = argv.indexOf('--scope');
   const source = si !== -1 ? (argv[si + 1] ?? '') : file.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
   const scope = sci !== -1 ? (argv[sci + 1] ?? '') : scopes[0]!;
-  const ext = (file.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
-  const format = ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
-
-  const content = await readFile(file, 'utf8');
+  // A data source can be a LINK: fetch + reduce to text, same pipeline after.
+  let content: string;
+  let resolvedSource = source;
+  let format: 'text' | 'csv' | 'json';
+  if (isUrl(file)) {
+    const page = await fetchUrl(file);
+    content = page.text;
+    if (si === -1) resolvedSource = page.source; // default source = origin
+    format = 'text';
+  } else {
+    const ext = (file.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
+    format = ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
+    content = await readFile(file, 'utf8');
+  }
   const brain = await Brain.create();
   const spin = new Spinner();
   spin.start(`embedding ${file}`);
-  const r = await brain.ingest({ format, content, source, scope }, [scope]);
+  const r = await brain.ingest({ format, content, source: resolvedSource, scope }, [scope]);
   spin.stop();
   stdout.write(`${butter('✓')} ingested ${bold(String(r.ingested))} record${r.ingested === 1 ? '' : 's'}  ${dim(`· source=${r.source} · scope=${r.scope} · format=${format}`)}\n`);
   if (r.reactions.length) stdout.write(`  ${dim('fan-out reactions ran:')} ${r.reactions.length}\n`);
   stdout.write(`${dim('Ask about it:')} ${bold(`comb run --agent builtin "<question>" --scopes ${scope}`)}\n`);
+}
+
+/**
+ * `comb demo-data [--scope s]` — load the Northwind Robotics sample corpus
+ * (12 docs, mixed formats) into the REAL backend so the pipeline can be tried
+ * at slightly larger scale without your own data. Replace it with yours later.
+ */
+async function loadDemoData(scopes: string[]): Promise<void> {
+  const scope = scopes[0]!;
+  const brain = await Brain.create();
+  const spin = new Spinner();
+  let total = 0;
+  let flags = 0;
+  for (const doc of DEMO_COMPANY) {
+    spin.start(`embedding ${doc.source}`);
+    const r = await brain.ingest({ format: doc.format, content: doc.content, source: doc.source, scope }, [scope]);
+    spin.stop();
+    total += r.ingested;
+    flags += r.divergences;
+    stdout.write(`  ${butter('✓')} ${bold(doc.source)} ${dim(`(${doc.format}, ${r.ingested} record${r.ingested === 1 ? '' : 's'})`)}\n`);
+  }
+  stdout.write(`\n${butter('◆')} loaded ${bold(String(total))} records into scope ${bold(scope)}${flags ? dim(` · ${flags} divergence flag(s)`) : ''}\n`);
+  stdout.write(`${dim('Try:')} ${bold('comb run --agent builtin "What is the refund approval over $10,000?"')}\n`);
 }
 
 /**
@@ -719,11 +758,12 @@ function banner(agent: Agent, fabric: ToolFabric, scopes: string[]): void {
 
 async function main(): Promise<void> {
   const [mode, ...argv] = process.argv.slice(2);
-  const { agent: kind, scopes, saved, fresh, rest } = parseFlags(argv);
+  const { agent: kind, scopes, saved, fresh, act, rest } = parseFlags(argv);
   const spin = new Spinner();
 
   // Registry-only commands: no brain/fabric assembly needed.
   if (mode === 'ingest') return ingestFile(argv, scopes);
+  if (mode === 'demo-data') return loadDemoData(scopes);
   if (mode === 'new') return newAgent(rest.join(' '));
   if (mode === 'create') return createAgent(argv);
   if (mode === 'agents') return listAgents();
@@ -840,6 +880,21 @@ async function main(): Promise<void> {
       await fabric.close();
     }
     stdout.write(dim('\nbye.\n'));
+    return;
+  }
+
+  // ACT shape: the agent DOES a task — it drafts a grounded action into the
+  // approval queue (propose → approve → deliver) instead of just answering.
+  if (mode === 'run' && act) {
+    const task = rest.join(' ').trim();
+    if (!task) { stdout.write(gray('usage: comb run --saved <name> --act "<task to do>"\n')); await fabric.close(); process.exit(1); }
+    const def = saved ? await resolveAgent(getCustomAgentStore(), saved) : null;
+    const instruction = def?.instruction ?? 'Draft the requested action from the brain, grounded and cited.';
+    const r = await ActionSvc.create(brain).propose({ title: task.slice(0, 60), instruction, query: task, by: def ? `saved:${def.name}` : 'cli' }, scopes);
+    spin.stop();
+    if (!r.ok) stdout.write(`${coral('✗')} ${r.reason}\n`);
+    else stdout.write(`${butter('✓')} drafted action ${bold(r.action.id.slice(0, 8))} (${r.action.status}) — review: ${bold('comb actions')}\n\n${dim(r.action.body.slice(0, 400))}\n`);
+    await fabric.close();
     return;
   }
 
