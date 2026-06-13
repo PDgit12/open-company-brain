@@ -378,7 +378,58 @@ export class FileVectorMemoryStore implements MemoryStore {
   }
 }
 
+/**
+ * Model-free, persistent KEYWORD recall — the MCP-first / no-model store.
+ * Same overlap scoring as MockMemoryStore (needs NO embedder), but file-
+ * persistent so a brain survives across processes with zero models and zero
+ * database. The host agent does the smart synthesis over what this returns;
+ * this just finds the right governed, scoped chunks by term overlap. Same
+ * scope-filter + assertScoped contract as every store.
+ */
+export class FileKeywordMemoryStore implements MemoryStore {
+  private readonly collection: JsonFileCollection<MemoryDocument>;
+  constructor(dataDir: string) {
+    this.collection = new JsonFileCollection<MemoryDocument>(path.join(dataDir, 'keyword-docs.json'));
+  }
+  async upsert(docs: MemoryDocument[]): Promise<number> {
+    assertScoped(docs);
+    const byId = new Map((await this.collection.read()).map((d) => [d.id, d]));
+    for (const d of docs) byId.set(d.id, d);
+    await this.collection.write([...byId.values()]);
+    return docs.length;
+  }
+  async retrieve(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
+    const allowed = new Set(opts.accessScopes);
+    const q = new Set(tokenize(opts.query));
+    return (await this.collection.read())
+      .filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''))
+      .map((d) => {
+        const hits = tokenize(d.text).filter((t) => q.has(t)).length;
+        return { d, score: q.size ? hits / q.size : 0 };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, opts.topK ?? 8)
+      .map(({ d, score }) => ({ text: d.text, source: d.metadata[META_SOURCE] ?? 'unknown', metadata: d.metadata, score: Math.min(1, score) }));
+  }
+  async stats(accessScopes: string[]): Promise<SourceCount[]> {
+    const allowed = new Set(accessScopes);
+    const counts = new Map<string, number>();
+    for (const d of await this.collection.read()) {
+      if (!allowed.has(d.metadata[META_ACCESS] ?? '')) continue;
+      const src = d.metadata[META_SOURCE] ?? 'unknown';
+      counts.set(src, (counts.get(src) ?? 0) + 1);
+    }
+    return [...counts].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
+  }
+}
+
 export function createMemoryStore(opts: { minScoreOverride?: number } = {}): MemoryStore {
+  // MODEL-FREE posture (explicit): keyword recall, no embedder, file-persistent,
+  // regardless of backend. This is the MCP-first no-model product mode.
+  if (config.comb.retrieval === 'keyword') {
+    return new FileKeywordMemoryStore(config.comb.dataDir);
+  }
   // Live backends (local Ollama / BYO key): pgvector when a Postgres URL is
   // configured (scale), else the FILE-BACKED vector store — a persistent brain
   // with NO database, so `npm i -g` + Ollama just works. Same contract either way.

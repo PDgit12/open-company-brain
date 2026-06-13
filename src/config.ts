@@ -101,6 +101,11 @@ const EnvSchema = z.object({
   // (exact for OpenAI vocabularies, approximate for llama); falls back to the
   // heuristic if the package is absent.
   COMB_TOKENIZER: z.enum(['heuristic', 'bpe']).default('heuristic'),
+  // Retrieval mode. 'vector' (default) = semantic, needs an embedder.
+  // 'keyword' = MODEL-FREE keyword recall, file-persistent — the MCP-first,
+  // no-model posture: the host agent brings the intelligence, Comb just finds
+  // the right governed, scoped chunks by term overlap. No embeddings, no model.
+  COMB_RETRIEVAL: z.enum(['vector', 'keyword']).default('vector'),
   // Model-call resilience: per-request timeout and retry count (network errors,
   // 429, and 5xx are retried with exponential backoff + jitter).
   COMB_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
@@ -190,6 +195,7 @@ export const config = {
     httpTimeoutMs: env.COMB_HTTP_TIMEOUT_MS,
     httpRetries: env.COMB_HTTP_RETRIES,
     groundingMargin: env.COMB_GROUNDING_MARGIN,
+    retrieval: env.COMB_RETRIEVAL,
   },
 } as const;
 
