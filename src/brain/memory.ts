@@ -80,12 +80,34 @@ const STOPWORDS = new Set([
   'about', 'is', 'are', 'what', 'who', 'our', 'we', 'me', 'prep', 'tell',
 ]);
 
+/**
+ * Light, symmetric suffix stemmer — collapse the common inflections so the
+ * keyword retriever matches "refunds"→"refund" and "approving"→"approv" instead
+ * of refusing a question it has the answer to. Applied identically to query and
+ * document tokens (symmetry is what makes the match work), and only to tokens
+ * long enough that stripping leaves a real stem (>4 chars). Deliberately NOT a
+ * full Porter stemmer: this handles plurals/verb tenses (the over-refusal that
+ * actually bites), stays O(token length), and leaves semantics (verb→noun, e.g.
+ * "approve"→"approval") to the vector upgrade. Order matters: longest suffix first.
+ */
+function stem(t: string): string {
+  if (t.length <= 4) return t;
+  for (const suf of ['ing', 'ies', 'es', 'ed', 's']) {
+    if (t.endsWith(suf) && t.length - suf.length >= 3) {
+      // "ies" → "y" (policies→policy); other suffixes just drop.
+      return suf === 'ies' ? `${t.slice(0, -3)}y` : t.slice(0, -suf.length);
+    }
+  }
+  return t;
+}
+
 function tokenize(s: string): string[] {
   return s
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, ' ')
     .split(/\s+/)
-    .filter((t) => t.length > 1 && !STOPWORDS.has(t));
+    .filter((t) => t.length > 1 && !STOPWORDS.has(t))
+    .map(stem);
 }
 
 export class MockMemoryStore implements MemoryStore {
