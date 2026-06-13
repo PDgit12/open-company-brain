@@ -14,11 +14,13 @@
  * the templating layer. Access control is only as real as this agreement.
  */
 
+import path from 'node:path';
 import { Langbase } from 'langbase';
 import pg from 'pg';
 import { config } from '../config.js';
 import { META_ACCESS, META_SOURCE } from '../constants.js';
-import { createEmbedder, type Embedder } from './embedding.js';
+import { createEmbedder, cosineSim, type Embedder } from './embedding.js';
+import { JsonFileCollection } from '../storage/json-file.js';
 import type { MemoryDocument } from './documents.js';
 
 export interface RetrievedChunk {
@@ -313,33 +315,82 @@ export class PgVectorMemoryStore implements MemoryStore {
   }
 }
 
-export function createMemoryStore(opts: { minScoreOverride?: number } = {}): MemoryStore {
-  // BYO-key backend: recall is pgvector with OpenAI-compatible embeddings —
-  // same store as local, different embedder (the factory resolves it).
-  if (config.backend === 'openai') {
-    if (!config.ollama.vectorDatabaseUrl) {
-      throw new Error('The openai backend needs a Postgres for pgvector — set VECTOR_DATABASE_URL (or DATABASE_URL).');
-    }
-    return new PgVectorMemoryStore(
-      config.ollama.vectorDatabaseUrl,
-      undefined,
-      opts.minScoreOverride ?? config.ollama.minScore,
+/**
+ * File-backed vector recall — the ZERO-DATABASE persistent brain.
+ *
+ * The missing zero-setup tier for KNOWLEDGE: embeddings + text + scope live in
+ * one JSON file under the data dir; retrieval embeds the query and ranks by
+ * cosine in-process. Real embeddings (Ollama or a key) → real semantic recall,
+ * with NO Postgres and NO Docker — a user who installed only Ollama gets a
+ * working, persistent brain. Same scope-filter + min-score + assertScoped
+ * contract as pgvector, so the grounding gate and calibration behave identically.
+ * Brute-force search is fine to ~10k chunks; past that, move to pgvector/S3.
+ */
+export class FileVectorMemoryStore implements MemoryStore {
+  private readonly collection: JsonFileCollection<MemoryDocument & { embedding: number[] }>;
+  constructor(
+    dataDir: string,
+    private readonly embedder: Embedder = createEmbedder(),
+    private readonly minScore: number = config.ollama.minScore,
+  ) {
+    this.collection = new JsonFileCollection<MemoryDocument & { embedding: number[] }>(
+      path.join(dataDir, 'vectors.json'),
     );
   }
-  if (config.backend === 'local') {
-    if (!config.ollama.vectorDatabaseUrl) {
-      throw new Error('Local backend needs a Postgres for pgvector — set VECTOR_DATABASE_URL (or DATABASE_URL).');
+
+  async upsert(docs: MemoryDocument[]): Promise<number> {
+    assertScoped(docs);
+    if (!docs.length) return 0;
+    const vectors = await this.embedder.embed(docs.map((d) => d.text));
+    const existing = await this.collection.read();
+    const byId = new Map(existing.map((d) => [d.id, d]));
+    docs.forEach((d, i) => byId.set(d.id, { ...d, embedding: vectors[i]! }));
+    await this.collection.write([...byId.values()]);
+    return docs.length;
+  }
+
+  async retrieve(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
+    const allowed = new Set(opts.accessScopes);
+    const rows = (await this.collection.read()).filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
+    if (!rows.length) return [];
+    const [q] = await this.embedder.embed([opts.query]);
+    return rows
+      .map((d) => ({
+        text: d.text,
+        source: d.metadata[META_SOURCE] ?? 'unknown',
+        metadata: d.metadata,
+        score: Math.max(0, Math.min(1, cosineSim(q!, d.embedding))),
+      }))
+      .filter((c) => c.score >= this.minScore)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, opts.topK ?? 8);
+  }
+
+  async stats(accessScopes: string[]): Promise<SourceCount[]> {
+    const allowed = new Set(accessScopes);
+    const counts = new Map<string, number>();
+    for (const d of await this.collection.read()) {
+      if (!allowed.has(d.metadata[META_ACCESS] ?? '')) continue;
+      const src = d.metadata[META_SOURCE] ?? 'unknown';
+      counts.set(src, (counts.get(src) ?? 0) + 1);
     }
-    // minScoreOverride: calibration retrieves WITHOUT the floor (0) so it can
-    // observe the full score distribution and place the floor from data.
-    return new PgVectorMemoryStore(
-      config.ollama.vectorDatabaseUrl,
-      undefined,
-      opts.minScoreOverride ?? config.ollama.minScore,
-    );
+    return [...counts].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
+  }
+}
+
+export function createMemoryStore(opts: { minScoreOverride?: number } = {}): MemoryStore {
+  // Live backends (local Ollama / BYO key): pgvector when a Postgres URL is
+  // configured (scale), else the FILE-BACKED vector store — a persistent brain
+  // with NO database, so `npm i -g` + Ollama just works. Same contract either way.
+  if (config.backend === 'openai' || config.backend === 'local') {
+    const score = opts.minScoreOverride ?? config.ollama.minScore;
+    return config.ollama.vectorDatabaseUrl
+      ? new PgVectorMemoryStore(config.ollama.vectorDatabaseUrl, undefined, score)
+      : new FileVectorMemoryStore(config.comb.dataDir, undefined, score);
   }
   if (config.backend === 'langbase' && config.langbase.apiKey) {
     return new LangbaseMemoryStore(config.langbase.apiKey, config.langbase.memoryName);
   }
   return new MockMemoryStore();
 }
+

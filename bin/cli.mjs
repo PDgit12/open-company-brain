@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 /**
- * Comb CLI — the "just add your keys" setup experience.
+ * Comb CLI — the operator command for the governed company brain + OS.
  *
- *   npm run init      guided setup: creates .env and (interactively) takes your keys
- *   npm run doctor    report the current mode and what's still needed
+ *   comb init      guided setup: pick a backend (local Ollama / your key)
+ *   comb doctor    report the active backend and what's still needed
  *
- * Philosophy: the framework is the product. A user supplies API keys (and points
- * it at their data) — nothing else. With no keys it runs in mock mode immediately.
- *
- * Zero dependencies, TTY-safe (never hangs in a non-interactive shell).
+ * Suppress Node's transitive-dependency deprecation noise (e.g. punycode) so
+ * the CLI output is clean; inherited by spawned subcommands via the env.
  */
+process.env.NODE_NO_WARNINGS = '1';
 
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
@@ -116,15 +115,15 @@ async function init() {
 
   reportMode(parseEnv(text));
   console.log('\n  Next:');
-  console.log('   npm run demo         open the brain at http://localhost:4000');
-  console.log('   # fully local ($0/query): set LLM_BACKEND=local in .env, then:');
-  console.log('   npm run setup:local  pull models + seed pgvector, then `npm run demo`');
-  console.log('   # connect an AI agent (Claude/Cursor): comb mcp\n');
+  console.log('   comb doctor          confirm the active backend');
+  console.log('   comb ingest <file>   feed the brain your data');
+  console.log('   comb run --agent builtin "<question>"   ask it');
+  console.log('   # fully local ($0/query) needs Ollama + Postgres+pgvector — see the README.\n');
 }
 
 async function doctor() {
   if (!(await exists(ENV))) {
-    console.log('No .env yet — run:  npm run init');
+    console.log('No backend configured yet — run:  comb init');
     return;
   }
   reportMode(parseEnv(await readFile(ENV, 'utf8')));
