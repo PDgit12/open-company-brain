@@ -47,6 +47,8 @@ export interface SkillStore {
   list(scopes?: string[]): Promise<Skill[]>;
   get(id: string): Promise<Skill | undefined>;
   bumpUses(id: string): Promise<void>;
+  /** Increment usage for many skills in ONE read+write (file) / ONE UPDATE (pg). */
+  bumpUsesMany(ids: string[]): Promise<void>;
 }
 
 const nextId = (): string => `skill_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -117,6 +119,11 @@ export class InMemorySkillStore implements SkillStore {
     const s = this.skills.find((x) => x.id === id);
     if (s) s.uses += 1;
   }
+  async bumpUsesMany(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    const set = new Set(ids);
+    for (const s of this.skills) if (set.has(s.id)) s.uses += 1;
+  }
 }
 
 export class FileSkillStore implements SkillStore {
@@ -140,11 +147,15 @@ export class FileSkillStore implements SkillStore {
     return (await this.collection.read()).find((s) => s.id === id);
   }
   async bumpUses(id: string): Promise<void> {
+    await this.bumpUsesMany([id]);
+  }
+  async bumpUsesMany(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    const set = new Set(ids);
     const all = await this.collection.read();
-    const s = all.find((x) => x.id === id);
-    if (!s) return;
-    s.uses += 1;
-    await this.collection.write(all);
+    let changed = false;
+    for (const s of all) if (set.has(s.id)) { s.uses += 1; changed = true; }
+    if (changed) await this.collection.write(all); // ONE write for all hits (was k writes)
   }
 }
 
@@ -205,8 +216,12 @@ export class PgSkillStore implements SkillStore {
     return (await this.all()).find((s) => s.id === id);
   }
   async bumpUses(id: string): Promise<void> {
+    await this.bumpUsesMany([id]);
+  }
+  async bumpUsesMany(ids: string[]): Promise<void> {
+    if (!ids.length) return;
     await this.ensure();
-    await this.pool.query(`UPDATE ${this.table} SET uses = uses + 1 WHERE id = $1`, [id]);
+    await this.pool.query(`UPDATE ${this.table} SET uses = uses + 1 WHERE id = ANY($1)`, [ids]);
   }
 }
 

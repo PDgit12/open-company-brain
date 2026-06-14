@@ -148,16 +148,17 @@ export class Brain {
     if (!this.refuseUnlessGrounded(chunks)) {
       return toBrainAnswer(refusal());
     }
-    const context = buildContextBlock(chunks);
+    // Phase 2 primary path: constrained decoding — the model fills the record
+    // schema and code validates it (status enum + citation subset proof). Try it
+    // FIRST: it needs only (question, chunks), so the fallback's prompt assembly
+    // and feedback-store read below run only when this returns null.
+    const structured = await generateStructured(question, chunks);
+    if (structured) return toBrainAnswer(structured);
+    // Fallback (legacy prose path) — unsupported model or twice-invalid schema.
     // Few-shot learning loop: inject approved past answers (scope-gated) as
     // exemplars so the brain's style/rigor compounds with usage.
     const examples = await this.feedback.approvedExamples(question, accessScopes, 2);
-    const prompt = buildAskPrompt(question, context, examples);
-    // Phase 2: constrained decoding — the model fills the record schema and
-    // code validates it (status enum + citation subset proof). Falls back to
-    // the legacy prose path when unsupported or twice-invalid.
-    const structured = await generateStructured(question, chunks);
-    if (structured) return toBrainAnswer(structured);
+    const prompt = buildAskPrompt(question, buildContextBlock(chunks), examples);
     const answer = await this.generator.generate({ prompt, chunks });
     return toBrainAnswer(answered(answer, chunks));
   }

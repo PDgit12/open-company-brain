@@ -19,6 +19,7 @@
  * to stderr; we keep stdout clean for MCP frames only.
  */
 
+import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -53,7 +54,11 @@ function resolveScopes(arg?: string): string[] {
 export async function createMcpServer(): Promise<McpServer> {
   const brain = await Brain.create();
   const actions = ActionService.create(brain);
-  const server = new McpServer({ name: 'open-company-brain', version: '0.5.0' });
+  // Single source of truth for the version: read package.json at runtime
+  // (createRequire avoids the rootDir:src compile constraint on a static import,
+  // and package.json ships with the package, so dist/mcp → ../../package.json).
+  const { version } = createRequire(import.meta.url)('../../package.json') as { version: string };
+  const server = new McpServer({ name: 'open-company-brain', version });
 
   // ── search_brain: governed retrieval, host synthesizes ──────────────────────
   server.tool(
@@ -210,7 +215,8 @@ export async function createMcpServer(): Promise<McpServer> {
     async ({ query, scopes }) => {
       const hits = await getSkillStore().find(query, resolveScopes(scopes));
       if (!hits.length) return { content: [{ type: 'text', text: `No skill recorded for "${query}".` }] };
-      for (const h of hits) await getSkillStore().bumpUses(h.id);
+      // ONE batched write for all hits (was k sequential read+write cycles).
+      await getSkillStore().bumpUsesMany(hits.map((h) => h.id));
       return { content: [{ type: 'text', text: hits.map((s) => `## ${s.name}\n${s.body}`).join('\n\n') }] };
     },
   );
