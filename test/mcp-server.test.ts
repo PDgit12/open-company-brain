@@ -41,7 +41,7 @@ const EXPECTED_TOOLS = [
   'search_brain', 'ask_brain', 'ingest', 'list_sources',
   'propose_action', 'action_status', 'list_divergence_candidates', 'query_runs',
   'record_skill', 'find_skill', 'record_fact', 'submit_action',
-  'declare_intent', 'list_intents',
+  'declare_intent', 'list_intents', 'record_outcome',
 ].sort();
 
 type TextContent = { type: string; text?: string };

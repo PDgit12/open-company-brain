@@ -20,6 +20,19 @@ export type ActionStatus =
   | 'rejected' // a human declined it
   | 'failed'; // execution threw
 
+/**
+ * The real-world OUTCOME of a delivered action — the Signal rung of the loop.
+ * Unlike approve/reject (a human verdict at decision time) or executed/failed
+ * (did delivery throw), this is what actually happened AFTER the action landed:
+ * the measured consequence that turns "task complete" into "task worked".
+ */
+export type ActionOutcome =
+  | 'replied' // the recipient engaged back
+  | 'converted' // the action produced its intended result (a sale, a fix, a yes)
+  | 'ignored' // landed but no engagement
+  | 'error' // bounced / rejected downstream / wrong
+  | 'reverted'; // had to be undone
+
 export interface ActionSourceRef {
   text: string;
   source: string;
@@ -41,6 +54,11 @@ export interface ProposedAction {
   executedAt?: string;
   /** Human-readable result of execution, e.g. "Queued to outbox". */
   effect?: string;
+  /** Real-world outcome reported after delivery (the Signal rung). */
+  outcome?: ActionOutcome;
+  outcomeAt?: string;
+  /** Optional free-text evidence for the outcome ("manager replied: approved"). */
+  outcomeEvidence?: string;
 }
 
 export type AuditEvent =
@@ -49,6 +67,7 @@ export type AuditEvent =
   | 'rejected'
   | 'executed'
   | 'failed'
+  | 'outcome'
   | 'duplicate-ignored';
 
 export interface AuditEntry {
@@ -69,4 +88,9 @@ export type ProposeResult =
 
 export type DecisionResult =
   | { ok: true; action: ProposedAction }
+  | { ok: false; reason: string };
+
+/** Result of recording a real-world outcome; `reward` is what fed the loop. */
+export type OutcomeResult =
+  | { ok: true; action: ProposedAction; reward: number }
   | { ok: false; reason: string };

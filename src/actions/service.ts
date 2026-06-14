@@ -25,9 +25,26 @@ import type {
   ProposeResult,
   DecisionResult,
   AuditEvent,
+  ActionOutcome,
+  OutcomeResult,
 } from './types.js';
 
 const nowIso = (): string => new Date().toISOString();
+
+/**
+ * The reward each real-world outcome contributes to the loop. Magnitudes are
+ * deliberate: a conversion (the action produced its intended result) is the
+ * strongest positive; a reply is engagement but weaker; ignored is a mild
+ * negative; an error or revert is a full negative. These feed the SAME [-1,1]
+ * reward currency the reranker and eval candidates already consume.
+ */
+const OUTCOME_REWARD: Record<ActionOutcome, number> = {
+  converted: 1,
+  replied: 0.5,
+  ignored: -0.25,
+  error: -1,
+  reverted: -1,
+};
 
 export interface ProposeInput {
   /** Short human label for the action. */
@@ -215,6 +232,55 @@ export class ActionService {
       scopes: [],
     });
     return { ok: true, action: rejected };
+  }
+
+  /**
+   * THE SIGNAL RUNG — record the real-world outcome of a delivered action.
+   *
+   * Approve/reject closes the loop on a human's yes; this closes it on what
+   * actually happened after the action landed. The outcome flows into the same
+   * reward currency that drives the retrieval reranker and eval candidates,
+   * carrying the action's grounding sources — so a draft that got a reply or a
+   * conversion boosts the records that produced it, and one that bounced demotes
+   * them. That is what makes "Adapt → Compound" close on reality, not just intent.
+   *
+   * Guard: only an EXECUTED action has an outcome — you can't measure the
+   * consequence of something that never left the system.
+   */
+  async recordOutcome(input: {
+    id: string;
+    outcome: ActionOutcome;
+    evidence?: string;
+    scopes?: string[];
+  }): Promise<OutcomeResult> {
+    const action = await this.store.get(input.id);
+    if (!action) return { ok: false, reason: 'Action not found.' };
+    if (action.status !== 'executed') {
+      return { ok: false, reason: `Action is "${action.status}", not executed — no real-world outcome to record yet.` };
+    }
+    const reward = OUTCOME_REWARD[input.outcome];
+    await getFeedbackStore().record({
+      kind: 'outcome',
+      query: action.title,
+      answer: action.body,
+      verdict: reward >= 0 ? 'helpful' : 'unhelpful',
+      reward,
+      scopes: input.scopes ?? [],
+      sources: action.sources.map((s) => s.source),
+    });
+    const updated: ProposedAction = {
+      ...action,
+      outcome: input.outcome,
+      outcomeAt: nowIso(),
+      outcomeEvidence: input.evidence,
+    };
+    await this.store.update(updated);
+    await this.log(
+      updated,
+      'outcome',
+      `outcome=${input.outcome} (reward ${reward})${input.evidence ? `: ${input.evidence.slice(0, 120)}` : ''}`,
+    );
+    return { ok: true, action: updated, reward };
   }
 
   list(): Promise<ProposedAction[]> {

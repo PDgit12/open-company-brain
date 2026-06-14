@@ -155,7 +155,25 @@ export async function createMcpServer(): Promise<McpServer> {
       const all = await actions.list();
       const a = all.find((x) => x.id === id) ?? all.find((x) => x.id.startsWith(id));
       if (!a) return { content: [{ type: 'text', text: `No action ${id}.` }] };
-      return { content: [{ type: 'text', text: `${a.title}: ${a.status}${a.effect ? ` — ${a.effect}` : ''}` }] };
+      const outcome = a.outcome ? ` · outcome: ${a.outcome}` : '';
+      return { content: [{ type: 'text', text: `${a.title}: ${a.status}${a.effect ? ` — ${a.effect}` : ''}${outcome}` }] };
+    },
+  );
+
+  // ── SIGNAL: report the real-world outcome of a delivered action ─────────────
+  server.tool(
+    'record_outcome',
+    "Report what ACTUALLY happened after an executed action landed in the world — did it get a reply, convert, get ignored, error, or have to be reverted. This is the Signal rung: it feeds the brain's reward currency, so the records that grounded a winning action rank higher next time and a losing one demotes them. Use it once you know the result; only works on an executed action.",
+    {
+      id: z.string().describe('The action id (from propose_action / submit_action).'),
+      outcome: z.enum(['replied', 'converted', 'ignored', 'error', 'reverted']).describe('What happened after delivery.'),
+      evidence: z.string().optional().describe('Optional note, e.g. "manager replied: approved".'),
+      scopes: z.string().optional().describe('Scopes the action lived in (so the reward is gated correctly).'),
+    },
+    async ({ id, outcome, evidence, scopes }) => {
+      const r = await actions.recordOutcome({ id, outcome, evidence, scopes: resolveScopes(scopes) });
+      if (!r.ok) return { content: [{ type: 'text', text: `Could not record outcome: ${r.reason}` }] };
+      return { content: [{ type: 'text', text: `Recorded outcome "${outcome}" for ${r.action.title} (reward ${r.reward}). The loop adjusted: grounding sources re-weighted.` }] };
     },
   );
 

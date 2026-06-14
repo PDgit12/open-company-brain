@@ -20,8 +20,13 @@ export type Verdict = 'approved' | 'rejected' | 'helpful' | 'unhelpful';
 export interface FeedbackEvent {
   id: string;
   at: string;
-  /** 'answer' (Q&A/brief feedback) or 'action' (approve/reject of a write). */
-  kind: 'answer' | 'action';
+  /**
+   * 'answer' (Q&A/brief feedback), 'action' (approve/reject of a write at
+   * decision time), or 'outcome' (the measured real-world result AFTER a
+   * delivered action — the Signal rung that closes the loop on reality, not
+   * just on a human's yes).
+   */
+  kind: 'answer' | 'action' | 'outcome';
   query: string;
   answer: string;
   verdict: Verdict;
@@ -127,8 +132,12 @@ export class InMemoryFeedbackStore implements FeedbackStore {
     const allowed = new Set(scopes);
     const out = new Map<string, number>();
     for (const e of this.events) {
-      // Same gate as exemplars: only human answers, never unscoped (no [] bypass).
-      if (e.kind !== 'answer' || !e.sources?.length) continue;
+      // Reward flows from Q&A verdicts AND real-world action OUTCOMES — both
+      // carry the citation sources that grounded them, so a source whose draft
+      // got a reply/conversion is boosted and one whose draft bounced is demoted.
+      // Action approve/reject (kind 'action') is deliberately excluded: it's a
+      // decision-time yes, not a measured result, and carries no sources.
+      if ((e.kind !== 'answer' && e.kind !== 'outcome') || !e.sources?.length) continue;
       if (!(e.scopes.length > 0 && e.scopes.every((s) => allowed.has(s)))) continue;
       // Reward flows to every source the answer cited — positive boosts, negative demotes.
       for (const s of e.sources) out.set(s, (out.get(s) ?? 0) + e.reward);
