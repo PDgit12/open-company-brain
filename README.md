@@ -43,11 +43,14 @@ comb run --agent builtin "what does our handbook say about X?"   # grounded or r
            "MCP_PRINCIPAL": "you", "MCP_SCOPES": "default-team" } } } }
 ```
 
-Your agent gains governed tools — **read** (`search_brain`, `find_skill`), **write**
-(`ingest`, `record_skill`, `record_fact`), **act** (`submit_action` — you draft, Comb
-governs approval → execute → audit), **prove** (`query_runs`,
-`list_divergence_candidates`). Semantic (vector) recall + a local/cloud model are an
-**opt‑in upgrade** (`LLM_BACKEND=local` / `openai`), never required.
+Your agent gains 15 governed tools — **read** (`search_brain`, `find_skill`,
+`list_sources`, `list_intents`), **write** (`ingest`, `record_fact`, `record_skill`),
+**act** (`propose_action` / `submit_action` — you draft, Comb governs approval →
+execute → audit), and **prove + learn** (`query_runs`, `declare_intent`,
+`list_divergence_candidates`, and `record_outcome` — report what actually happened
+after an action lands so the brain re‑weights the records that produced a win).
+Semantic (vector) recall + a local/cloud model are an **opt‑in upgrade**
+(`LLM_BACKEND=local` / `openai`), never required.
 
 ---
 
@@ -90,8 +93,9 @@ Most agent platforms are **agent‑centric and single‑user** (one smart assist
 that grows with you). Comb is **governance‑centric, multi‑agent, and
 organizational** — a substrate a whole company's agents run on:
 
-- ⚖️ **Governed by default** — access scopes enforced in SQL on every read, a durable audit trail, and a human‑approved (or rate‑capped policy‑approved) action layer, all in the kernel so every agent inherits them.
-- 🎯 **Refusal decided in code, not by the model** — a **calibrated grounding floor** (`comb calibrate`) gates every generation: thin retrieval → deterministic refusal *before* the model runs. Cite‑or‑refuse that holds on the real vector path.
+- ⚖️ **Governed by default** — access scopes enforced on every read (in SQL on the Postgres path), a durable audit trail, and a human‑approved (or rate‑capped policy‑approved) action layer, all in the kernel so every agent inherits them.
+- 🎯 **Refusal decided in code, not by the model** — a **calibrated grounding floor** (`comb calibrate`) gates every generation: thin retrieval → deterministic refusal *before* the model runs. Cite‑or‑refuse that holds on the default keyword path and the opt‑in vector path.
+- 🔁 **A loop that compounds, not just executes** — most agents stop at *execute* and forget every run. Comb records the **real outcome** of an approved action (`record_outcome`: replied · converted · ignored · error · reverted) and feeds it into the reward that re‑ranks retrieval and grows the eval set — so the brain *appreciates* with use instead of going stale.
 - 🧪 **Agentic evals built in** — `comb eval` asserts behaviour (cites · refuses · tool use · budgets · scope), plus a live LLM‑judge layer; `comb promote` turns any production failure into a permanent regression test.
 - 🔬 **Observability** — every run traced (`comb runs` / `comb trace`): steps, tokens, latency; failure‑shaped runs triaged with `--failed`.
 - 🔌 **Bring any model & any tool** — local Ollama ($0/query) **or any OpenAI‑compatible key** (OpenAI, Groq, Together, OpenRouter, LM Studio, vLLM); connect any API or MCP server into one namespaced toolset. Dynamic context window, token budgets, response caching, retries.

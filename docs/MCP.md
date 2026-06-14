@@ -40,14 +40,44 @@ For a source checkout, use your local build instead of npx:
 
 ## Tools
 
-All are access-scoped and obey the cite-or-refuse trust contract.
+All 15 are access-scoped and obey the cite-or-refuse trust contract. Every
+connection carries a principal (`MCP_PRINCIPAL` + `MCP_SCOPES`): scopes authorize,
+the principal attributes.
+
+**READ**
 
 | Tool | What it does | Who generates |
 |---|---|---|
 | `search_brain` | governed retrieval — returns the top records + provenance + score | the **host's** model synthesizes (cheap) |
-| `ask_brain` | a grounded, cited answer from the brain's own model | **Comb** |
-| `ingest` | add knowledge (also fires fan-out agents) | — |
+| `ask_brain` | a grounded, cited answer from the brain's own model | **Comb** (opt-in model) |
+| `find_skill` | trigger-matched "how X is done" procedures | — |
 | `list_sources` | provenance sources the caller can see | — |
+
+**WRITE** (host structures, Comb stores — model-free)
+
+| Tool | What it does |
+|---|---|
+| `ingest` | add raw knowledge (also fires fan-out agents) |
+| `record_fact` | store one structured, scoped fact |
+| `record_skill` | store a named procedure with trigger keywords |
+
+**ACT** (you draft, Comb governs)
+
+| Tool | What it does |
+|---|---|
+| `propose_action` | Comb drafts a grounded action (refused if no grounding) → approval queue |
+| `submit_action` | you supply the body + the sources you grounded on → approval queue |
+| `action_status` | check an action's status and effect |
+
+**LOOP — intent · divergence · outcome**
+
+| Tool | What it does |
+|---|---|
+| `declare_intent` | declare what *should* be happening (goal/spec/policy/procedure) |
+| `list_intents` | the declared intents visible to the caller |
+| `list_divergence_candidates` | new reality that overlaps an intent (model-free) — the host judges |
+| `record_outcome` | report what *actually happened* after a delivered action (replied/converted/ignored/error/reverted) → re-weights the records that grounded it |
+| `query_runs` | the audit/observability trail — status, tokens, latency, classification |
 
 ## Two ways your agent "runs"
 
