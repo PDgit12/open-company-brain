@@ -258,10 +258,18 @@ export async function createMcpServer(): Promise<McpServer> {
     {
       title: z.string().describe('Short label.'),
       body: z.string().describe('The full drafted content you want approved and sent.'),
+      sources: z.string().optional().describe('Comma-separated source labels you grounded this on (from search_brain). Carrying them lets record_outcome later re-weight exactly those records — this is what makes the loop compound.'),
       scopes: z.string().optional(),
     },
-    async ({ title, body }) => {
-      const r = await actions.proposeDirect({ title, body, sources: [], by: principalName() });
+    async ({ title, body, sources }) => {
+      // Carry the host's grounding sources so a later record_outcome can reward
+      // the exact records that produced this action (the Adapt->Compound wire).
+      const refs = (sources ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((source) => ({ text: '', source }));
+      const r = await actions.proposeDirect({ title, body, sources: refs, by: principalName() });
       return { content: [{ type: 'text', text: r.ok ? `Submitted (${r.action.status}): id=${r.action.id} — awaits approval (comb actions).` : `Rejected: ${r.reason}` }] };
     },
   );
