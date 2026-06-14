@@ -14,7 +14,6 @@
  * is missing, this script detects the provider error and tells you exactly that.
  */
 
-import { Langbase } from 'langbase';
 import { config, describeMode } from '../config.js';
 import { SYSTEM_PROMPT } from '../agents/prompts.js';
 import { createMemoryStore } from './memory.js';
@@ -32,6 +31,10 @@ export async function setupLive(): Promise<void> {
   if (config.memoryMode !== 'live' || !config.langbase.apiKey) {
     throw new Error('Not in live mode — set LANGBASE_API_KEY in .env first.');
   }
+  // Lazy SDK load: this live-setup script is the only caller, and it only runs
+  // when langbase is explicitly configured — so the generation tree never loads
+  // for the model-free default.
+  const { Langbase } = await import('langbase');
   const lb = new Langbase({ apiKey: config.langbase.apiKey });
   const memoryName = config.langbase.memoryName;
   const wantModel = config.langbase.embeddingModel;

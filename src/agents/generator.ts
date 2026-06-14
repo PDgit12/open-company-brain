@@ -8,7 +8,7 @@
  *     the showcase work with zero credentials AND makes the contract testable.
  */
 
-import { Langbase } from 'langbase';
+import type { Langbase } from 'langbase';
 import { config } from '../config.js';
 import { postJson } from '../harness/http.js';
 import { SYSTEM_PROMPT } from './prompts.js';
@@ -61,16 +61,29 @@ export class MockGenerator implements Generator {
 }
 
 export class LangbasePipe implements Generator {
-  private readonly lb: Langbase;
+  private readonly apiKey: string;
   private readonly pipeName: string;
+  private lb: Langbase | undefined;
 
   constructor(apiKey: string, pipeName: string) {
-    this.lb = new Langbase({ apiKey });
+    this.apiKey = apiKey;
     this.pipeName = pipeName;
   }
 
+  // Lazy SDK load — keeps the langbase/openai/node-fetch tree out of module
+  // load so the model-free default never pays for a generation backend it
+  // doesn't use. Only invoked when the langbase backend is actually selected.
+  private async client(): Promise<Langbase> {
+    if (!this.lb) {
+      const { Langbase } = await import('langbase');
+      this.lb = new Langbase({ apiKey: this.apiKey });
+    }
+    return this.lb;
+  }
+
   async generate({ prompt }: GenerateInput): Promise<string> {
-    const res = await this.lb.pipes.run({
+    const lb = await this.client();
+    const res = await lb.pipes.run({
       name: this.pipeName,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

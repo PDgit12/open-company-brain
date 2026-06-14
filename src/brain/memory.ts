@@ -1,21 +1,26 @@
 /**
  * The recall layer — the brain's semantic memory.
  *
- * `MemoryStore` is the interface the rest of the brain depends on. Two impls:
+ * `MemoryStore` is the interface the rest of the brain depends on. Five impls,
+ * one seam — the factory (`createMemoryStore`) picks by config:
  *
- *   • LangbaseMemoryStore — real managed RAG: documents are embedded and stored
- *     in Langbase Memory; retrieval is vector similarity + metadata filter.
+ *   • FileKeywordMemoryStore — MODEL-FREE DEFAULT: keyword overlap over scoped
+ *     chunks, persisted to .comb/. No embedder, no model, $0/query (ARCHITECTURE
+ *     §9). The host agent brings the intelligence; Comb finds the right chunks.
+ *   • MockMemoryStore — the in-memory rung of the persistence ladder (§4): same
+ *     keyword-overlap scoring, but documents live in an array. Zero-credential
+ *     and deterministic — what tests and the `mock` backend use. No file I/O.
+ *   • FileVectorMemoryStore / PgVectorMemoryStore — OPT-IN semantic upgrade for
+ *     deployments that accept an embedder (local Ollama → file or pgvector).
+ *   • LangbaseMemoryStore — OPT-IN managed RAG via the Langbase SDK (lazy-loaded
+ *     so the model-free default never pulls the generation tree into module load).
  *
- *   • MockMemoryStore — zero-credential, deterministic: documents live in an
- *     array; retrieval is keyword overlap scoring + the SAME metadata filter.
- *     Good enough to show the end-to-end shape (and to test it) without a key.
- *
- * CRITICAL SEAM: both impls filter on META_ACCESS using the exact key written by
+ * CRITICAL SEAM: every impl filters on META_ACCESS using the exact key written by
  * the templating layer. Access control is only as real as this agreement.
  */
 
 import path from 'node:path';
-import { Langbase } from 'langbase';
+import type { Langbase } from 'langbase';
 import pg from 'pg';
 import { config } from '../config.js';
 import { META_ACCESS, META_SOURCE } from '../constants.js';
@@ -169,19 +174,36 @@ export class MockMemoryStore implements MemoryStore {
  * name differs in your installed version you fix it here and nowhere else.
  */
 export class LangbaseMemoryStore implements MemoryStore {
-  private readonly lb: Langbase;
+  private readonly apiKey: string;
   private readonly memoryName: string;
+  private lb: Langbase | undefined;
   private ensured = false;
 
   constructor(apiKey: string, memoryName: string) {
-    this.lb = new Langbase({ apiKey });
+    this.apiKey = apiKey;
     this.memoryName = memoryName;
+  }
+
+  /**
+   * Lazily construct the SDK on first use. The `langbase` package drags in the
+   * legacy OpenAI/node-fetch tree — keeping it out of module load means the
+   * model-free default path (FileKeywordMemoryStore) never pulls it in. This is
+   * the dependency-graph expression of the locked posture: the default runs no
+   * model. Only a deployment that actually selects the langbase backend pays.
+   */
+  private async client(): Promise<Langbase> {
+    if (!this.lb) {
+      const { Langbase } = await import('langbase');
+      this.lb = new Langbase({ apiKey: this.apiKey });
+    }
+    return this.lb;
   }
 
   private async ensureMemory(): Promise<void> {
     if (this.ensured) return;
+    const lb = await this.client();
     try {
-      await this.lb.memories.create({
+      await lb.memories.create({
         name: this.memoryName,
         description: 'Comb — semantic recall layer',
         embedding_model: config.langbase.embeddingModel,
@@ -195,11 +217,12 @@ export class LangbaseMemoryStore implements MemoryStore {
   async upsert(docs: MemoryDocument[]): Promise<number> {
     assertScoped(docs);
     await this.ensureMemory();
+    const lb = await this.client();
     for (const d of docs) {
       // Langbase requires a valid filename with an allowed extension. Our ids
       // look like "company:1"; turn them into "company-1.txt".
       const documentName = `${d.id.replace(/[^a-z0-9_-]+/gi, '-')}.txt`;
-      await this.lb.memories.documents.upload({
+      await lb.memories.documents.upload({
         memoryName: this.memoryName,
         documentName,
         contentType: 'text/plain',
@@ -212,7 +235,8 @@ export class LangbaseMemoryStore implements MemoryStore {
 
   async retrieve(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
     await this.ensureMemory();
-    const results = await this.lb.memories.retrieve({
+    const lb = await this.client();
+    const results = await lb.memories.retrieve({
       memory: [{ name: this.memoryName }],
       query: opts.query,
       topK: opts.topK ?? 8,
