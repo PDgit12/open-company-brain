@@ -4,6 +4,43 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.7.0] — 2026-06-15
+
+The model-free release: Comb runs no model by default, the connected agent over
+MCP is the intelligence, and the closed loop now learns from real outcomes.
+
+### Added — the closed loop that compounds
+- **`record_outcome` (15th MCP tool)**: report the real-world result of a
+  delivered action (`replied | converted | ignored | error | reverted`). The
+  outcome feeds the same reward currency that drives the retrieval reranker and
+  eval candidates, carrying the action's grounding sources — so a draft that
+  worked boosts the records that produced it and one that bounced demotes them.
+  This is the Signal rung: the loop closes on reality, not just a human's "yes".
+- **`submit_action` now carries `sources`**: the host passes the labels it
+  grounded on, so the outcome reward can re-weight exactly those records on the
+  model-free path (it was inert before — `sources` was empty).
+
+### Changed — model-free by default
+- **`COMB_RETRIEVAL` defaults to `keyword`** (was `vector`): out of the box Comb
+  resolves to the file-persistent `FileKeywordMemoryStore` — no embedder, no
+  model, $0/query. Vector/semantic recall is the opt-in upgrade behind the seam.
+- **Lazy generation deps**: the `langbase` SDK is dynamically imported, so the
+  default path never loads the OpenAI/node-fetch tree (also removes the
+  `punycode` deprecation warning from the default runtime and the test suite).
+
+### Fixed
+- **Keyword over-refusal**: added a light symmetric suffix stemmer so the default
+  keyword retriever matches `refunds`→`refund` instead of refusing.
+- **Skill-usage write amplification**: `find_skill` batched into one write via
+  `bumpUsesMany` (was k sequential read+write cycles per query).
+- **SSRF guard** on URL ingest; removed a self-referential package dependency;
+  MCP server version now reads from `package.json` (single source).
+
+### Verified
+- Real no-mock e2e (`test/loop-e2e.test.ts`) drives the full loop through a
+  genuine MCP client on real file stores. 246 tests pass; typecheck, lint, build
+  green. Value-prop core covered 92–100%.
+
 ## [0.5.0] — 2026-06-11
 
 The production-trust release: refusal decided in code, agents built from one
