@@ -22,7 +22,7 @@ import { draftAgent } from '../agents/architect.js';
 import { buildBirthKit, saveBirthKit, commission } from '../agents/lifecycle.js';
 import { getIntentStore, type IntentKind } from '../intents/registry.js';
 import { getSkillStore } from '../skills/registry.js';
-import { listDivergences } from '../divergence/engine.js';
+import { listDivergences, listCandidates } from '../divergence/engine.js';
 import { DEMO_COMPANY } from '../seed/demo-company.js';
 import { isUrl, fetchUrl } from '../connectors/url.js';
 import { ActionService as ActionSvc } from '../actions/service.js';
@@ -42,7 +42,8 @@ import {
   type CalibrationPoint,
   type LabeledQuery,
 } from '../brain/grounding.js';
-import { readFile, writeFile, rm } from 'node:fs/promises';
+import { readFile, writeFile, rm, stat, readdir } from 'node:fs/promises';
+import path from 'node:path';
 import pg from 'pg';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
@@ -565,12 +566,25 @@ async function listIntents(scopes: string[]): Promise<void> {
 
 /** `comb divergences` — the COMPARE stage's verdicts (flags + silent record). */
 async function showDivergences(): Promise<void> {
-  const all = await listDivergences(20);
-  if (!all.length) {
-    stdout.write(`${dim('No divergence checks yet — declare an intent, then ingest reality.')}\n`);
+  // Two layers: model-free CANDIDATES (always detected at ingest, the host
+  // judges) and model-judged VERDICTS (only on a model-capable backend). The
+  // candidates are the part that works with no model, so surface them first —
+  // without this the CLI looked empty on the model-free default.
+  const [candidates, all] = await Promise.all([listCandidates(undefined, 20), listDivergences(20)]);
+  if (!candidates.length && !all.length) {
+    stdout.write(`${dim('No divergence checks yet. Declare an intent FIRST, then ingest reality:')}\n`);
+    stdout.write(`${dim('  comb intent "..." --kind policy   then   comb ingest <reality>')}\n`);
     return;
   }
-  stdout.write(`\n${butter('◆')} ${bold('Divergence verdicts')} ${dim(`· ${all.length} recent`)}\n`);
+  if (candidates.length) {
+    stdout.write(`\n${butter('◆')} ${bold('Divergence candidates')} ${dim(`· ${candidates.length} · model-free — you judge`)}\n`);
+    for (const c of candidates) {
+      stdout.write(`  ${coral('⚑')} ${gray(`intent: ${c.intentStatement.slice(0, 50)}`)} ${dim(`(overlap ${(c.overlap * 100).toFixed(0)}%)`)}\n`);
+      stdout.write(`    ${dim(`reality (${c.source}):`)} ${gray(c.evidence.slice(0, 74))}\n`);
+    }
+  }
+  if (!all.length) return;
+  stdout.write(`\n${butter('◆')} ${bold('Divergence verdicts')} ${dim(`· ${all.length} · model-judged`)}\n`);
   for (const d of all) {
     const badge = d.status === 'diverged' ? coral('⚑ DIVERGED') : d.status === 'aligned' ? butter('✓ aligned') : gray('· silent');
     stdout.write(`  ${badge}  ${dim(d.at.slice(0, 19).replace('T', ' '))}  ${gray(`intent: ${d.intentStatement.slice(0, 48)}`)}\n`);
@@ -619,38 +633,80 @@ async function listAgents(): Promise<void> {
  * else text). Same governed path as the HTTP webhook: chunk → embed → store
  * with the caller's scope; fan-out reactions run if configured.
  */
+/** Supported ingest formats, by extension. */
+const INGEST_EXTS = new Set(['txt', 'md', 'csv', 'json']);
+const formatFor = (f: string): 'text' | 'csv' | 'json' => {
+  const ext = (f.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
+  return ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
+};
+const baseName = (f: string): string => f.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+
+/** Recursively collect ingestable files under a directory. */
+async function collectFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...(await collectFiles(full)));
+    else if (INGEST_EXTS.has((entry.name.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase())) out.push(full);
+  }
+  return out.sort();
+}
+
 async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
   const positional = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1] ?? '').startsWith('--'));
-  const file = positional[0];
-  if (!file) {
-    stdout.write(gray('usage: comb ingest <file> [--source name] [--scope s]\n'));
+  const target = positional[0];
+  if (!target) {
+    stdout.write(gray('usage: comb ingest <file|folder|url> [--source name] [--scope s]\n'));
     process.exit(1);
   }
   const si = argv.indexOf('--source');
   const sci = argv.indexOf('--scope');
-  const source = si !== -1 ? (argv[si + 1] ?? '') : file.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+  const sourceOverride = si !== -1 ? (argv[si + 1] ?? '') : undefined;
   const scope = sci !== -1 ? (argv[sci + 1] ?? '') : scopes[0]!;
-  // A data source can be a LINK: fetch + reduce to text, same pipeline after.
-  let content: string;
-  let resolvedSource = source;
-  let format: 'text' | 'csv' | 'json';
-  if (isUrl(file)) {
-    const page = await fetchUrl(file);
-    content = page.text;
-    if (si === -1) resolvedSource = page.source; // default source = origin
-    format = 'text';
+
+  // Resolve the work list: a URL, a directory of docs, or a single file. A
+  // folder is the obvious first move ("point it at my docs"), so support it.
+  let files: string[];
+  const url = isUrl(target);
+  if (url) {
+    files = [target];
   } else {
-    const ext = (file.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
-    format = ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
-    content = await readFile(file, 'utf8');
+    const info = await stat(target);
+    files = info.isDirectory() ? await collectFiles(target) : [target];
+    if (!files.length) {
+      stdout.write(gray(`no .txt/.md/.csv/.json files under ${target}\n`));
+      return;
+    }
   }
+
   const brain = await Brain.create();
   const spin = new Spinner();
-  spin.start(`embedding ${file}`);
-  const r = await brain.ingest({ format, content, source: resolvedSource, scope }, [scope]);
-  spin.stop();
-  stdout.write(`${butter('✓')} ingested ${bold(String(r.ingested))} record${r.ingested === 1 ? '' : 's'}  ${dim(`· source=${r.source} · scope=${r.scope} · format=${format}`)}\n`);
-  if (r.reactions.length) stdout.write(`  ${dim('fan-out reactions ran:')} ${r.reactions.length}\n`);
+  let total = 0;
+  let reactions = 0;
+  for (const f of files) {
+    let content: string;
+    let format: 'text' | 'csv' | 'json';
+    let source: string;
+    if (url) {
+      const page = await fetchUrl(f);
+      content = page.text;
+      format = 'text';
+      source = sourceOverride ?? page.source;
+    } else {
+      format = formatFor(f);
+      content = await readFile(f, 'utf8');
+      source = sourceOverride ?? baseName(f);
+    }
+    spin.start(`embedding ${f}`);
+    const r = await brain.ingest({ format, content, source, scope }, [scope]);
+    spin.stop();
+    total += r.ingested;
+    reactions += r.reactions.length;
+    if (files.length > 1) stdout.write(`  ${butter('✓')} ${dim(`${baseName(f)} (${r.ingested})`)}\n`);
+  }
+  const from = files.length === 1 ? '' : ` ${dim(`from ${files.length} files`)}`;
+  stdout.write(`${butter('✓')} ingested ${bold(String(total))} record${total === 1 ? '' : 's'}${from}  ${dim(`· scope=${scope}`)}\n`);
+  if (reactions) stdout.write(`  ${dim('fan-out reactions ran:')} ${reactions}\n`);
   stdout.write(`${dim('Ask about it:')} ${bold(`comb run --agent builtin "<question>" --scopes ${scope}`)}\n`);
 }
 

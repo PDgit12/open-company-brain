@@ -10,11 +10,12 @@
  */
 process.env.NODE_NO_WARNINGS = '1';
 
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access, mkdir } from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 import path from 'node:path';
 
 const ENV = '.env';
@@ -232,6 +233,7 @@ ${h('Data & tools')}
     ${c('connect <name> -- <cmd>')} ${d('plug in any MCP server or API')}
 ${h('Setup')}
     ${c('init')}                 ${d('guided setup — create .env, add your keys')}
+    ${c('install <client>')}     ${d('connect Comb to claude·claude-code·cursor·vscode·windsurf')}
     ${c('doctor')}               ${d('which backend is live and what’s missing')}
     ${c('demo')}                 ${d('(npm run demo) web console + HTTP API at :4000')}
     ${c('mcp')}                  ${d('expose this brain to other agents over MCP')}
@@ -240,9 +242,86 @@ ${h('Setup')}
 `);
 }
 
+/**
+ * `comb install <client>` — write the MCP config into an AI tool so Comb shows up
+ * as native tools, no JSON archaeology. The install experience IS the first
+ * impression of the product, so it is one command with a clear "you're connected"
+ * end state. The block uses the clean, model-free, NO-SEED config (your data
+ * only) and pins an ABSOLUTE data dir so the tool and `comb ingest` share one brain.
+ */
+const SHARED_BRAIN = path.join(os.homedir(), '.comb-brain');
+const MCP_ENV = {
+  LLM_BACKEND: 'mock',
+  COMB_SEED_DEMO: 'off',
+  COMB_RETRIEVAL: 'keyword',
+  COMB_DATA_DIR: SHARED_BRAIN,
+  MCP_PRINCIPAL: 'you',
+  MCP_SCOPES: 'default-team',
+};
+
+function clientTarget(client) {
+  const home = os.homedir();
+  const darwin = process.platform === 'darwin';
+  const appSupport = darwin ? path.join(home, 'Library/Application Support') : path.join(home, '.config');
+  switch (client) {
+    case 'claude':
+    case 'claude-desktop':
+      return { file: path.join(appSupport, 'Claude/claude_desktop_config.json'), shape: 'mcpServers', restart: 'Restart Claude Desktop.' };
+    case 'claude-code':
+      return { file: path.join(process.cwd(), '.mcp.json'), shape: 'mcpServers', restart: 'Reopen this project in Claude Code (check `claude mcp list`).' };
+    case 'cursor':
+      return { file: path.join(home, '.cursor/mcp.json'), shape: 'mcpServers', restart: 'Restart Cursor.' };
+    case 'windsurf':
+      return { file: path.join(home, '.codeium/windsurf/mcp_config.json'), shape: 'mcpServers', restart: 'Restart Windsurf.' };
+    case 'vscode':
+      return { file: path.join(process.cwd(), '.vscode/mcp.json'), shape: 'vscode', restart: 'Reload VS Code; start the server in Copilot agent mode.' };
+    default:
+      return null;
+  }
+}
+
+async function installClient(client) {
+  if (!client) {
+    console.log('\n  Usage:  comb install <claude|claude-code|cursor|vscode|windsurf>\n');
+    return;
+  }
+  const t = clientTarget(client);
+  if (!t) {
+    console.log(`\n  ✗ Unknown client "${client}".  Supported: claude · claude-code · cursor · vscode · windsurf\n`);
+    return;
+  }
+  let json = {};
+  if (await exists(t.file)) {
+    try {
+      json = JSON.parse(await readFile(t.file, 'utf8'));
+    } catch {
+      console.log(`  ! ${t.file} wasn't valid JSON — leaving it; add the block by hand.`);
+      return;
+    }
+  }
+  if (t.shape === 'vscode') {
+    json.servers = json.servers || {};
+    json.servers.comb = { type: 'stdio', command: 'comb', args: ['mcp'], env: { ...MCP_ENV } };
+  } else {
+    json.mcpServers = json.mcpServers || {};
+    json.mcpServers.comb = { command: 'comb', args: ['mcp'], env: { ...MCP_ENV } };
+  }
+  await mkdir(path.dirname(t.file), { recursive: true });
+  await writeFile(t.file, JSON.stringify(json, null, 2) + '\n');
+  console.log(`\n  ✓ Connected Comb to ${client}`);
+  console.log(`    wrote   ${t.file}`);
+  console.log(`    server  "comb" · model-free (keyword, $0/query) · your data only · scope=${MCP_ENV.MCP_SCOPES}`);
+  console.log(`    brain   ${SHARED_BRAIN}  (shared with the CLI)`);
+  console.log(`\n  Feed the SAME brain the tool reads:`);
+  console.log(`    COMB_DATA_DIR=${SHARED_BRAIN} comb ingest <your-folder> --source handbook`);
+  console.log(`\n  ${t.restart}`);
+  console.log(`  Then ask your agent:  "search the brain for <something you ingested>"\n`);
+}
+
 const cmd = process.argv[2] ?? 'help';
 const run = () => {
   if (cmd === 'init') return init();
+  if (cmd === 'install') return installClient(process.argv[3]);
   if (cmd === 'doctor') return doctor();
   if (cmd === 'mcp') return mcp();
   if (cmd === 'tools') return toolsCmd([]);

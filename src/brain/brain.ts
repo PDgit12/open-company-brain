@@ -108,7 +108,9 @@ export class Brain {
    */
   static async create(): Promise<Brain> {
     const memory = createMemoryStore();
-    if (config.backend === 'mock') {
+    // Seed demo notes only on the mock backend AND only when not disabled — so a
+    // real brain (e.g. an MCP connection from `comb install`) holds your data only.
+    if (config.backend === 'mock' && config.comb.seedDemo) {
       await memory.upsert(demoDocuments());
     }
     // Grounding policy is resolved once at boot: calibrated per-embedding-model
