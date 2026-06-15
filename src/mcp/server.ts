@@ -95,7 +95,7 @@ export async function createMcpServer(): Promise<McpServer> {
       // default (no model) it can't deliver that — so say so and point to the
       // intended flow (search_brain + the host's model) instead of returning a
       // confusing template that looks like a real answer.
-      if (config.backend === 'mock') {
+      if (!config.generationEnabled) {
         return {
           content: [
             {
@@ -154,6 +154,11 @@ export async function createMcpServer(): Promise<McpServer> {
       scopes: z.string().optional().describe('Comma-separated access scopes.'),
     },
     async ({ title, instruction, query, scopes }) => {
+      // propose_action has COMB draft the body, which needs a model. On the
+      // model-free default, the host drafts instead — point to submit_action.
+      if (!config.generationEnabled) {
+        return { content: [{ type: 'text', text: 'propose_action drafts the body with a model, which is not configured. On the model-free setup, draft it yourself and call submit_action (you provide the body; Comb governs approval + audit). Or set LLM_BACKEND=local/openai.' }] };
+      }
       const r = await actions.propose({ title, instruction, query, by: principalName() }, resolveScopes(scopes));
       if (!r.ok) return { content: [{ type: 'text', text: `REFUSED: ${r.reason}` }] };
       return { content: [{ type: 'text', text: `Proposed (${r.action.status}): id=${r.action.id}\nDraft:\n${r.action.body.slice(0, 800)}` }] };

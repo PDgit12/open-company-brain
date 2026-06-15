@@ -16,6 +16,13 @@ import type { RetrievedChunk } from '../brain/memory.js';
 
 export const NO_CONTEXT_REPLY = "I don't have that in the brain yet.";
 
+/** Returned by generation surfaces when no real model is configured — so a real
+ *  user gets honest guidance to the working paths, never a faked mock answer. */
+export const NO_MODEL_MESSAGE =
+  'No generation model is configured, so Comb will not fabricate an answer. ' +
+  'Use search_brain to get the cited records and let your connected agent (Claude/Cursor) write the answer, ' +
+  'or set LLM_BACKEND=local (Ollama) or openai to let Comb generate.';
+
 /**
  * The DRAFTING system role. Grounding is already verified by the gate before
  * generation, so this prompt must NOT tell the model to refuse (the Q&A

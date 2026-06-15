@@ -12,6 +12,7 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Brain } from '../brain/brain.js';
 import { config, describeMode } from '../config.js';
+import { NO_MODEL_MESSAGE } from '../agents/generator.js';
 import { createFabric } from '../tools/assemble.js';
 import { pickAgent, type AgentKind } from './run.js';
 import { getCustomAgentStore, resolveAgent, type CustomAgent } from '../agents/registry.js';
@@ -903,6 +904,14 @@ async function main(): Promise<void> {
     const si = argv.indexOf('--suite');
     const runId = argv.find((a) => a.startsWith('run_')) ?? rest[0];
     return promoteRun(runId, si !== -1 ? (argv[si + 1] ?? DEFAULT_REGRESSION_SUITE) : DEFAULT_REGRESSION_SUITE, argv.includes('--expect-refusal'));
+  }
+
+  // run/chat GENERATE an answer — refuse to fake it without a real model. The
+  // deterministic generator is for demo/tests only and must never reach a real
+  // user as if it were a real answer. Use MCP (your agent answers) or set a model.
+  if ((mode === 'run' || mode === 'chat') && !config.generationEnabled) {
+    stdout.write(`${coral('✗')} ${NO_MODEL_MESSAGE}\n`);
+    process.exit(1);
   }
 
   // Resolve the active model's real context window before any agent is built —

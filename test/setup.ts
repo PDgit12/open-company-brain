@@ -14,6 +14,10 @@ process.env.LLM_BACKEND = 'mock';
 // deterministic fixture, so opt in here. Suites that assert a clean/empty brain
 // set COMB_SEED_DEMO='off' themselves (e.g. loop-e2e).
 process.env.COMB_SEED_DEMO = 'on';
+// Tests exercise the generation surfaces with the deterministic generator (a
+// test double). Real users on the mock backend get an honest "no model" message
+// instead; this opt-in keeps the suite exercising the real generation paths.
+process.env.COMB_DEMO_GENERATION = 'on';
 // Leave the write path open by default so the keyless ingest tests stay 200.
 // The auth-enabled path is tested in isolation (ingest-auth.test.ts) with
 // vi.resetModules + a fresh config import.

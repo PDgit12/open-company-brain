@@ -53,7 +53,7 @@
     "dev": "tsx watch src/server/index.ts",
     "start": "node dist/server/index.js",
     "build": "tsc -p tsconfig.json",
-    "demo": "tsx src/server/index.ts",
+    "demo": "COMB_SEED_DEMO=on COMB_DEMO_GENERATION=on tsx src/server/index.ts",
     "setup:live": "tsx src/brain/setup-live.ts",
     "setup:local": "tsx src/brain/setup-local.ts",
     "mcp": "tsx src/mcp/server.ts",

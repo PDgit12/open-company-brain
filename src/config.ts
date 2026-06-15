@@ -92,6 +92,10 @@ const EnvSchema = z.object({
   // suite (which use the seed as a fixture). The sample corpus is also loadable
   // on demand with `comb demo-data`. Never seeds on real backends regardless.
   COMB_SEED_DEMO: z.enum(['on', 'off']).default('off'),
+  // Opt-in for the deterministic test/demo generator on the mock backend. OFF
+  // for real users (generation surfaces refuse with an honest "no model" message
+  // instead of faking an answer). `comb demo` and the test suite turn it on.
+  COMB_DEMO_GENERATION: z.enum(['on', 'off']).default('off'),
   // Per-scope generation token budget. 0 = unlimited (default). When > 0, a
   // saved agent run that would exceed the budget for its scope refuses instead.
   COMB_TOKEN_BUDGET_PER_SCOPE: z.coerce.number().int().min(0).default(0),
@@ -144,8 +148,17 @@ const hasOpenAi = Boolean(env.OPENAI_API_KEY);
 const backend: 'mock' | 'langbase' | 'local' | 'openai' =
   env.LLM_BACKEND !== 'auto' ? env.LLM_BACKEND : hasOpenAi ? 'openai' : hasLangbase ? 'langbase' : 'mock';
 
+// Is a REAL generation model available? The mock backend has only the
+// deterministic test/demo formatter, which must never reach a real user as if
+// it were an answer. So generation is "available" on a real backend, OR when the
+// explicit demo/test opt-in (COMB_DEMO_GENERATION) is set. Real users on the
+// mock backend without that flag get an honest "no model" message, not a fake.
+const generationEnabled = backend !== 'mock' || env.COMB_DEMO_GENERATION === 'on';
+
 export const config = {
   port: env.PORT,
+  /** True when a real model is configured (or demo/test generation is opted in). */
+  generationEnabled,
   demoUserAccessScope: env.DEMO_USER_ACCESS_SCOPE,
 
   /** Resolved backend: 'mock' | 'langbase' | 'local' | 'openai'. Factories switch on this. */

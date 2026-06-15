@@ -52,6 +52,7 @@ import { getReactionAgentStore } from '../fanout/registry.js';
 import { getFanoutResultStore } from '../fanout/engine.js';
 import { ingestAuth, type AuthedRequest } from './auth.js';
 import { readConfig, writeConfig } from '../config/settings.js';
+import { NO_MODEL_MESSAGE } from '../agents/generator.js';
 import { config, describeMode } from '../config.js';
 import { logger } from '../observability/logger.js';
 
@@ -143,6 +144,8 @@ export async function createApp(): Promise<express.Express> {
   app.post('/api/ask', asyncRoute(async (req, res) => {
     const parsed = AskBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'question is required' });
+    // No real model → don't fabricate. Point to search + the connected agent.
+    if (!config.generationEnabled) return res.json({ answer: NO_MODEL_MESSAGE, sources: [], modelFree: true });
     return res.json(await brain.ask(parsed.data.question, callerScopes(req)));
   }));
 
@@ -162,6 +165,7 @@ export async function createApp(): Promise<express.Express> {
   app.post('/api/ask/stream', asyncRoute(async (req, res) => {
     const parsed = AskBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'question is required' });
+    if (!config.generationEnabled) return res.json({ answer: NO_MODEL_MESSAGE, sources: [], modelFree: true });
     // Generate BEFORE opening the SSE stream, so a generation error returns a
     // clean 500 via the error handler instead of a half-written stream.
     const { answer, sources } = await brain.ask(parsed.data.question, callerScopes(req));
@@ -241,6 +245,7 @@ export async function createApp(): Promise<express.Express> {
   app.post('/api/agents/run', asyncRoute(async (req, res) => {
     const parsed = AgentRunBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'instruction and query are required' });
+    if (!config.generationEnabled) return res.json({ answer: NO_MODEL_MESSAGE, sources: [], modelFree: true });
     const { instruction, query } = parsed.data;
     const { text, sources } = await brain.draft(query, instruction, callerScopes(req));
     return res.json({ answer: text, sources });
