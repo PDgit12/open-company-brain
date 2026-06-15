@@ -86,10 +86,12 @@ const EnvSchema = z.object({
   // token budgets, and the response cache live here as JSON when no Postgres is
   // configured. Gitignored; mirrors ACTION_OUTBOX_PATH's local-file philosophy.
   COMB_DATA_DIR: z.string().trim().default('.comb'),
-  // Seed a few demo notes on boot (mock backend only) so a fresh console isn't
-  // blank. Turn 'off' for a real brain that should hold ONLY your ingested data
-  // (e.g. an MCP connection via `comb install`). Never seeds on real backends.
-  COMB_SEED_DEMO: z.enum(['on', 'off']).default('on'),
+  // Seed demo notes on boot (mock backend only). DEFAULT OFF: a real brain holds
+  // ONLY the data you ingest — no mock/sample records ever leak into a real
+  // user's brain. Turn 'on' explicitly for the zero-setup demo and the test
+  // suite (which use the seed as a fixture). The sample corpus is also loadable
+  // on demand with `comb demo-data`. Never seeds on real backends regardless.
+  COMB_SEED_DEMO: z.enum(['on', 'off']).default('off'),
   // Per-scope generation token budget. 0 = unlimited (default). When > 0, a
   // saved agent run that would exceed the budget for its scope refuses instead.
   COMB_TOKEN_BUDGET_PER_SCOPE: z.coerce.number().int().min(0).default(0),

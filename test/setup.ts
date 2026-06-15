@@ -9,6 +9,11 @@ process.env.LANGBASE_API_KEY = '';
 process.env.DATABASE_URL = '';
 process.env.VECTOR_DATABASE_URL = '';
 process.env.LLM_BACKEND = 'mock';
+// The demo seed is OFF by default for real users (a real brain holds only the
+// data they ingest — no mock records leak in). Tests use the seed as a
+// deterministic fixture, so opt in here. Suites that assert a clean/empty brain
+// set COMB_SEED_DEMO='off' themselves (e.g. loop-e2e).
+process.env.COMB_SEED_DEMO = 'on';
 // Leave the write path open by default so the keyless ingest tests stay 200.
 // The auth-enabled path is tested in isolation (ingest-auth.test.ts) with
 // vi.resetModules + a fresh config import.
