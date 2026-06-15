@@ -101,7 +101,7 @@ comb reject <id> "reason"
 ```bash
 comb init                                     # guided
 ```
-- Webapp **Settings** tab or `POST /api/config`: change backend (mock/local/openai/langbase), retrieval (keyword/vector), keys, and **Amazon S3 Vectors (BYO — your own bucket)**. Persisted to `.env`; applied on restart.
+- Webapp **Settings** tab or `POST /api/config`: change backend (model-free/local/openai/langbase), retrieval (keyword/vector), keys, and **Amazon S3 Vectors (BYO — your own bucket)**. Persisted to `.env`; applied on restart.
 
 ### Stage 8 — Observe, test, harden (Operator)
 ```bash

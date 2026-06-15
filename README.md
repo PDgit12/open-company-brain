@@ -44,7 +44,7 @@ comb skill "Handle a refund" --body "verify order → check policy → credit �
 // Claude Desktop / Cursor MCP config
 { "mcpServers": { "comb": {
   "command": "comb", "args": ["mcp"],
-  "env": { "LLM_BACKEND": "mock", "COMB_RETRIEVAL": "keyword",
+  "env": { "LLM_BACKEND": "modelfree", "COMB_RETRIEVAL": "keyword",
            "MCP_PRINCIPAL": "you", "MCP_SCOPES": "default-team" } } } }
 ```
 
@@ -184,7 +184,7 @@ No code change — set `LLM_BACKEND`:
 
 | Backend | What | Cost |
 |---|---|---|
-| `mock` | deterministic, offline — zero credentials (tests & demos) | $0 |
+| `modelfree` | **default** — Comb runs no model; your connected agent answers over MCP. Keyword retrieval, zero credentials | **$0 / query** |
 | `local` | Ollama generation + Ollama embeddings + pgvector | **$0 / query** |
 | `openai` | **bring your own key** — any OpenAI‑compatible endpoint (OpenAI, Groq, Together, OpenRouter, LM Studio, vLLM) + pgvector | your key |
 | `langbase` | managed Memory + Pipes | usage |
@@ -207,7 +207,7 @@ POST /api/actions/propose       { title, instruction, query }          human-app
 ## Development
 
 ```bash
-npm test          # vitest (176 tests, hermetic mock mode)
+npm test          # vitest (269 tests, hermetic — offline test double)
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint
 npm run build     # → dist/
@@ -222,7 +222,7 @@ auto‑approve (rate‑capped)** · library export · **MCP host** · **bring‑
 harness** · **prompt‑to‑agent (`comb new`)** + wizard · per‑agent **memory with
 poisoning hygiene** · **token budgets · dynamic context window · response caching ·
 retries/keep‑alive** · **agentic evals + LLM judge + prod→eval promote loop** ·
-**run traces** · four backends (mock · local · **any OpenAI‑compatible key** · Langbase).
+**run traces** · backends: **model-free** (default, no model) · local (Ollama) · **any OpenAI‑compatible key** · Langbase.
 
 Next: web dashboard (maintenance · analytics · brain graph) · structured JSON
 output for automation platforms · delivery providers (Slack/email) · resumable

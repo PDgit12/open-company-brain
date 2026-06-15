@@ -689,7 +689,13 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
   const from = files.length === 1 ? '' : ` ${dim(`from ${files.length} files`)}`;
   stdout.write(`${butter('✓')} ingested ${bold(String(total))} record${total === 1 ? '' : 's'}${from}  ${dim(`· scope=${scope}`)}\n`);
   if (reactions) stdout.write(`  ${dim('fan-out reactions ran:')} ${reactions}\n`);
-  stdout.write(`${dim('Ask about it:')} ${bold(`comb run --agent builtin "<question>" --scopes ${scope}`)}\n`);
+  // Honest next step: model-free, the connected agent answers (comb run would
+  // refuse without a model). Only point at comb run when a model is configured.
+  if (config.generationEnabled) {
+    stdout.write(`${dim('Ask about it:')} ${bold(`comb run "<question>" --scopes ${scope}`)}\n`);
+  } else {
+    stdout.write(`${dim('Now ask in your connected AI tool')} ${bold('(it calls search_brain)')}${dim(` — or set a model (LLM_BACKEND=local/openai) to use `)}${bold('comb run')}.\n`);
+  }
 }
 
 /**

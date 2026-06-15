@@ -32,7 +32,7 @@ export function sharedBrainDir(home: string = os.homedir()): string {
  */
 export function mcpServerEnv(dataDir: string, scopes = 'default-team'): Record<string, string> {
   return {
-    LLM_BACKEND: 'mock',
+    LLM_BACKEND: 'modelfree',
     COMB_SEED_DEMO: 'off',
     COMB_RETRIEVAL: 'keyword',
     COMB_DATA_DIR: dataDir,

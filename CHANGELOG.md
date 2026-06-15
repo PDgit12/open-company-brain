@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.7.1] — 2026-06-16
+
+Consistency + packaging pass — one honest story across CLI, npm, GitHub, and the
+product itself. No core behavior change.
+
+### Changed
+- **"mock" is gone from every user-facing surface.** Users now see **model-free**
+  everywhere (`LLM_BACKEND=modelfree`, `comb doctor`, the MCP/CLI banners, the
+  webapp Settings, the README backends table). "mock" remains only as the
+  internal test-double alias; it resolves identically. Real users never see it.
+- **CLI identity unified** — `comb --help` now says "the company brain that powers
+  a closed loop" (was the old "agentic OS harness"), matching README/GitHub/npm.
+- **Honest post-ingest hint** — points to your connected agent / search on the
+  model-free path instead of `comb run` (which is gated without a model).
+- **Accurate mode banner** — `recall=keyword`, `generation=none (your agent
+  answers)` instead of the misleading `recall=mock`.
+
+### Fixed
+- **npm description** updated to the model-free company-brain positioning (it had
+  reverted to the old Langbase/Ollama framing).
+- **S3 Vectors ships again** — `@aws-sdk/client-s3vectors` is back in
+  `optionalDependencies`, so the BYO-S3 feature works for users who enable it
+  (it had slipped to devDependencies only → `Cannot find module` at runtime).
+
+### Verified
+- Published 0.7.0 installed cold from npm and ran the full golden path (install →
+  ingest → MCP → search). typecheck + lint + build green, 269 tests / 3 skipped.
+
 ## [0.7.0] — 2026-06-15
 
 The model-free release: Comb runs no model by default, the connected agent over

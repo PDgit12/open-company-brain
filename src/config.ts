@@ -30,7 +30,10 @@ const EnvSchema = z.object({
   // embeddings + pgvector): $0/query. `openai` = BRING YOUR OWN KEY: any
   // OpenAI-compatible endpoint (OpenAI, Groq, Together, OpenRouter, LM Studio,
   // vLLM) via OPENAI_BASE_URL — one protocol covers nearly every provider.
-  LLM_BACKEND: z.enum(['auto', 'mock', 'langbase', 'local', 'openai']).default('auto'),
+  // 'modelfree' is the user-facing name for "Comb runs no model" (the connected
+  // agent is the intelligence). 'mock' is the internal test-double alias for the
+  // same state — both resolve identically; users only ever see "model-free".
+  LLM_BACKEND: z.enum(['auto', 'modelfree', 'mock', 'langbase', 'local', 'openai']).default('auto'),
   OPENAI_API_KEY: z.string().trim().optional().or(z.literal('').transform(() => undefined)),
   OPENAI_BASE_URL: z.string().trim().url().default('https://api.openai.com/v1'),
   OPENAI_MODEL: z.string().trim().default('gpt-4o-mini'),
@@ -146,7 +149,18 @@ const hasOpenAi = Boolean(env.OPENAI_API_KEY);
 // Resolve the backend: explicit wins; `auto` prefers a BYO key (openai) over
 // langbase, else mock. `local` is always explicit (it needs Ollama running).
 const backend: 'mock' | 'langbase' | 'local' | 'openai' =
-  env.LLM_BACKEND !== 'auto' ? env.LLM_BACKEND : hasOpenAi ? 'openai' : hasLangbase ? 'langbase' : 'mock';
+  env.LLM_BACKEND === 'modelfree' || env.LLM_BACKEND === 'mock'
+    ? 'mock'
+    : env.LLM_BACKEND !== 'auto'
+      ? env.LLM_BACKEND
+      : hasOpenAi
+        ? 'openai'
+        : hasLangbase
+          ? 'langbase'
+          : 'mock';
+
+/** User-facing backend name — "modelfree" instead of the internal "mock". */
+const backendLabel = backend === 'mock' ? 'modelfree' : backend;
 
 // Is a REAL generation model available? The mock backend has only the
 // deterministic test/demo formatter, which must never reach a real user as if
@@ -163,6 +177,8 @@ export const config = {
 
   /** Resolved backend: 'mock' | 'langbase' | 'local' | 'openai'. Factories switch on this. */
   backend,
+  /** User-facing backend name ("modelfree" instead of internal "mock"). */
+  backendLabel,
 
   /** BYO key: any OpenAI-compatible endpoint (OpenAI, Groq, Together, vLLM…). */
   openai: {
@@ -238,8 +254,10 @@ export const config = {
 
 /** Human-readable banner so it's never ambiguous which mode is live. */
 export function describeMode(): string {
-  return [
-    `recall=${config.memoryMode}`,
-    `generation=${config.pipeMode}`,
-  ].join('  ');
+  // Recall reflects the ACTUAL retrieval path: keyword (model-free default) is
+  // real, not "mock" — only say mock when the in-memory mock store is truly used.
+  const recall = config.comb.retrieval === 'keyword' ? 'keyword' : config.memoryMode;
+  const generation = generationEnabled ? config.pipeMode : 'none (your agent answers)';
+  const mode = backend === 'mock' ? 'model-free' : backend;
+  return [`mode=${mode}`, `recall=${recall}`, `generation=${generation}`].join('  ');
 }

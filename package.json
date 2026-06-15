@@ -1,7 +1,7 @@
 {
   "name": "open-company-brain",
-  "version": "0.7.0",
-  "description": "An open-source, governed AI brain framework: pipe ANY data in (paste, upload, or a workflow webhook like n8n), it becomes scoped, embedded, cited, retrievable knowledge — then ask grounded questions, build no-code agents, and fan agents out automatically over new data, all cite-or-refuse with a human-approved action layer. Embeddable as a library or run as a server. Three backends — mock (no creds), managed (Langbase), and fully local (Ollama + pgvector, $0/query).",
+  "version": "0.7.1",
+  "description": "The open-source company brain that powers a closed loop — model-free, over MCP. Your AI tool (Claude, Cursor, Copilot) answers from your docs with citations or refuses; record how-work-gets-done as skills, govern real actions with human approval + an audit trail, and let the loop learn from outcomes. Comb runs no model of its own — bring your own model, data, and infra.",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -77,7 +77,8 @@
     "zod": "^3.24.1"
   },
   "optionalDependencies": {
-    "@aws-sdk/client-s3vectors": "^3.1068.0"
+    "@aws-sdk/client-s3vectors": "^3.1068.0",
+    "gpt-tokenizer": "^3.4.0"
   },
   "devDependencies": {
     "@aws-sdk/client-s3vectors": "^3.1068.0",
@@ -92,8 +93,5 @@
     "typescript-eslint": "^8.19.0",
     "vitest": "^2.1.8"
   },
-  "license": "MIT",
-  "optionalDependencies": {
-    "gpt-tokenizer": "^3.4.0"
-  }
+  "license": "MIT"
 }

@@ -102,7 +102,7 @@ describe('HTTP API (mock backend)', () => {
     const res = await fetch(`${base}/api/config`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.backend).toBe('mock');
+    expect(body.backend).toBe('modelfree'); // user-facing label, never the internal "mock"
     expect(typeof body.openaiKeySet).toBe('boolean'); // a boolean, not the key
     expect(body).not.toHaveProperty('OPENAI_API_KEY');
   });

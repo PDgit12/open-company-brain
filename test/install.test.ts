@@ -23,7 +23,7 @@ describe('comb install — client targets + config merge', () => {
   it('mcpServerEnv is the model-free, no-seed, your-data-only config', () => {
     const env = mcpServerEnv('/data/brain', 'finance');
     expect(env).toEqual({
-      LLM_BACKEND: 'mock',
+      LLM_BACKEND: 'modelfree', // user-facing name (never "mock")
       COMB_SEED_DEMO: 'off', // a real brain holds only the user's data
       COMB_RETRIEVAL: 'keyword', // $0/query, no model
       COMB_DATA_DIR: '/data/brain',

@@ -59,7 +59,9 @@ function resolveBackend(map) {
   const lb = Boolean(map.LANGBASE_API_KEY && map.LANGBASE_API_KEY.trim());
   const oa = Boolean(map.OPENAI_API_KEY && map.OPENAI_API_KEY.trim());
   const explicit = (map.LLM_BACKEND || 'auto').trim();
-  if (explicit && explicit !== 'auto') return explicit; // mock | langbase | local | openai
+  // 'modelfree' is the user-facing name for the no-model state (internal 'mock').
+  if (explicit === 'modelfree' || explicit === 'mock') return 'mock';
+  if (explicit && explicit !== 'auto') return explicit; // langbase | local | openai
   return oa ? 'openai' : lb ? 'langbase' : 'mock';
 }
 
@@ -68,8 +70,10 @@ function reportMode(map) {
   const lb = Boolean(map.LANGBASE_API_KEY && map.LANGBASE_API_KEY.trim());
   const db = Boolean(map.DATABASE_URL && map.DATABASE_URL.trim());
   const vec = Boolean((map.VECTOR_DATABASE_URL && map.VECTOR_DATABASE_URL.trim()) || db);
+  const retrieval = (map.COMB_RETRIEVAL || 'keyword').trim();
+  const label = backend === 'mock' ? 'model-free' : backend;
   console.log('\n  Configuration');
-  console.log(`   • backend          ${backend}  (LLM_BACKEND=${map.LLM_BACKEND || 'auto'})`);
+  console.log(`   • mode             ${label}  (LLM_BACKEND=${map.LLM_BACKEND || 'auto'})`);
 
   if (backend === 'local') {
     console.log(`   ✓ Ollama           ${map.OLLAMA_BASE_URL || 'http://localhost:11434'}  (gen=${map.OLLAMA_GENERATION_MODEL || 'llama3.2:1b'}, embed=${map.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text'})`);
@@ -87,14 +91,18 @@ function reportMode(map) {
     return;
   }
 
-  console.log(`   ${lb ? '✓' : '○'} Langbase API key   ${lb ? 'set — managed recall + generation' : 'blank → mock mode'}`);
-  console.log(`   ${db ? '✓' : '○'} DATABASE_URL       ${db ? 'set — your Postgres' : 'blank → in-memory seed data'}`);
   if (backend === 'langbase') {
+    console.log(`   ${lb ? '✓' : '○'} Langbase API key   ${lb ? 'set — managed recall + generation' : 'blank'}`);
     console.log('   ! Langbase Memory also needs an embedding-provider key (e.g. OpenAI/Google)');
     console.log('     configured in your Langbase account — separate from any LLM key.');
+    console.log(`\n  Mode: langbase  recall=live  generation=live`);
+    return;
   }
-  const mode = backend === 'langbase' ? 'live' : 'mock';
-  console.log(`\n  Mode: recall=${mode}  generation=${mode}  data=${db ? 'postgres' : 'seed'}`);
+  // model-free (the default): no model, the connected agent answers; keyword
+  // retrieval over your own data ($0/query, nothing seeded).
+  console.log('   ✓ model-free       Comb runs no model — your connected AI tool (Claude/Cursor) answers over MCP.');
+  console.log(`   • retrieval        ${retrieval}${retrieval === 'keyword' ? '  ($0/query, no embedder)' : ''}`);
+  console.log(`\n  Mode: model-free  recall=${retrieval}  generation=none (your agent answers)  data=your-own`);
 }
 
 async function init() {
@@ -104,7 +112,7 @@ async function init() {
 
   if (stdin.isTTY) {
     const rl = createInterface({ input: stdin, output: stdout });
-    console.log('\n  Press Enter to skip any key (it will run in mock mode).\n');
+    console.log('\n  Press Enter to skip any key (it stays model-free — your agent answers over MCP).\n');
     const key = (await rl.question('  Langbase API key: ')).trim();
     if (key) text = setEnvLine(text, 'LANGBASE_API_KEY', key);
     const db = (await rl.question('  Postgres DATABASE_URL (optional): ')).trim();
@@ -192,8 +200,8 @@ function help() {
   const d = (s) => dim(s);
   const h = (s) => `\n  ${butter('◆')} ${bold(s)}\n  ${dim('─'.repeat(60))}`;
   console.log(`
-  ${butter('◆')} ${bold('comb')} ${dim('· your company’s agentic OS harness')}
-  ${dim('Claude Code, but for your own agents — governed, cited, evaluated.')}
+  ${butter('◆')} ${bold('comb')} ${dim('· the company brain that powers a closed loop')}
+  ${dim('Model-free, over MCP: your AI tool answers from your docs — cited, or refused.')}
 
   ${dim('Usage:')} comb ${coral('<command>')} [options]
 ${h('Build agents')}

@@ -57,7 +57,7 @@ export interface SafeConfig {
 
 export function readConfig(): SafeConfig {
   return {
-    backend: config.backend,
+    backend: config.backendLabel, // user-facing ("modelfree", never "mock")
     retrieval: config.comb.retrieval,
     openaiKeySet: Boolean(config.openai.apiKey),
     langbaseKeySet: Boolean(config.langbase.apiKey),
