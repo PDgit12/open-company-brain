@@ -51,6 +51,7 @@ import { getCustomAgentStore } from '../agents/registry.js';
 import { getReactionAgentStore } from '../fanout/registry.js';
 import { getFanoutResultStore } from '../fanout/engine.js';
 import { ingestAuth, type AuthedRequest } from './auth.js';
+import { readConfig, writeConfig } from '../config/settings.js';
 import { config, describeMode } from '../config.js';
 import { logger } from '../observability/logger.js';
 
@@ -189,6 +190,23 @@ export async function createApp(): Promise<express.Express> {
       // the brain itself is fine; the input could not be parsed/accepted.
       return res.status(400).json({ ok: false, error: err instanceof Error ? err.message : 'Could not ingest.' });
     }
+  }));
+
+  // Config: read the current backend/retrieval/keys-set (no secret values) and
+  // change them without hand-editing .env. GET is safe (no secrets); POST is a
+  // sensitive write (it sets keys) so it carries the same auth as ingest, and
+  // takes effect on restart (config is parsed once at boot).
+  app.get('/api/config', asyncRoute(async (_req, res) => {
+    return res.json(readConfig());
+  }));
+  app.post('/api/config', ingestAuth, asyncRoute(async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    if (typeof body !== 'object' || Array.isArray(body)) return res.status(400).json({ error: 'expected an object of settings' });
+    const result = await writeConfig(body);
+    if (!result.updated.length) {
+      return res.status(400).json({ ok: false, error: 'no valid settings to update', rejected: result.rejected });
+    }
+    return res.json({ ok: true, ...result, note: 'Saved to .env — restart Comb for changes to take effect.' });
   }));
 
   // Feedback: a thumbs up/down on an answer. Fuels the few-shot + reranker loops.
