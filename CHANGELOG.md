@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.7.3] — 2026-06-16
+
+### Fixed
+- **Dockerfile removed** (leaning into the no-Docker default) cascaded two broken
+  references — now fixed: `render.yaml` deploys as a **Node service** (no Docker),
+  and the README points to `docker-compose.yml` (still present, for the opt-in
+  pgvector backend) instead of the deleted Dockerfile. "Deploy to Render" works
+  again; no doc references a file that doesn't exist.
+
 ## [0.7.2] — 2026-06-16
 
 Documentation consistency — one honest story across the README, the npm page, and

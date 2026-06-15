@@ -1,18 +1,21 @@
 # Render Blueprint — one-click deploy. https://render.com/docs/blueprint-spec
-# Click "Deploy to Render", and it provisions the web service from the Dockerfile.
-# The brain boots in mock mode with zero config; add LANGBASE_API_KEY / DATABASE_URL
-# in the Render dashboard to go live.
+# Click "Deploy to Render" and it provisions a Node web service (no Docker needed).
+# The brain boots model-free with zero config; set OPENAI_API_KEY / DATABASE_URL /
+# COMB_S3_VECTOR_* in the Render dashboard only if you opt into a model or vector store.
 services:
   - type: web
     name: company-brain
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     plan: free
     healthCheckPath: /health
     envVars:
       - key: PORT
         value: 4000
-      - key: LANGBASE_API_KEY
+      - key: COMB_RETRIEVAL
+        value: keyword
+      - key: OPENAI_API_KEY
         sync: false
       - key: DATABASE_URL
         sync: false

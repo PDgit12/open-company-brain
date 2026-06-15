@@ -22,9 +22,9 @@ brings the intelligence; Comb is the governed substrate underneath.
 
 ## Run it model‑free
 
-No model, no database, no Docker **needed** — just Node. Retrieval is keyword‑based;
-**your AI host does the thinking** over MCP. (Postgres/pgvector and the included
-Dockerfile come into play only if you opt into the local vector backend.)
+No model, no database, no Docker — just Node. Retrieval is keyword‑based; **your AI
+host does the thinking** over MCP. (Postgres/pgvector — via the included
+`docker-compose.yml` — comes into play only if you opt into the local vector backend.)
 
 ```bash
 npm i -g open-company-brain                       # the `comb` command
