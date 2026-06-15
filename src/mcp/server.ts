@@ -91,6 +91,20 @@ export async function createMcpServer(): Promise<McpServer> {
       scopes: z.string().optional().describe('Comma-separated access scopes; defaults to the configured scope.'),
     },
     async ({ question, scopes }) => {
+      // Honest gate: ask_brain is Comb's OWN generation. On the model-free
+      // default (no model) it can't deliver that — so say so and point to the
+      // intended flow (search_brain + the host's model) instead of returning a
+      // confusing template that looks like a real answer.
+      if (config.backend === 'mock') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'ask_brain needs a generation model, which is not configured on this model-free setup. Use search_brain instead and write the answer yourself from the cited records — that is the intended model-free flow. (To enable ask_brain, set LLM_BACKEND=local or openai.)',
+            },
+          ],
+        };
+      }
       const { answer, sources } = await brain.ask(question, resolveScopes(scopes));
       const cites = [...new Set(sources.map((s) => s.source))];
       const suffix = cites.length ? `\n\nSources: ${cites.map((s) => `[${s}]`).join(' ')}` : '';

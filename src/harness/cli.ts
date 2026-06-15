@@ -42,8 +42,8 @@ import {
   type CalibrationPoint,
   type LabeledQuery,
 } from '../brain/grounding.js';
-import { readFile, writeFile, rm, stat, readdir } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { collectFiles, formatFor, baseName } from './ingest-files.js';
 import pg from 'pg';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
@@ -633,25 +633,6 @@ async function listAgents(): Promise<void> {
  * else text). Same governed path as the HTTP webhook: chunk → embed → store
  * with the caller's scope; fan-out reactions run if configured.
  */
-/** Supported ingest formats, by extension. */
-const INGEST_EXTS = new Set(['txt', 'md', 'csv', 'json']);
-const formatFor = (f: string): 'text' | 'csv' | 'json' => {
-  const ext = (f.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
-  return ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
-};
-const baseName = (f: string): string => f.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
-
-/** Recursively collect ingestable files under a directory. */
-async function collectFiles(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await collectFiles(full)));
-    else if (INGEST_EXTS.has((entry.name.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase())) out.push(full);
-  }
-  return out.sort();
-}
-
 async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
   const positional = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1] ?? '').startsWith('--'));
   const target = positional[0];
