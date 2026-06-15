@@ -55,6 +55,13 @@ const EnvSchema = z.object({
   // DATABASE_URL if unset, so one Postgres can serve both data + vectors.
   VECTOR_DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
   DATABASE_URL: z.string().trim().url().optional().or(z.literal('').transform(() => undefined)),
+  // Amazon S3 Vectors (BYO — the customer's OWN bucket/index/region/creds). When
+  // both are set and retrieval=vector, embeddings are written to THEIR S3 vector
+  // index; Comb stores nothing on our infra. Creds come from the standard AWS
+  // chain (env / IAM / profile). Region defaults to us-east-1.
+  COMB_S3_VECTOR_BUCKET: z.string().trim().optional().or(z.literal('').transform(() => undefined)),
+  COMB_S3_VECTOR_INDEX: z.string().trim().optional().or(z.literal('').transform(() => undefined)),
+  COMB_AWS_REGION: z.string().trim().default('us-east-1'),
   DEMO_USER_ACCESS_SCOPE: z.string().trim().default('default-team'),
   // Ingest webhook auth. When INGEST_API_KEY is set, POST /api/ingest and the
   // fan-out config routes require it (Authorization: Bearer <key> or x-api-key),
@@ -205,6 +212,12 @@ export const config = {
     httpRetries: env.COMB_HTTP_RETRIES,
     groundingMargin: env.COMB_GROUNDING_MARGIN,
     retrieval: env.COMB_RETRIEVAL,
+  },
+  /** Amazon S3 Vectors (BYO). bucket+index set + retrieval=vector → S3 store. */
+  s3: {
+    bucket: env.COMB_S3_VECTOR_BUCKET,
+    index: env.COMB_S3_VECTOR_INDEX,
+    region: env.COMB_AWS_REGION,
   },
 } as const;
 

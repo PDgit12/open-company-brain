@@ -470,6 +470,111 @@ export class FileKeywordMemoryStore implements MemoryStore {
   }
 }
 
+// ─── Amazon S3 Vectors (BYO — the customer's own AWS account) ────────────────
+
+/** Metadata key the chunk's text is stashed under in the S3 vector record. */
+const S3_TEXT_KEY = '__text';
+
+/**
+ * Vector recall backed by Amazon S3 Vectors — serverless, scale-out, and
+ * crucially BRING-YOUR-OWN: the bucket, index, region, and IAM creds are the
+ * CUSTOMER's. Comb writes embeddings to THEIR S3 vector index and stores nothing
+ * on our infrastructure (the model-free / your-data posture extends to storage).
+ *
+ * The AWS SDK is lazy-loaded so the model-free default never pulls it in; it's an
+ * optional dependency, installed only by deployments that choose this backend.
+ * Access control is the same seam as every store: META_ACCESS filtered in-app as
+ * a hard backstop after the similarity query.
+ *
+ * NOTE: distance→similarity assumes the index uses the COSINE metric (the
+ * recommended default); score = 1 - distance, clamped to [0,1].
+ */
+export class S3VectorsMemoryStore implements MemoryStore {
+  private readonly embedder: Embedder;
+  // Typed loosely: the SDK client type is only available behind the lazy import.
+  private client: unknown;
+
+  constructor(
+    private readonly bucket: string,
+    private readonly index: string,
+    private readonly region: string,
+    embedder?: Embedder,
+    private readonly minScore = 0,
+  ) {
+    this.embedder = embedder ?? createEmbedder();
+  }
+
+  private async sdk(): Promise<{ client: unknown; mod: typeof import('@aws-sdk/client-s3vectors') }> {
+    const mod = await import('@aws-sdk/client-s3vectors');
+    if (!this.client) this.client = new mod.S3VectorsClient({ region: this.region });
+    return { client: this.client, mod };
+  }
+
+  async upsert(docs: MemoryDocument[]): Promise<number> {
+    assertScoped(docs);
+    if (!docs.length) return 0;
+    const { client, mod } = await this.sdk();
+    const embeddings = await this.embedder.embed(docs.map((d) => d.text));
+    const vectors = docs.map((d, i) => ({
+      key: d.id,
+      data: { float32: embeddings[i]! },
+      metadata: { ...d.metadata, [S3_TEXT_KEY]: d.text },
+    }));
+    // PutVectors caps at 500 vectors per call — chunk so a large ingest succeeds.
+    for (let i = 0; i < vectors.length; i += 500) {
+      await (client as InstanceType<typeof mod.S3VectorsClient>).send(
+        new mod.PutVectorsCommand({ vectorBucketName: this.bucket, indexName: this.index, vectors: vectors.slice(i, i + 500) }),
+      );
+    }
+    return docs.length;
+  }
+
+  async retrieve(opts: RetrieveOptions): Promise<RetrievedChunk[]> {
+    const { client, mod } = await this.sdk();
+    const [q] = await this.embedder.embed([opts.query]);
+    const res = await (client as InstanceType<typeof mod.S3VectorsClient>).send(
+      new mod.QueryVectorsCommand({
+        vectorBucketName: this.bucket,
+        indexName: this.index,
+        queryVector: { float32: q! },
+        topK: opts.topK ?? 8,
+        returnMetadata: true,
+        returnDistance: true,
+      }),
+    );
+    const allowed = new Set(opts.accessScopes);
+    return (res.vectors ?? [])
+      .map((v): RetrievedChunk => {
+        const metadata = (v.metadata ?? {}) as Record<string, string>;
+        const score = typeof v.distance === 'number' ? Math.max(0, Math.min(1, 1 - v.distance)) : 0;
+        return { text: metadata[S3_TEXT_KEY] ?? '', source: metadata[META_SOURCE] ?? 'unknown', metadata, score };
+      })
+      // Hard access backstop (same seam as every store) + the calibrated floor.
+      .filter((c) => allowed.has(c.metadata[META_ACCESS] ?? ''))
+      .filter((c) => c.score >= this.minScore);
+  }
+
+  async stats(accessScopes: string[]): Promise<SourceCount[]> {
+    const { client, mod } = await this.sdk();
+    const allowed = new Set(accessScopes);
+    const counts = new Map<string, number>();
+    let nextToken: string | undefined;
+    do {
+      const res: { nextToken?: string; vectors?: { metadata?: unknown }[] } = await (
+        client as InstanceType<typeof mod.S3VectorsClient>
+      ).send(new mod.ListVectorsCommand({ vectorBucketName: this.bucket, indexName: this.index, returnMetadata: true, nextToken }));
+      for (const v of res.vectors ?? []) {
+        const meta = (v.metadata ?? {}) as Record<string, string>;
+        if (!allowed.has(meta[META_ACCESS] ?? '')) continue;
+        const src = meta[META_SOURCE] ?? 'unknown';
+        counts.set(src, (counts.get(src) ?? 0) + 1);
+      }
+      nextToken = res.nextToken;
+    } while (nextToken);
+    return [...counts].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
+  }
+}
+
 export function createMemoryStore(opts: { minScoreOverride?: number } = {}): MemoryStore {
   // MODEL-FREE posture (explicit): keyword recall, no embedder, file-persistent,
   // regardless of backend. This is the MCP-first no-model product mode.
@@ -481,6 +586,10 @@ export function createMemoryStore(opts: { minScoreOverride?: number } = {}): Mem
   // with NO database, so `npm i -g` + Ollama just works. Same contract either way.
   if (config.backend === 'openai' || config.backend === 'local') {
     const score = opts.minScoreOverride ?? config.ollama.minScore;
+    // BYO Amazon S3 Vectors takes priority when configured (customer's own AWS).
+    if (config.s3.bucket && config.s3.index) {
+      return new S3VectorsMemoryStore(config.s3.bucket, config.s3.index, config.s3.region, undefined, score);
+    }
     return config.ollama.vectorDatabaseUrl
       ? new PgVectorMemoryStore(config.ollama.vectorDatabaseUrl, undefined, score)
       : new FileVectorMemoryStore(config.comb.dataDir, undefined, score);
