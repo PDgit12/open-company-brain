@@ -1,6 +1,6 @@
 {
   "name": "open-company-brain",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "The open-source company brain that powers a closed loop — model-free, over MCP. Your AI tool (Claude, Cursor, Copilot) answers from your docs with citations or refuses; record how-work-gets-done as skills, govern real actions with human approval + an audit trail, and let the loop learn from outcomes. Comb runs no model of its own — bring your own model, data, and infra.",
   "type": "module",
   "main": "dist/index.js",

@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [0.7.2] — 2026-06-16
+
+Documentation consistency — one honest story across the README, the npm page, and
+every shipped doc. No code change.
+
+### Fixed
+- **"no Docker" contradiction** — README/USAGE now say "no Docker/DB **needed**"
+  (the model-free default needs none; the included Dockerfile + pgvector are only
+  for the opt-in local vector backend). USAGE uses `LLM_BACKEND=modelfree`.
+- **Removed two stale docs from the repo** — `docs/AGENTIC_OS.md` (the old
+  "agentic OS harness" identity) and `docs/DYNAMIC_ARCHITECTURE.md` (referenced a
+  knowledge-graph build that doesn't exist). Current truth lives in
+  ARCHITECTURE.md / ROADMAP.md / docs/USER_JOURNEY.md.
+- Bug-report template run-mode prompt updated to model-free / local / openai / langbase.
+
 ## [0.7.1] — 2026-06-16
 
 Consistency + packaging pass — one honest story across CLI, npm, GitHub, and the
