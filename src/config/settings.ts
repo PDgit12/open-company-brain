@@ -14,19 +14,25 @@ import { config } from '../config.js';
 
 const ENV_FILE = '.env';
 
-/** Keys a user may set. Anything else in a request is rejected, not written. */
+/**
+ * Keys a user may set over the API. Anything else is rejected, not written.
+ *
+ * SECURITY: endpoint + storage-LOCATION settings are deliberately NOT here —
+ * `OPENAI_BASE_URL`, `OLLAMA_BASE_URL`, `VECTOR_DATABASE_URL`,
+ * `COMB_S3_VECTOR_BUCKET`/`_INDEX`. Allowing those over the network would let a
+ * write-authorized (or, on an unauthenticated deployment, any) caller redirect
+ * generation / embeddings / vector storage to attacker-controlled infrastructure
+ * and exfiltrate company data. Those are set ONLY via the trusted local channel
+ * (`.env` / `comb init`). The API may change preferences, model names, region,
+ * and provider keys — never where data is sent.
+ */
 const SETTABLE = new Set([
   'LLM_BACKEND',
   'COMB_RETRIEVAL',
   'OPENAI_API_KEY',
-  'OPENAI_BASE_URL',
   'OPENAI_MODEL',
   'LANGBASE_API_KEY',
-  'COMB_S3_VECTOR_BUCKET',
-  'COMB_S3_VECTOR_INDEX',
   'COMB_AWS_REGION',
-  'VECTOR_DATABASE_URL',
-  'OLLAMA_BASE_URL',
   'OLLAMA_GENERATION_MODEL',
   'OLLAMA_EMBEDDING_MODEL',
 ]);

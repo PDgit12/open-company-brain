@@ -27,11 +27,16 @@ host does the thinking** over MCP.
 
 ```bash
 npm i -g open-company-brain                       # the `comb` command
-export LLM_BACKEND=mock COMB_RETRIEVAL=keyword     # model-free mode
-comb ingest ./your-docs.md --source handbook       # build the brain
+comb install claude                                # connect Comb to Claude/Cursor/VS Code…
+comb ingest ./your-docs.md --source handbook       # build the brain (your data only)
 comb skill "Handle a refund" --body "verify order → check policy → credit ≤ \$2k → else Finance"
-comb run --agent builtin "what does our handbook say about X?"   # grounded or refused
+# then ASK IN YOUR AI TOOL:  "search the brain — what does the handbook say about X?"
+# your agent writes the answer from cited records, or refuses. Comb runs no model.
 ```
+
+> Model-free means the **answering happens in your AI tool**, not in Comb. The CLI
+> `comb run` / `comb chat` are for when you give Comb its own model
+> (`LLM_BACKEND=local`/`openai`); without one they tell you to use your agent instead.
 
 ### Connect your AI over MCP (the product)
 
@@ -142,7 +147,8 @@ comb ingest ./handbook.md --source handbook
 comb new "an agent that answers leave and policy questions"
 comb calibrate --labels calibration-<slug>.json   # place the grounding floor from YOUR data
 
-# run agents over your governed brain + connected tools
+# run agents over your governed brain (needs a model: LLM_BACKEND=local/openai —
+# model-free, your connected AI tool answers over MCP instead)
 comb run "what's open across my-team this week?" --scopes my-team
 comb run --saved "Handbook Helper" "what changed this month?"
 comb chat --saved "Handbook Helper"          # REPL: /agent /model /budget /forget
@@ -155,8 +161,10 @@ comb promote <run id>                        # failure → permanent regression 
 comb eval --suite comb-regressions.json      # gate CI on it
 ```
 
-`comb run`/`chat` show each tool call live and stream a grounded, cited answer —
-like a coding agent, but over your company's knowledge.
+`comb run`/`chat` show each tool call live and stream a grounded, cited answer
+when a model is configured (`LLM_BACKEND=local`/`openai`). On the model-free
+default, Comb runs no model — your connected AI tool does the answering over MCP,
+and `comb run`/`chat` will tell you so rather than fabricate.
 
 ## Embed it as a library
 

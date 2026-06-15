@@ -141,9 +141,8 @@
           <label for="set-openai">OpenAI-compatible API key <span style="font-weight:500;text-transform:none">(optional — enables a cloud model)</span></label>
           <input id="set-openai" type="password" placeholder="leave blank to keep current" />
           <h1 style="font-size:1.05rem;margin-top:22px">Amazon S3 Vectors (BYO — your own AWS)</h1>
+          <p class="note">For security, the bucket + index (where your data is stored) are set only via <code>comb init</code> / <code>.env</code>, never over the network — so no remote caller can redirect your data. Region is a safe preference.</p>
           <div class="row">
-            <div><label for="set-s3b">Vector bucket</label><input id="set-s3b" placeholder="my-vector-bucket" /></div>
-            <div><label for="set-s3i">Index</label><input id="set-s3i" placeholder="brain-index" /></div>
             <div><label for="set-s3r">Region</label><input id="set-s3r" placeholder="us-east-1" /></div>
           </div>
           <button class="go" id="saveBtn">Save settings</button>
@@ -235,11 +234,13 @@
           const c = await api('/api/config');
           $('modepill').innerHTML = `<span class="k">backend</span> ${esc(c.backend)} · <span class="k">retrieval</span> ${esc(c.retrieval)}`;
           $('set-backend').value = c.backend; $('set-retrieval').value = c.retrieval;
-          $('set-s3b').value = c.s3.bucket || ''; $('set-s3i').value = c.s3.index || ''; $('set-s3r').value = c.s3.region || '';
+          $('set-s3r').value = c.s3.region || '';
         } catch (e) { $('modepill').textContent = 'config unavailable'; }
       }
       $('saveBtn').onclick = async () => {
-        const body = { LLM_BACKEND: $('set-backend').value, COMB_RETRIEVAL: $('set-retrieval').value, COMB_S3_VECTOR_BUCKET: $('set-s3b').value.trim(), COMB_S3_VECTOR_INDEX: $('set-s3i').value.trim(), COMB_AWS_REGION: $('set-s3r').value.trim() };
+        // Endpoints + storage locations (S3 bucket/index, base URLs, DB URL) are
+        // NOT settable over the API for security — set them via `comb init` / .env.
+        const body = { LLM_BACKEND: $('set-backend').value, COMB_RETRIEVAL: $('set-retrieval').value, COMB_AWS_REGION: $('set-s3r').value.trim() };
         if ($('set-openai').value.trim()) body.OPENAI_API_KEY = $('set-openai').value.trim();
         try {
           const j = await api('/api/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
