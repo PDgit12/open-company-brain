@@ -22,3 +22,7 @@ handoff.md
 openbrain.mcp.json
 .claude/
 CLAUDE.md
+
+# Superseded research/roadmap — kept local, off the public repo (current truth: ARCHITECTURE.md / ROADMAP.md / docs/USER_JOURNEY.md)
+docs/AGENTIC_OS.md
+docs/DYNAMIC_ARCHITECTURE.md

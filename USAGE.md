@@ -3,7 +3,7 @@
 `comb` is the command (`npm i -g open-company-brain`, or `npm link` in this repo).
 Model-free mode: keyword retrieval, your AI host does the thinking over MCP.
 
-    export LLM_BACKEND=mock COMB_RETRIEVAL=keyword   # no model, no DB, no Docker
+    export LLM_BACKEND=modelfree COMB_RETRIEVAL=keyword   # no model, no DB, no Docker needed
 
 ## Build the brain (facts + skills)
     comb reset                                  # clean slate for your data

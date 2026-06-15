@@ -15,7 +15,7 @@ What you expected instead.
 
 ## Reproduction
 
-Steps to reproduce. Include the run mode (`/health` output: mock or live).
+Steps to reproduce. Include the run mode (`comb doctor`: model-free / local / openai / langbase).
 
 ```
 1.
@@ -25,7 +25,7 @@ Steps to reproduce. Include the run mode (`/health` output: mock or live).
 
 ## Environment
 
-- Run mode: mock / live
+- Run mode: model-free / local / openai / langbase
 - Node version:
 - OS:
 
