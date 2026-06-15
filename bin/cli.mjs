@@ -250,14 +250,25 @@ ${h('Setup')}
  * end state. The block uses the clean, model-free, NO-SEED config (your data
  * only) and pins an ABSOLUTE data dir so the tool and `comb ingest` share one brain.
  */
+function printGenericMcpConfig() {
+  const env = mcpServerEnv(sharedBrainDir());
+  console.log('\n  Comb speaks standard MCP over stdio — it works with ANY MCP client.');
+  console.log('  `comb install <claude|claude-code|cursor|vscode|windsurf>` automates those;');
+  console.log('  for any other agentic platform (Cline, Zed, etc.), paste this block:\n');
+  console.log(JSON.stringify({ mcpServers: { comb: { command: 'comb', args: ['mcp'], env } } }, null, 2));
+  console.log('\n  (VS Code uses "servers" + "type":"stdio" instead of "mcpServers".)\n');
+}
+
 async function installClient(client) {
   if (!client) {
-    console.log('\n  Usage:  comb install <claude|claude-code|cursor|vscode|windsurf>\n');
+    console.log('\n  Usage:  comb install <claude|claude-code|cursor|vscode|windsurf>');
+    printGenericMcpConfig();
     return;
   }
   const t = clientTarget(client);
   if (!t) {
-    console.log(`\n  ✗ Unknown client "${client}".  Supported: claude · claude-code · cursor · vscode · windsurf\n`);
+    console.log(`\n  ✗ "${client}" isn't auto-configured — but Comb works with any MCP client.`);
+    printGenericMcpConfig();
     return;
   }
   const brain = sharedBrainDir();

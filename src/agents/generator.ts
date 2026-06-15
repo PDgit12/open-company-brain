@@ -47,6 +47,19 @@ export interface Generator {
   generate(input: GenerateInput): Promise<string>;
 }
 
+/**
+ * Real-user fallback when no model is configured: it NEVER fabricates — it
+ * returns the honest "no model" guidance. This is what a real user on the mock
+ * backend gets, so the deterministic MockGenerator below stays confined to the
+ * demo + tests (opted in via COMB_DEMO_GENERATION) and never ships into a real
+ * answer. Surfaces also gate upstream; this is the backstop.
+ */
+export class RefusingGenerator implements Generator {
+  async generate(_input: GenerateInput): Promise<string> {
+    return NO_MODEL_MESSAGE;
+  }
+}
+
 export class MockGenerator implements Generator {
   async generate({ chunks }: GenerateInput): Promise<string> {
     // Trust contract: no grounding → refuse, exactly like the real prompt demands.
@@ -169,5 +182,9 @@ export function createGenerator(): Generator {
   if (config.backend === 'langbase' && config.langbase.apiKey) {
     return new LangbasePipe(config.langbase.apiKey, config.langbase.pipeName);
   }
-  return new MockGenerator();
+  // Mock backend: the deterministic MockGenerator is for the DEMO + TESTS only
+  // (opted in via COMB_DEMO_GENERATION → config.generationEnabled). A real user
+  // gets the RefusingGenerator, which never fabricates. So the mock never ships
+  // into a real user's answer.
+  return config.generationEnabled ? new MockGenerator() : new RefusingGenerator();
 }
