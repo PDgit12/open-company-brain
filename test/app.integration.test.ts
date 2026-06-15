@@ -75,6 +75,38 @@ describe('HTTP API (mock backend)', () => {
     expect(body.sources).toHaveLength(0);
   });
 
+  it('POST /api/search with no query → 400', async () => {
+    const res = await fetch(`${base}/api/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/search → 200 with cited results (model-free, no generation)', async () => {
+    const res = await fetch(`${base}/api/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-scopes': 'default-team' },
+      body: JSON.stringify({ query: 'Project Atlas migration plan' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.results)).toBe(true);
+    expect(body.results.length).toBeGreaterThan(0);
+    expect(body.results[0]).toHaveProperty('source');
+    expect(body.results[0]).toHaveProperty('score');
+  });
+
+  it('GET /api/config returns the mode without leaking secret values', async () => {
+    const res = await fetch(`${base}/api/config`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.backend).toBe('mock');
+    expect(typeof body.openaiKeySet).toBe('boolean'); // a boolean, not the key
+    expect(body).not.toHaveProperty('OPENAI_API_KEY');
+  });
+
   it('approve an unknown action id → 404', async () => {
     const res = await fetch(`${base}/api/actions/does-not-exist/approve`, {
       method: 'POST',

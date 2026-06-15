@@ -3,147 +3,251 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Comb — your company's agentic OS harness</title>
-    <meta name="description" content="Comb is an open, self-hosted agentic OS harness — Claude Code, but for your company's own agents. Pipe in your data, build agents, run them governed: cite-or-refuse, access-scoped, no sycophancy." />
+    <title>Comb — console</title>
+    <meta name="description" content="Comb console — search your governed brain, ingest data, approve actions, and configure the backend. Model-free: the answering happens in your connected AI tool." />
     <style>
       :root {
-        --bg: oklch(87% 0.014 78); --cream: oklch(96.5% 0.008 78); --white: oklch(99.2% 0.003 78);
+        --bg: oklch(96.5% 0.008 78); --white: oklch(99.2% 0.003 78); --panel: oklch(98% 0.006 78);
         --dark: oklch(26% 0.014 285); --ink: oklch(24% 0.012 285); --muted: oklch(50% 0.015 285);
-        --faint: oklch(64% 0.012 285); --on-dark: oklch(95% 0.01 78); --on-dark-mut: oklch(72% 0.015 285);
+        --faint: oklch(64% 0.012 285); --on-dark: oklch(95% 0.01 78);
         --coral: oklch(76% 0.11 24); --coral-deep: oklch(68% 0.15 24); --butter: oklch(90% 0.11 101);
-        --good: oklch(64% 0.13 150); --border: oklch(83% 0.012 78); --r: 22px; --r-sm: 13px;
-        --shadow: 0 1px 2px oklch(30% 0.02 80 / 0.05), 0 14px 36px oklch(30% 0.02 80 / 0.09);
+        --good: oklch(62% 0.13 150); --bad: oklch(60% 0.17 24); --border: oklch(88% 0.012 78);
+        --r: 14px; --r-sm: 9px; --shadow: 0 1px 2px oklch(30% 0.02 80 / 0.05), 0 10px 30px oklch(30% 0.02 80 / 0.07);
+        --mono: ui-monospace, "SF Mono", Menlo, monospace;
       }
       * { box-sizing: border-box; }
-      body { margin: 0; color: var(--ink); background: var(--bg); font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-      .wrap { max-width: 1040px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 40px); }
-      header { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
-      .brand { display: flex; align-items: center; gap: 11px; }
-      .brand .dot { width: 36px; height: 36px; border-radius: 11px; background: var(--dark); display: grid; place-items: center; color: var(--butter); font-size: 18px; }
-      .brand b { font-size: 18px; letter-spacing: -0.02em; }
-      nav.top a { color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; margin-left: 20px; }
-      nav.top a:hover { color: var(--ink); }
-      .hero { padding: 56px 0 28px; }
-      .eyebrow { display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--coral-deep); background: oklch(76% 0.11 24 / 0.14); padding: 6px 12px; border-radius: 999px; }
-      h1 { font-size: clamp(2.4rem, 1.4rem + 4vw, 4.2rem); letter-spacing: -0.035em; line-height: 1.02; margin: 18px 0 14px; }
-      h1 .accent { color: var(--coral-deep); }
-      .lede { font-size: clamp(1.05rem, 1rem + 0.5vw, 1.3rem); color: var(--muted); max-width: 64ch; margin: 0 0 28px; }
-      .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-      .btn { display: inline-block; cursor: pointer; padding: 13px 24px; border-radius: 999px; font-weight: 650; font-size: 15px; text-decoration: none; background: var(--dark); color: var(--on-dark); border: 0; transition: 130ms; }
-      .btn:hover { transform: translateY(-1px); }
-      .btn.coral { background: var(--coral); color: white; } .btn.coral:hover { background: var(--coral-deep); }
-      .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--border); }
-      .install { display: flex; align-items: center; gap: 12px; margin-top: 22px; background: var(--dark); color: var(--on-dark); border-radius: var(--r-sm); padding: 14px 16px; font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; max-width: 560px; }
-      .install code { color: var(--butter); background: none; border: 0; padding: 0; }
-      .install .copy { margin-left: auto; cursor: pointer; background: oklch(31% 0.014 285); color: var(--on-dark); border: 0; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 650; }
-      section { padding: 44px 0; }
-      h2 { font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.1rem); letter-spacing: -0.025em; margin: 0 0 8px; }
-      .sub { color: var(--muted); max-width: 60ch; margin: 0 0 26px; }
-      .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-      .step { background: var(--white); border-radius: var(--r); box-shadow: var(--shadow); padding: 20px; }
-      .step .n { width: 28px; height: 28px; border-radius: 999px; background: var(--coral); color: white; font-weight: 700; display: grid; place-items: center; margin-bottom: 12px; font-size: 14px; }
-      .step h3 { margin: 0 0 6px; font-size: 1.05rem; letter-spacing: -0.01em; }
-      .step p { margin: 0; font-size: 13.5px; color: var(--muted); }
-      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-      .card { background: var(--white); border-radius: var(--r); box-shadow: var(--shadow); padding: 22px 24px; }
-      .card.dark { background: var(--dark); color: var(--on-dark); }
-      .card.dark p { color: var(--on-dark-mut); }
-      .card .ic { font-size: 22px; }
-      .card h3 { margin: 10px 0 6px; font-size: 1.05rem; letter-spacing: -0.01em; }
-      .card p { margin: 0; font-size: 13.5px; color: var(--muted); }
-      pre.code { background: var(--dark); color: var(--on-dark); border-radius: var(--r-sm); padding: 20px 22px; overflow-x: auto; font: 13px/1.7 ui-monospace, "SF Mono", Menlo, monospace; }
-      pre.code .c { color: var(--on-dark-mut); } pre.code .k { color: var(--butter); }
-      .diagram { background: var(--cream); border: 1px solid var(--border); border-radius: var(--r); padding: 22px; font: 12.5px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); white-space: pre; overflow-x: auto; }
-      footer { border-top: 1px solid var(--border); padding: 30px 0 50px; color: var(--faint); font-size: 13.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-      footer a { color: var(--muted); text-decoration: none; } footer a:hover { color: var(--ink); }
-      @media (max-width: 800px) { .steps { grid-template-columns: 1fr 1fr; } .grid { grid-template-columns: 1fr; } }
+      body { margin: 0; color: var(--ink); background: var(--bg); font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      a { color: var(--coral-deep); }
+      header { display: flex; align-items: center; gap: 14px; padding: 14px 22px; background: var(--dark); color: var(--on-dark); }
+      header .dot { width: 30px; height: 30px; border-radius: 9px; background: oklch(31% 0.014 285); display: grid; place-items: center; color: var(--butter); font-size: 16px; }
+      header b { font-size: 16px; letter-spacing: -0.02em; }
+      header .pill { margin-left: auto; font: 12px/1 var(--mono); background: oklch(31% 0.014 285); padding: 7px 11px; border-radius: 999px; color: var(--on-dark); }
+      header .pill .k { color: var(--butter); }
+      header a { color: var(--on-dark); opacity: 0.8; text-decoration: none; font-size: 13px; font-weight: 600; }
+      .app { display: grid; grid-template-columns: 210px 1fr; min-height: calc(100vh - 58px); }
+      nav.side { border-right: 1px solid var(--border); padding: 16px 12px; background: var(--panel); }
+      nav.side button { display: flex; gap: 9px; align-items: center; width: 100%; text-align: left; background: none; border: 0; cursor: pointer; padding: 10px 12px; border-radius: var(--r-sm); font-size: 14px; font-weight: 600; color: var(--muted); }
+      nav.side button:hover { background: var(--white); color: var(--ink); }
+      nav.side button.on { background: var(--dark); color: var(--on-dark); }
+      main { padding: 26px clamp(18px, 4vw, 40px); max-width: 860px; }
+      h1 { font-size: 1.5rem; letter-spacing: -0.02em; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+      .panel { display: none; }
+      .panel.on { display: block; }
+      label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin: 14px 0 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+      input, textarea, select { width: 100%; font: 14px/1.5 inherit; color: var(--ink); background: var(--white); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px; }
+      input:focus, textarea:focus, select:focus { outline: 2px solid var(--coral); outline-offset: 1px; border-color: var(--coral); }
+      textarea { min-height: 120px; resize: vertical; font-family: var(--mono); font-size: 13px; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; }
+      .row > div { flex: 1; min-width: 150px; }
+      button.go { cursor: pointer; margin-top: 14px; padding: 11px 20px; border-radius: 999px; border: 0; background: var(--coral); color: white; font-weight: 700; font-size: 14px; }
+      button.go:hover { background: var(--coral-deep); }
+      button.go.dark { background: var(--dark); }
+      button.go[disabled] { opacity: 0.5; cursor: default; }
+      .result { background: var(--white); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; margin-top: 12px; box-shadow: var(--shadow); }
+      .result .meta { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--faint); margin-bottom: 6px; }
+      .badge { font: 11px/1 var(--mono); background: oklch(76% 0.11 24 / 0.14); color: var(--coral-deep); padding: 5px 9px; border-radius: 999px; font-weight: 700; }
+      .badge.good { background: oklch(62% 0.13 150 / 0.16); color: var(--good); }
+      .badge.bad { background: oklch(60% 0.17 24 / 0.14); color: var(--bad); }
+      .result p { margin: 0; font-size: 13.5px; white-space: pre-wrap; }
+      .note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+      .empty { color: var(--faint); font-size: 14px; padding: 20px 0; }
+      .codeblock { background: var(--dark); color: var(--on-dark); border-radius: var(--r-sm); padding: 14px 16px; font: 13px/1.7 var(--mono); overflow-x: auto; white-space: pre; }
+      .codeblock .k { color: var(--butter); }
+      .actbar { display: flex; gap: 8px; margin-top: 8px; }
+      .actbar button { cursor: pointer; border: 1px solid var(--border); background: var(--white); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 650; }
+      .actbar button.ap { border-color: var(--good); color: var(--good); }
+      .actbar button.rj { border-color: var(--bad); color: var(--bad); }
+      .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--dark); color: var(--on-dark); padding: 11px 18px; border-radius: 999px; font-size: 13.5px; box-shadow: var(--shadow); opacity: 0; transition: 200ms; }
+      .toast.show { opacity: 1; }
+      @media (max-width: 720px) { .app { grid-template-columns: 1fr; } nav.side { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); } nav.side button { width: auto; } }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <header>
-        <div class="brand"><div class="dot">◆</div><b>Comb</b></div>
-        <nav class="top">
-          <a href="#how">How it works</a>
-          <a href="#cli">CLI</a>
-          <a href="https://github.com/PDgit12/open-company-brain">GitHub</a>
-        </nav>
-      </header>
+    <header>
+      <div class="dot">◆</div><b>Comb</b>
+      <span style="opacity:.6;font-size:13px">console</span>
+      <span class="pill" id="modepill">loading…</span>
+      <a href="https://github.com/PDgit12/open-company-brain" style="margin-left:14px">GitHub</a>
+    </header>
+    <div class="app">
+      <nav class="side" id="nav">
+        <button data-tab="search" class="on">🔍 Search</button>
+        <button data-tab="ingest">📥 Ingest</button>
+        <button data-tab="sources">📚 Sources</button>
+        <button data-tab="approvals">✅ Approvals</button>
+        <button data-tab="settings">⚙️ Settings</button>
+        <button data-tab="connect">🔌 Connect</button>
+      </nav>
+      <main>
+        <!-- SEARCH -->
+        <section class="panel on" id="p-search">
+          <h1>Search the brain</h1>
+          <p class="sub">Model-free retrieval — returns the cited records by relevance, or nothing if the brain can't ground it. (The <em>answer</em> is written by your connected AI tool — see Connect.)</p>
+          <label for="q">Query</label>
+          <input id="q" placeholder="e.g. who approves a refund over $10,000?" />
+          <label for="qscope">Scope</label>
+          <input id="qscope" value="default-team" />
+          <button class="go" id="searchBtn">Search</button>
+          <div id="searchOut"></div>
+        </section>
 
-      <div class="hero">
-        <span class="eyebrow">Open-source · self-hosted · $0 local</span>
-        <h1>Your company's<br /><span class="accent">agentic OS</span> harness.</h1>
-        <p class="lede">Comb is <strong>Claude Code, but for your company's own agents</strong>. Pipe in your
-          data, build agents by answering a few questions, and run them from one CLI — over a governed brain
-          that <strong>cites its sources or refuses</strong>, respects access scopes, and never plays yes-man.</p>
-        <div class="cta">
-          <a class="btn coral" href="#cli">Get the CLI</a>
-          <a class="btn ghost" href="https://github.com/PDgit12/open-company-brain">Star on GitHub</a>
-        </div>
-        <div class="install">
-          <code id="install">npm i -g open-company-brain &amp;&amp; comb init</code>
-          <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('install').textContent)">copy</button>
-        </div>
-      </div>
+        <!-- INGEST -->
+        <section class="panel" id="p-ingest">
+          <h1>Ingest knowledge</h1>
+          <p class="sub">Paste text, CSV, or JSON. It becomes scoped, retrievable knowledge your agents can ground on.</p>
+          <label for="content">Content</label>
+          <textarea id="content" placeholder="Refund policy: any refund over $2,000 requires manager approval…"></textarea>
+          <div class="row">
+            <div><label for="src">Source label</label><input id="src" value="handbook" /></div>
+            <div><label for="iscope">Scope</label><input id="iscope" value="default-team" /></div>
+            <div><label for="fmt">Format</label><select id="fmt"><option>text</option><option>csv</option><option>json</option></select></div>
+          </div>
+          <button class="go" id="ingestBtn">Ingest</button>
+          <div id="ingestOut"></div>
+        </section>
 
-      <section id="how">
-        <h2>How it works</h2>
-        <p class="sub">From raw data to working, governed agents — without gluing five tools together.</p>
-        <div class="steps">
-          <div class="step"><div class="n">1</div><h3>Start the brain</h3><p>Pipe in any data — paste, upload, an API, or a workflow webhook (n8n). It becomes scoped, embedded, citable knowledge.</p></div>
-          <div class="step"><div class="n">2</div><h3>Create agents</h3><p>Answer a few prompts and an agent is ready — it inherits citations, cite-or-refuse, and your access scopes.</p></div>
-          <div class="step"><div class="n">3</div><h3>Run &amp; govern</h3><p>The harness runs agents on any model (local or cloud), with memory, context retention, anti-drift, and a human-approved action layer.</p></div>
-          <div class="step"><div class="n">4</div><h3>Connect anything</h3><p>Bring any tool, API, or MCP server (even your own) — the harness aggregates them into one governed toolset.</p></div>
-        </div>
-      </section>
+        <!-- SOURCES -->
+        <section class="panel" id="p-sources">
+          <h1>Sources in the brain</h1>
+          <p class="sub">Real per-source record counts you can see (scope-filtered).</p>
+          <input id="sscope" value="default-team" style="max-width:260px" />
+          <button class="go dark" id="sourcesBtn">Refresh</button>
+          <div id="sourcesOut"></div>
+        </section>
 
-      <section>
-        <h2>One harness, your model, your tools</h2>
-        <p class="sub">The CLI is the harness. It runs the agents; you bring the model and the tools.</p>
-        <div class="diagram">┌──────────────────────────── comb (CLI) ────────────────────────────┐
-│                                                                     │
-│      HARNESS  ──────  AI MODEL (local Ollama  ·  or cloud)           │
-│         │                                                           │
-│         └────────  HARNESS TOOLS  (brain · APIs · any MCP)          │
-│                                                                     │
-│   governed kernel:  embed · access-scoped recall · cite-or-refuse   │
-└─────────────────────────────────────────────────────────────────────┘</div>
-      </section>
+        <!-- APPROVALS -->
+        <section class="panel" id="p-approvals">
+          <h1>Approval queue</h1>
+          <p class="sub">Actions an agent proposed. Nothing executes until a human approves — the governance gate.</p>
+          <button class="go dark" id="apprBtn">Refresh</button>
+          <div id="apprOut"></div>
+        </section>
 
-      <section>
-        <h2>Why Comb</h2>
-        <div class="grid">
-          <div class="card"><div class="ic">⚖️</div><h3>Governed by default</h3><p>Access scopes on every read, a full audit trail, and human-approved actions. The governance lives in the kernel, so every agent inherits it.</p></div>
-          <div class="card dark"><div class="ic">🎯</div><h3>No hallucination, no yes-man</h3><p>Cite-or-refuse: answers quote their sources or say "I don't know." Agents stay on task (anti-drift) and tell you the truth instead of flattering you.</p></div>
-          <div class="card"><div class="ic">🔌</div><h3>Connect any model & tool</h3><p>Run on local Ollama ($0/query) or a cloud model. Connect any API or MCP server — including your own — into one namespaced toolset.</p></div>
-          <div class="card"><div class="ic">🧠</div><h3>Memory & context</h3><p>Per-agent memory and context retention so agents get better with use, with token-aware context to keep each run efficient.</p></div>
-          <div class="card"><div class="ic">🏢</div><h3>Built for organizations</h3><p>Multi-scope access control is first-class — not a single-user assistant, but a substrate a whole company's agents run on.</p></div>
-          <div class="card"><div class="ic">🛠️</div><h3>Yours to self-host</h3><p>Open-source, runs on your infrastructure. Embed it as a library, run the API for your apps and workflows, or operate it from the CLI.</p></div>
-        </div>
-      </section>
+        <!-- SETTINGS -->
+        <section class="panel" id="p-settings">
+          <h1>Settings</h1>
+          <p class="sub">Change the backend, retrieval, and keys without editing files. Saved to <code>.env</code>; takes effect on restart.</p>
+          <div class="row">
+            <div>
+              <label for="set-backend">LLM backend</label>
+              <select id="set-backend"><option>mock</option><option>local</option><option>openai</option><option>langbase</option><option>auto</option></select>
+            </div>
+            <div>
+              <label for="set-retrieval">Retrieval</label>
+              <select id="set-retrieval"><option>keyword</option><option>vector</option></select>
+            </div>
+          </div>
+          <label for="set-openai">OpenAI-compatible API key <span style="font-weight:500;text-transform:none">(optional — enables a cloud model)</span></label>
+          <input id="set-openai" type="password" placeholder="leave blank to keep current" />
+          <h1 style="font-size:1.05rem;margin-top:22px">Amazon S3 Vectors (BYO — your own AWS)</h1>
+          <div class="row">
+            <div><label for="set-s3b">Vector bucket</label><input id="set-s3b" placeholder="my-vector-bucket" /></div>
+            <div><label for="set-s3i">Index</label><input id="set-s3i" placeholder="brain-index" /></div>
+            <div><label for="set-s3r">Region</label><input id="set-s3r" placeholder="us-east-1" /></div>
+          </div>
+          <button class="go" id="saveBtn">Save settings</button>
+          <div id="settingsOut"></div>
+        </section>
 
-      <section id="cli">
-        <h2>Use it from the terminal</h2>
-        <p class="sub">Install once, then build and run your company's agents.</p>
-        <pre class="code"><span class="c"># set up (guided) — pick local $0 models or a cloud key</span>
-npm i -g open-company-brain && <span class="k">comb</span> init
-
-<span class="c"># bring your data in (or point a workflow/API at the ingest webhook)</span>
-<span class="k">comb</span> connect knit -- npx -y knit-mcp@latest   <span class="c"># connect any tool / MCP</span>
-<span class="k">comb</span> tools                                     <span class="c"># everything an agent can use</span>
-
-<span class="c"># run an agent over your governed brain + connected tools</span>
-<span class="k">comb</span> run "what's open across the team this week?" --scopes my-team
-<span class="k">comb</span> chat                                      <span class="c"># interactive agent REPL</span></pre>
-      </section>
-
-      <footer>
-        <div>Comb — an open agentic OS harness. MIT licensed.</div>
-        <div>
-          <a href="https://github.com/PDgit12/open-company-brain">GitHub</a> &nbsp;·&nbsp;
-          <a href="https://github.com/PDgit12/open-company-brain#readme">Docs</a>
-        </div>
-      </footer>
+        <!-- CONNECT -->
+        <section class="panel" id="p-connect">
+          <h1>Connect your AI tool</h1>
+          <p class="sub">Comb is model-free — the <strong>answering happens in your AI tool</strong> (Claude, Cursor, Copilot) over MCP. One command connects it:</p>
+          <div class="codeblock">npm i -g open-company-brain
+<span class="k">comb</span> install claude   <span style="opacity:.6"># or cursor · vscode · claude-code · windsurf</span></div>
+          <p class="note">Then ask your agent: <em>"search the brain for the refund policy."</em> It calls <code>search_brain</code> and writes the answer from the cited records — or refuses if there's no grounding.</p>
+          <p class="note">This console is the <strong>operator surface</strong>: ingest, configure, and approve actions. The conversation lives in your AI tool.</p>
+        </section>
+      </main>
     </div>
+    <div class="toast" id="toast"></div>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); };
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      async function api(path, opts) {
+        const r = await fetch(path, opts);
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      }
+      // ── tabs ──
+      $('nav').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-tab]'); if (!b) return;
+        document.querySelectorAll('nav.side button').forEach((x) => x.classList.toggle('on', x === b));
+        document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === 'p-' + b.dataset.tab));
+      });
+      // ── search ──
+      $('searchBtn').onclick = async () => {
+        const query = $('q').value.trim(); if (!query) return;
+        const scopes = $('qscope').value.trim();
+        $('searchOut').innerHTML = '<p class="empty">Searching…</p>';
+        try {
+          const j = await api('/api/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query, scopes }) });
+          if (!j.results.length) { $('searchOut').innerHTML = '<p class="empty">No matching records in scope — the brain refuses rather than inventing.</p>'; return; }
+          $('searchOut').innerHTML = j.results.map((r) => `<div class="result"><div class="meta"><span class="badge">${esc(r.source)}</span><span>relevance ${(r.score * 100).toFixed(0)}%</span></div><p>${esc(r.text)}</p></div>`).join('');
+        } catch (e) { $('searchOut').innerHTML = `<p class="empty">Error: ${esc(e.message)}</p>`; }
+      };
+      // ── ingest ──
+      $('ingestBtn').onclick = async () => {
+        const content = $('content').value.trim(); if (!content) return;
+        try {
+          const j = await api('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content, format: $('fmt').value, source: $('src').value, scope: $('iscope').value }) });
+          $('ingestOut').innerHTML = `<div class="result"><p>✓ Ingested <b>${j.ingested}</b> record(s) as "${esc(j.source)}" under scope "${esc(j.scope)}".</p></div>`;
+          toast('Ingested ' + j.ingested + ' records');
+        } catch (e) { $('ingestOut').innerHTML = `<p class="empty">Error: ${esc(e.message)} (write auth may be required)</p>`; }
+      };
+      // ── sources ──
+      $('sourcesBtn').onclick = async () => {
+        try {
+          const j = await api('/api/stats?scopes=' + encodeURIComponent($('sscope').value.trim()));
+          const list = j.sources || j;
+          if (!list.length) { $('sourcesOut').innerHTML = '<p class="empty">The brain is empty in this scope. Ingest something.</p>'; return; }
+          $('sourcesOut').innerHTML = list.map((s) => `<div class="result"><div class="meta"><span class="badge">${esc(s.source)}</span><span>${s.count} record(s)</span></div></div>`).join('');
+        } catch (e) { $('sourcesOut').innerHTML = `<p class="empty">Error: ${esc(e.message)}</p>`; }
+      };
+      // ── approvals ──
+      async function loadApprovals() {
+        try {
+          const j = await api('/api/actions');
+          const list = j.actions || j;
+          if (!list.length) { $('apprOut').innerHTML = '<p class="empty">No actions proposed yet.</p>'; return; }
+          $('apprOut').innerHTML = list.map((a) => {
+            const cls = a.status === 'executed' ? 'good' : a.status === 'rejected' || a.status === 'failed' ? 'bad' : '';
+            const buttons = a.status === 'proposed' ? `<div class="actbar"><button class="ap" data-ap="${esc(a.id)}">Approve</button><button class="rj" data-rj="${esc(a.id)}">Reject</button></div>` : '';
+            return `<div class="result"><div class="meta"><span class="badge ${cls}">${esc(a.status)}</span><span>${esc(a.title || a.id)}</span></div><p>${esc((a.body || '').slice(0, 240))}</p>${buttons}</div>`;
+          }).join('');
+        } catch (e) { $('apprOut').innerHTML = `<p class="empty">Error: ${esc(e.message)}</p>`; }
+      }
+      $('apprBtn').onclick = loadApprovals;
+      $('apprOut').addEventListener('click', async (e) => {
+        const ap = e.target.closest('[data-ap]'); const rj = e.target.closest('[data-rj]');
+        try {
+          if (ap) { await api('/api/actions/' + ap.dataset.ap + '/approve', { method: 'POST' }); toast('Approved + executed'); }
+          if (rj) { await api('/api/actions/' + rj.dataset.rj + '/reject', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); toast('Rejected'); }
+          if (ap || rj) loadApprovals();
+        } catch (err) { toast('Error: ' + err.message); }
+      });
+      // ── settings ──
+      async function loadConfig() {
+        try {
+          const c = await api('/api/config');
+          $('modepill').innerHTML = `<span class="k">backend</span> ${esc(c.backend)} · <span class="k">retrieval</span> ${esc(c.retrieval)}`;
+          $('set-backend').value = c.backend; $('set-retrieval').value = c.retrieval;
+          $('set-s3b').value = c.s3.bucket || ''; $('set-s3i').value = c.s3.index || ''; $('set-s3r').value = c.s3.region || '';
+        } catch (e) { $('modepill').textContent = 'config unavailable'; }
+      }
+      $('saveBtn').onclick = async () => {
+        const body = { LLM_BACKEND: $('set-backend').value, COMB_RETRIEVAL: $('set-retrieval').value, COMB_S3_VECTOR_BUCKET: $('set-s3b').value.trim(), COMB_S3_VECTOR_INDEX: $('set-s3i').value.trim(), COMB_AWS_REGION: $('set-s3r').value.trim() };
+        if ($('set-openai').value.trim()) body.OPENAI_API_KEY = $('set-openai').value.trim();
+        try {
+          const j = await api('/api/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+          $('settingsOut').innerHTML = `<div class="result"><p>✓ Saved ${j.updated.length} setting(s). ${esc(j.note)}</p></div>`;
+          toast('Saved — restart to apply');
+        } catch (e) { $('settingsOut').innerHTML = `<p class="empty">Error: ${esc(e.message)} (write auth may be required)</p>`; }
+      };
+      loadConfig();
+    </script>
   </body>
 </html>

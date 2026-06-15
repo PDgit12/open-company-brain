@@ -146,6 +146,16 @@ export async function createApp(): Promise<express.Express> {
     return res.json(await brain.ask(parsed.data.question, callerScopes(req)));
   }));
 
+  // Model-free retrieval — the honest default for the webapp: returns the cited
+  // records (no generation), exactly like the MCP search_brain tool. This works
+  // with NO model; the connected agent (or the user) reads the cited results.
+  app.post('/api/search', asyncRoute(async (req, res) => {
+    const query = typeof (req.body as { query?: unknown })?.query === 'string' ? (req.body as { query: string }).query : '';
+    if (!query.trim()) return res.status(400).json({ error: 'query is required' });
+    const chunks = await brain.search(query, callerScopes(req));
+    return res.json({ query, results: chunks.map((c) => ({ text: c.text, source: c.source, score: c.score })) });
+  }));
+
   // Streaming answer over Server-Sent Events. Streams the grounded answer in
   // chunks; live token-by-token streaming via Langbase stream:true is a
   // documented upgrade in the generator.
