@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🐝 Comb
+# Comb
 
 ### The company brain that powers a closed loop — model‑free, over MCP.
 
