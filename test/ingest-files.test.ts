@@ -40,6 +40,6 @@ describe('folder ingest — file collection (the EISDIR-regression guard)', () =
   });
 
   it('the supported set is exactly the documented formats', () => {
-    expect([...INGEST_EXTS].sort()).toEqual(['csv', 'json', 'md', 'txt']);
+    expect([...INGEST_EXTS].sort()).toEqual(['csv', 'docx', 'json', 'md', 'pdf', 'txt']);
   });
 });

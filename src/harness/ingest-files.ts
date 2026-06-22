@@ -6,17 +6,40 @@
  * that should fail a test, not a demo.
  */
 
-import { readdir } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-/** Extensions Comb knows how to ingest. */
-export const INGEST_EXTS = new Set(['txt', 'md', 'csv', 'json']);
+/** Extensions Comb knows how to ingest. Binary docs (docx/pdf) are extracted to text. */
+export const INGEST_EXTS = new Set(['txt', 'md', 'csv', 'json', 'docx', 'pdf']);
+
+const extOf = (f: string): string => (f.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
 
 /** Map a filename to the ingest format (defaults to text). */
 export const formatFor = (f: string): 'text' | 'csv' | 'json' => {
-  const ext = (f.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
+  const ext = extOf(f);
   return ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
 };
+
+/**
+ * Read a file's content as ingestable text + its format. Real company docs are
+ * docx/pdf, not just .md — so binary office formats are extracted to plain text
+ * (parsers loaded lazily, only when that extension is actually hit). Everything
+ * else is read as UTF-8 and keeps its csv/json/text format.
+ */
+export async function extractText(file: string): Promise<{ content: string; format: 'text' | 'csv' | 'json' }> {
+  const ext = extOf(file);
+  if (ext === 'docx') {
+    const mammoth = await import('mammoth');
+    const { value } = await mammoth.extractRawText({ path: file });
+    return { content: value, format: 'text' };
+  }
+  if (ext === 'pdf') {
+    const { PDFParse } = await import('pdf-parse');
+    const { text } = await new PDFParse({ data: await readFile(file) }).getText();
+    return { content: text, format: 'text' };
+  }
+  return { content: await readFile(file, 'utf8'), format: formatFor(file) };
+}
 
 /** Strip directory and extension: "/a/b/refund-policy.md" -> "refund-policy". */
 export const baseName = (f: string): string => f.replace(/^.*\//, '').replace(/\.[^.]+$/, '');

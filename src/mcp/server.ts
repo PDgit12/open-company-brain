@@ -318,6 +318,66 @@ export async function createMcpServer(): Promise<McpServer> {
     },
   );
 
+  // ── gtm_research_prospect: cited dossier for a prospect ──────────────
+  server.tool(
+    'gtm_research_prospect',
+    'GTM: build a grounded, cited dossier for a prospect from the company brain — your ICP, case studies, product facts, and past wins relevant to this prospect. Returns only cited records (or nothing), so YOUR agent never invents context. Use before drafting outreach.',
+    {
+      name: z.string().describe('Prospect name, e.g. "Jane Doe".'),
+      company: z.string().describe('Prospect company, e.g. "Acme".'),
+      role: z.string().optional().describe('Prospect role/title.'),
+      context: z.string().optional().describe('Known pains/goals/signals about them.'),
+      scopes: z.string().optional().describe('Comma-separated access scopes; defaults to the configured scope.'),
+    },
+    async ({ name, company, role, context, scopes }) => {
+      const query = [company, role, context, name].filter(Boolean).join(' ');
+      const chunks = await brain.search(query, resolveScopes(scopes));
+      if (chunks.length === 0) {
+        return { content: [{ type: 'text', text: `No grounded records in the brain relevant to ${name} at ${company}. Ingest your ICP / case studies / product facts first — do not invent a dossier.` }] };
+      }
+      const opt = await new ServingOptimizer(principalName()).serve(
+        chunks.map((c) => ({ text: c.text, source: c.source })),
+      );
+      return { content: [{ type: 'text', text: `Dossier for ${name} (${role ?? 'unknown role'}) at ${company} — grounded in cited records:\n\n${opt.text}` }] };
+    },
+  );
+
+  // ── gtm_draft_outreach: grounded, cite-or-refuse personalized outreach ──
+  server.tool(
+    'gtm_draft_outreach',
+    'GTM: draft a short personalized outreach email to a prospect, grounded ONLY in cited company records. Refuses if there is no grounding (never invents claims about your product). On the model-free setup it returns the cited records + a drafting instruction for your host agent to write from.',
+    {
+      name: z.string().describe('Prospect name.'),
+      company: z.string().describe('Prospect company.'),
+      role: z.string().optional().describe('Prospect role/title.'),
+      angle: z.string().describe('The hook/goal, e.g. "we cut their API test maintenance".'),
+      scopes: z.string().optional().describe('Comma-separated access scopes; defaults to the configured scope.'),
+    },
+    async ({ name, company, role, angle, scopes }) => {
+      const who = `${name}${role ? `, ${role}` : ''} at ${company}`;
+      const query = [company, role, angle].filter(Boolean).join(' ');
+      const instruction = `Draft a short (<120 word) personalized cold outreach email to ${who}. Angle: ${angle}. Use ONLY the cited company facts in the context — never invent product claims, metrics, or customers. Be specific and human, no fluff.`;
+      const resolved = resolveScopes(scopes);
+      // Model-free: Comb runs no model. Hand the host agent the cited records to
+      // draft from (grounded by construction) rather than fabricate an email.
+      if (!config.generationEnabled) {
+        const chunks = await brain.search(query, resolved);
+        if (chunks.length === 0) {
+          return { content: [{ type: 'text', text: `No grounded records for ${who}. Ingest relevant product facts/case studies first — refusing to draft ungrounded outreach.` }] };
+        }
+        const opt = await new ServingOptimizer(principalName()).serve(
+          chunks.map((c) => ({ text: c.text, source: c.source })),
+        );
+        return { content: [{ type: 'text', text: `${instruction}\n\nCONTEXT (cite these, draft from these only):\n${opt.text}` }] };
+      }
+      // Model configured: Comb drafts, inheriting draft()'s grounding gate.
+      const { text, sources } = await brain.draft(query, instruction, resolved);
+      const cites = [...new Set(sources.map((s) => s.source))];
+      const suffix = cites.length ? `\n\nSources: ${cites.map((s) => `[${s}]`).join(' ')}` : '';
+      return { content: [{ type: 'text', text: `${text}${suffix}` }] };
+    },
+  );
+
   return server;
 }
 

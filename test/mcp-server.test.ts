@@ -42,6 +42,7 @@ const EXPECTED_TOOLS = [
   'propose_action', 'action_status', 'list_divergence_candidates', 'query_runs',
   'record_skill', 'find_skill', 'record_fact', 'submit_action',
   'declare_intent', 'list_intents', 'record_outcome',
+  'gtm_research_prospect', 'gtm_draft_outreach',
 ].sort();
 
 type TextContent = { type: string; text?: string };

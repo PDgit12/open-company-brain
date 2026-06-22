@@ -183,3 +183,36 @@ auto skill-mining before a real workflow pulls it.
   skills, and the loop flags real divergence with evidence — all with Comb
   running no model. Metrics: refusal correctness, promoted-eval growth, one
   workflow reaching policy-approved autonomy, retention.
+
+## 12. Why this is not a RAG wrapper (current state)
+
+A RAG wrapper is four steps: ingest → embed → retrieve → hand to an LLM. Comb keeps
+that spine but adds the systems work a wrapper skips — and all of it is **built and
+tested today**, not aspirational:
+
+| Concern | RAG wrapper | Comb | Where |
+|---|---|---|---|
+| Who can read a record | nothing | access scopes asserted on **every** read | `assertScoped`, `src/brain/memory.ts` |
+| Hallucination control | hope the model cites | **deterministic refusal in code** before generation, calibrated per embedding model | `src/brain/grounding.ts` |
+| Real-file ingest | usually .txt/.md | .docx · .pdf · .md · .txt · .csv · .json | `extractText`, `src/harness/ingest-files.ts` |
+| Doing things | none | propose → approve → execute → **audit** | `src/actions/*` |
+| Getting better | static | `record_outcome` → reward → re-rank + grow eval set | `src/feedback/*` |
+| Proof it works | none | behavioural eval asserted in CI (refuse / answer-across-sources / scope-isolation) | `src/eval/*`, `test/` |
+
+The model is the easy, swappable part. The governance, the deterministic refusal, the
+action audit, and the outcome loop are the product.
+
+### Integrity guarantees asserted in CI
+- **Scope isolation** — a `leadership` record is invisible to a `default-team` caller.
+- **No demo-data leak** — a real (`comb install`) brain starts empty; holds only what
+  you ingest (`test/no-seed-leak.test.ts`).
+- **Reset wipes knowledge** — `comb reset` clears the actual stores
+  (`test/reset-targets.test.ts`).
+- **272 tests** · typecheck · lint · build green.
+
+### GTM persona example (what a prompt file can't do)
+Two MCP tools (`gtm_research_prospect`, `gtm_draft_outreach`) turn the brain into a
+grounded GTM agent: it builds a dossier and drafts personalized outreach **only from
+cited records**, and **refuses** when ungrounded — never inventing a metric or
+customer. A static `.md` prompt can't query a corpus past the context window, enforce
+scopes, or refuse. The persona on the brain can.

@@ -44,7 +44,8 @@ import {
   type LabeledQuery,
 } from '../brain/grounding.js';
 import { readFile, writeFile, rm, stat } from 'node:fs/promises';
-import { collectFiles, formatFor, baseName } from './ingest-files.js';
+import { collectFiles, extractText, baseName } from './ingest-files.js';
+import { RESET_ALWAYS, RESET_ALL_ONLY } from './reset-targets.js';
 import pg from 'pg';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
@@ -665,29 +666,37 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
   const spin = new Spinner();
   let total = 0;
   let reactions = 0;
+  let skipped = 0;
   for (const f of files) {
     let content: string;
     let format: 'text' | 'csv' | 'json';
     let source: string;
-    if (url) {
-      const page = await fetchUrl(f);
-      content = page.text;
-      format = 'text';
-      source = sourceOverride ?? page.source;
-    } else {
-      format = formatFor(f);
-      content = await readFile(f, 'utf8');
-      source = sourceOverride ?? baseName(f);
+    try {
+      if (url) {
+        const page = await fetchUrl(f);
+        content = page.text;
+        format = 'text';
+        source = sourceOverride ?? page.source;
+      } else {
+        ({ content, format } = await extractText(f));
+        source = sourceOverride ?? baseName(f);
+      }
+      spin.start(`embedding ${f}`);
+      const r = await brain.ingest({ format, content, source, scope }, [scope]);
+      spin.stop();
+      total += r.ingested;
+      reactions += r.reactions.length;
+      if (files.length > 1) stdout.write(`  ${butter('✓')} ${dim(`${baseName(f)} (${r.ingested})`)}\n`);
+    } catch (err) {
+      // One unreadable file (corrupt PDF, malformed docx) must not abort the
+      // whole batch — skip it loudly and keep ingesting the rest.
+      spin.stop();
+      skipped += 1;
+      stdout.write(`  ${coral('✗')} ${dim(`${baseName(f)} skipped — ${err instanceof Error ? err.message : String(err)}`)}\n`);
     }
-    spin.start(`embedding ${f}`);
-    const r = await brain.ingest({ format, content, source, scope }, [scope]);
-    spin.stop();
-    total += r.ingested;
-    reactions += r.reactions.length;
-    if (files.length > 1) stdout.write(`  ${butter('✓')} ${dim(`${baseName(f)} (${r.ingested})`)}\n`);
   }
   const from = files.length === 1 ? '' : ` ${dim(`from ${files.length} files`)}`;
-  stdout.write(`${butter('✓')} ingested ${bold(String(total))} record${total === 1 ? '' : 's'}${from}  ${dim(`· scope=${scope}`)}\n`);
+  stdout.write(`${butter('✓')} ingested ${bold(String(total))} record${total === 1 ? '' : 's'}${from}  ${dim(`· scope=${scope}${skipped ? ` · ${skipped} skipped` : ''}`)}\n`);
   if (reactions) stdout.write(`  ${dim('fan-out reactions ran:')} ${reactions}\n`);
   // Honest next step: model-free, the connected agent answers (comb run would
   // refuse without a model). Only point at comb run when a model is configured.
@@ -726,8 +735,8 @@ async function resetBrain(argv: string[]): Promise<void> {
   }
   // File-tier state under the data dir.
   const dir = config.comb.dataDir;
-  const always = ['divergences.json', 'runs.json', 'intents.json', 'conversations.json', 'actions.json', 'action-audit.json', 'brain_chunks.json'];
-  const allOnly = ['agents.json', 'calibration.json', 'token-usage.json', 'response-cache.json', 'birthkits'];
+  const always = RESET_ALWAYS;
+  const allOnly = RESET_ALL_ONLY;
   for (const f of [...always, ...(all ? allOnly : [])]) {
     await rm(`${dir}/${f}`, { recursive: true, force: true });
   }
