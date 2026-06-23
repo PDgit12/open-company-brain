@@ -640,13 +640,17 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
   const positional = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1] ?? '').startsWith('--'));
   const target = positional[0];
   if (!target) {
-    stdout.write(gray('usage: comb ingest <file|folder|url> [--source name] [--scope s]\n'));
+    stdout.write(gray('usage: comb ingest <file|folder|url> [--source name] [--scope s] [--replace]\n'));
     process.exit(1);
   }
   const si = argv.indexOf('--source');
   const sci = argv.indexOf('--scope');
   const sourceOverride = si !== -1 ? (argv[si + 1] ?? '') : undefined;
   const scope = sci !== -1 ? (argv[sci + 1] ?? '') : scopes[0]!;
+  // --replace: wipe each source's existing records before adding the fresh ones,
+  // so re-ingesting an updated URL/feed refreshes cleanly. Cleared once per source.
+  const replace = argv.includes('--replace');
+  const replaced = new Set<string>();
 
   // Resolve the work list: a URL, a directory of docs, or a single file. A
   // folder is the obvious first move ("point it at my docs"), so support it.
@@ -689,8 +693,12 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
         kind = ex.meta?.kind;
         themes = ex.meta?.themes;
       }
+      // Clear each source once per invocation, so a folder sharing one --source
+      // refreshes as a set (not file-by-file, which would keep only the last).
+      const doReplace = replace && !replaced.has(source);
+      if (doReplace) replaced.add(source);
       spin.start(`embedding ${f}`);
-      const r = await brain.ingest({ format, content, source, scope, kind, themes }, [scope]);
+      const r = await brain.ingest({ format, content, source, scope, kind, themes, replace: doReplace }, [scope]);
       spin.stop();
       total += r.ingested;
       reactions += r.reactions.length;

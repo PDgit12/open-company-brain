@@ -58,12 +58,32 @@ export interface MemoryStore {
   stats(accessScopes: string[]): Promise<SourceCount[]>;
   /** Every scoped document, for export (OKF bundle). Local stores only. */
   all(accessScopes: string[]): Promise<MemoryDocument[]>;
+  /** Delete every record of one source within the given scopes; returns the count
+   * removed. Powers `comb ingest --replace` — a clean refresh of a URL/feed. */
+  removeSource(source: string, accessScopes: string[]): Promise<number>;
 }
 
-/** Backends that don't enumerate locally throw this on export. */
-const exportUnsupported = (backend: string): never => {
-  throw new Error(`comb export reads the local stores (keyword / file-vector); not supported on the ${backend} backend yet.`);
+/** Cloud/db backends don't enumerate locally — export and --replace are local-only. */
+const localStoreOnly = (op: string, backend: string): never => {
+  throw new Error(`comb ${op} works on the local stores (keyword / file-vector); not on the ${backend} backend yet.`);
 };
+
+type Scoped = { metadata: Record<string, string> };
+
+/** Scoped documents from a file collection (shared by keyword + file-vector). */
+async function allFromCollection<T extends Scoped>(c: JsonFileCollection<T>, scopes: string[]): Promise<T[]> {
+  const allowed = new Set(scopes);
+  return (await c.read()).filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
+}
+
+/** Delete one source within scopes from a collection; returns the removed count. */
+async function removeFromCollection<T extends Scoped>(c: JsonFileCollection<T>, source: string, scopes: string[]): Promise<number> {
+  const before = await c.read();
+  const allowed = new Set(scopes);
+  const kept = before.filter((d) => !(allowed.has(d.metadata[META_ACCESS] ?? '') && d.metadata[META_SOURCE] === source));
+  if (kept.length !== before.length) await c.write(kept);
+  return before.length - kept.length;
+}
 
 /**
  * WRITE-BOUNDARY GUARD: every stored document MUST carry a non-empty access
@@ -127,6 +147,13 @@ export class MockMemoryStore implements MemoryStore {
     const allowed = new Set(accessScopes);
     return this.docs.filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
   }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    const allowed = new Set(accessScopes);
+    const before = this.docs.length;
+    this.docs = this.docs.filter((d) => !(allowed.has(d.metadata[META_ACCESS] ?? '') && d.metadata[META_SOURCE] === source));
+    return before - this.docs.length;
+  }
   private docs: MemoryDocument[] = [];
 
   async upsert(docs: MemoryDocument[]): Promise<number> {
@@ -186,7 +213,11 @@ export class MockMemoryStore implements MemoryStore {
  */
 export class LangbaseMemoryStore implements MemoryStore {
   async all(): Promise<MemoryDocument[]> {
-    return exportUnsupported('langbase');
+    return localStoreOnly('export', 'langbase');
+  }
+
+  async removeSource(): Promise<number> {
+    return localStoreOnly('ingest --replace', 'langbase');
   }
   private readonly apiKey: string;
   private readonly memoryName: string;
@@ -288,7 +319,16 @@ export class LangbaseMemoryStore implements MemoryStore {
  */
 export class PgVectorMemoryStore implements MemoryStore {
   async all(): Promise<MemoryDocument[]> {
-    return exportUnsupported('pgvector');
+    return localStoreOnly('export', 'pgvector');
+  }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    await this.ensure();
+    const { rowCount } = await this.pool.query(
+      `DELETE FROM ${this.table} WHERE source = $1 AND access = ANY($2::text[])`,
+      [source, accessScopes],
+    );
+    return rowCount ?? 0;
   }
   private readonly pool: pg.Pool;
   private ready = false;
@@ -391,10 +431,11 @@ export class PgVectorMemoryStore implements MemoryStore {
  */
 export class FileVectorMemoryStore implements MemoryStore {
   async all(accessScopes: string[]): Promise<MemoryDocument[]> {
-    const allowed = new Set(accessScopes);
-    return (await this.collection.read())
-      .filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''))
-      .map((d) => ({ id: d.id, text: d.text, metadata: d.metadata }));
+    return (await allFromCollection(this.collection, accessScopes)).map((d) => ({ id: d.id, text: d.text, metadata: d.metadata }));
+  }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    return removeFromCollection(this.collection, source, accessScopes);
   }
   private readonly collection: JsonFileCollection<MemoryDocument & { embedding: number[] }>;
   constructor(
@@ -457,8 +498,11 @@ export class FileVectorMemoryStore implements MemoryStore {
  */
 export class FileKeywordMemoryStore implements MemoryStore {
   async all(accessScopes: string[]): Promise<MemoryDocument[]> {
-    const allowed = new Set(accessScopes);
-    return (await this.collection.read()).filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
+    return allFromCollection(this.collection, accessScopes);
+  }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    return removeFromCollection(this.collection, source, accessScopes);
   }
   private readonly collection: JsonFileCollection<MemoryDocument>;
   constructor(dataDir: string) {
@@ -518,7 +562,11 @@ const S3_TEXT_KEY = '__text';
  */
 export class S3VectorsMemoryStore implements MemoryStore {
   async all(): Promise<MemoryDocument[]> {
-    return exportUnsupported('s3-vectors');
+    return localStoreOnly('export', 's3-vectors');
+  }
+
+  async removeSource(): Promise<number> {
+    return localStoreOnly('ingest --replace', 's3-vectors');
   }
   private readonly embedder: Embedder;
   // Typed loosely: the SDK client type is only available behind the lazy import.
