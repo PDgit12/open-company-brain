@@ -13,7 +13,8 @@
  */
 
 export interface MemoryDocument {
-  /** Stable id, unique across the whole brain: `${source}:${recordId}`. */
+  /** Stable id, unique across the whole brain: `${access}:${source}:${recordId}`
+   * — access is part of the id so the same text in two scopes stays two records. */
   id: string;
   /** The embeddable text the agent will read. */
   text: string;

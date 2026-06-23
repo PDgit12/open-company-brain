@@ -82,7 +82,10 @@ function makeDoc(
   // An explicit OKF `tags` value wins over the derived themes.
   const themes = themesOverride?.trim() || deriveThemes(body).join(',');
   return {
-    id: `${source}:${recordId}`,
+    // Access scope is part of the id: the SAME text in two scopes must be two
+    // records, not one. Without it, upsert (keyed by id) silently moves data
+    // across a scope boundary on re-ingest — a scope-isolation hole.
+    id: `${access}:${source}:${recordId}`,
     text: body,
     metadata: {
       [META_KIND]: kind,

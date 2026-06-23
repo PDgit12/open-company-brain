@@ -50,7 +50,7 @@ describe('buildDocuments — csv', () => {
       source: 'x',
       access: 'default-team',
     });
-    expect(docs[0]!.id).toBe('x:42');
+    expect(docs[0]!.id).toBe('default-team:x:42'); // access-scoped id
   });
 });
 
