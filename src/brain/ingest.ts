@@ -44,6 +44,10 @@ export interface IngestInput {
   source: string;
   /** Access scope every emitted doc is pinned to (caller-validated upstream). */
   access: string;
+  /** OKF concept `type` → record kind (defaults to "note"). */
+  kind?: string;
+  /** OKF `tags` → record themes (overrides the derived themes when present). */
+  themes?: string;
 }
 
 /** Deterministic, dependency-free FNV-1a hash → stable id (idempotent upsert). */
@@ -64,21 +68,32 @@ export function normalizeSource(raw: string): string {
   return s || 'notes';
 }
 
-function makeDoc(text: string, source: string, access: string, recordId: string): MemoryDocument {
+function makeDoc(
+  text: string,
+  source: string,
+  access: string,
+  recordId: string,
+  kind = 'note',
+  themesOverride?: string,
+): MemoryDocument {
   const body = text.trim();
   // Enrichment-with-guardrails: derive inspectable theme tags from the text so
   // thematic recall works across heterogeneous sources, without an LLM call.
-  const themes = deriveThemes(body);
+  // An explicit OKF `tags` value wins over the derived themes.
+  const themes = themesOverride?.trim() || deriveThemes(body).join(',');
   return {
-    id: `${source}:${recordId}`,
+    // Access scope is part of the id: the SAME text in two scopes must be two
+    // records, not one. Without it, upsert (keyed by id) silently moves data
+    // across a scope boundary on re-ingest — a scope-isolation hole.
+    id: `${access}:${source}:${recordId}`,
     text: body,
     metadata: {
-      [META_KIND]: 'note',
+      [META_KIND]: kind,
       [META_SOURCE]: source,
       [META_RECORD_ID]: recordId,
       [META_ACCESS]: access,
       [META_LAST_VERIFIED]: todayIso(),
-      ...(themes.length ? { [META_THEMES]: themes.join(',') } : {}),
+      ...(themes ? { [META_THEMES]: themes } : {}),
     },
   };
 }
@@ -99,7 +114,7 @@ function renderRow(row: Record<string, unknown>): string {
  * data-in path that the dashboard, uploads, and workflow webhooks all share.
  */
 export function buildDocuments(input: IngestInput): MemoryDocument[] {
-  const { content, access } = input;
+  const { content, access, kind, themes } = input;
   const source = normalizeSource(input.source);
   if (content.length > MAX_INGEST_CHARS) {
     throw new Error(`Content too large (${content.length} chars; max ${MAX_INGEST_CHARS}).`);
@@ -109,12 +124,12 @@ export function buildDocuments(input: IngestInput): MemoryDocument[] {
   if (input.format === 'text') {
     const chunks = content.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
     const parts = chunks.length ? chunks : [content.trim()].filter(Boolean);
-    docs = parts.map((t) => makeDoc(t, source, access, hash(t)));
+    docs = parts.map((t) => makeDoc(t, source, access, hash(t), kind, themes));
   } else if (input.format === 'csv') {
     docs = parseCsv(content).map((row) => {
       const text = renderRow(row);
       const recordId = (row.id ?? '').trim() || hash(text);
-      return makeDoc(text, source, access, recordId);
+      return makeDoc(text, source, access, recordId, kind, themes);
     });
   } else {
     const data: unknown = JSON.parse(content);
@@ -126,7 +141,7 @@ export function buildDocuments(input: IngestInput): MemoryDocument[] {
         o && typeof o === 'object' && 'id' in o && (o as { id: unknown }).id != null
           ? String((o as { id: unknown }).id)
           : hash(text);
-      return makeDoc(text, source, access, recordId);
+      return makeDoc(text, source, access, recordId, kind, themes);
     });
   }
 

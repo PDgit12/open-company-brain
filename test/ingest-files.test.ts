@@ -2,7 +2,42 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { collectFiles, formatFor, baseName, INGEST_EXTS } from '../src/harness/ingest-files.js';
+import { collectFiles, formatFor, baseName, INGEST_EXTS, foldFrontmatter, extractText } from '../src/harness/ingest-files.js';
+
+describe('extractText OKF metadata (round-trip)', () => {
+  it('maps a concept\'s type/tags/title into meta for faithful export', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'okf-'));
+    const file = path.join(dir, 'oncall.md');
+    await writeFile(file, '---\ntype: runbook\ntitle: Oncall\ntags: [sev1, paging]\n---\nSEV1: page on-call.\n');
+    const out = await extractText(file);
+    expect(out.meta).toEqual({ kind: 'runbook', themes: 'sev1, paging', title: 'Oncall' });
+    expect(out.content).toContain('SEV1: page on-call.');
+  });
+
+  it('returns no meta for a plain file', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'okf-'));
+    const file = path.join(dir, 'plain.md');
+    await writeFile(file, 'just a note');
+    const out = await extractText(file);
+    expect(out.meta).toBeUndefined();
+  });
+});
+
+describe('OKF frontmatter folding', () => {
+  it('folds an OKF concept\'s metadata into searchable text', () => {
+    const okf = '---\ntype: runbook\ntitle: Refund Handling\ntags: [billing, refunds]\n---\nRefunds over $2000 require Finance approval.\n';
+    const out = foldFrontmatter(okf);
+    expect(out).toContain('# Refund Handling');
+    expect(out).toContain('type: runbook');
+    expect(out).toContain('billing, refunds');
+    expect(out).toContain('Refunds over $2000 require Finance approval.');
+    expect(out).not.toContain('---'); // raw YAML fence gone
+  });
+
+  it('passes plain content through unchanged', () => {
+    expect(foldFrontmatter('just a note, no frontmatter')).toBe('just a note, no frontmatter');
+  });
+});
 
 describe('folder ingest — file collection (the EISDIR-regression guard)', () => {
   it('formatFor maps extensions, defaulting to text', () => {
@@ -40,6 +75,6 @@ describe('folder ingest — file collection (the EISDIR-regression guard)', () =
   });
 
   it('the supported set is exactly the documented formats', () => {
-    expect([...INGEST_EXTS].sort()).toEqual(['csv', 'json', 'md', 'txt']);
+    expect([...INGEST_EXTS].sort()).toEqual(['csv', 'docx', 'json', 'md', 'pdf', 'txt']);
   });
 });
