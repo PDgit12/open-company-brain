@@ -163,13 +163,28 @@ single JSON file.
 
 ```bash
 comb install <client>       # wire Comb into Claude/Cursor/VS Code as MCP
-comb ingest <file|folder|url>   # .docx .pdf .md .txt .csv .json (+ OKF)
+comb ingest <file|folder|url> [--source name] [--scope s] [--replace]
 comb export [--out dir] [--scope a,b]   # write the brain out as an OKF bundle
 comb mcp                    # run the MCP server (stdio)
 comb doctor                 # which backend is live, what's missing
 comb reset [--all] [--yes]  # clean slate (wipes the real knowledge stores)
 comb eval                   # run the behavioural eval suite
 ```
+
+### Keeping data fresh (URLs & feeds)
+
+Ingest accepts a URL, and a snapshot is stored — it isn't a live link. To refresh
+data that changes over time, **re-ingest with `--replace`**: it wipes that source's
+old records first, so an updated page/feed replaces its snapshot cleanly instead of
+piling stale copies beside it.
+
+```bash
+comb ingest https://example.com/pricing --source pricing --replace
+```
+
+For automation, schedule the re-ingest (cron / n8n / Zapier) against the same source,
+or POST to the ingest webhook (`POST /api/ingest`). Comb stores what you give it; it
+doesn't poll URLs on its own.
 
 ---
 

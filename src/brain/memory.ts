@@ -58,6 +58,9 @@ export interface MemoryStore {
   stats(accessScopes: string[]): Promise<SourceCount[]>;
   /** Every scoped document, for export (OKF bundle). Local stores only. */
   all(accessScopes: string[]): Promise<MemoryDocument[]>;
+  /** Delete every record of one source within the given scopes; returns the count
+   * removed. Powers `comb ingest --replace` — a clean refresh of a URL/feed. */
+  removeSource(source: string, accessScopes: string[]): Promise<number>;
 }
 
 /** Backends that don't enumerate locally throw this on export. */
@@ -127,6 +130,13 @@ export class MockMemoryStore implements MemoryStore {
     const allowed = new Set(accessScopes);
     return this.docs.filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
   }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    const allowed = new Set(accessScopes);
+    const before = this.docs.length;
+    this.docs = this.docs.filter((d) => !(allowed.has(d.metadata[META_ACCESS] ?? '') && d.metadata[META_SOURCE] === source));
+    return before - this.docs.length;
+  }
   private docs: MemoryDocument[] = [];
 
   async upsert(docs: MemoryDocument[]): Promise<number> {
@@ -187,6 +197,10 @@ export class MockMemoryStore implements MemoryStore {
 export class LangbaseMemoryStore implements MemoryStore {
   async all(): Promise<MemoryDocument[]> {
     return exportUnsupported('langbase');
+  }
+
+  async removeSource(): Promise<number> {
+    throw new Error('comb ingest --replace works on the local stores (keyword / file-vector); not on the langbase backend yet.');
   }
   private readonly apiKey: string;
   private readonly memoryName: string;
@@ -289,6 +303,15 @@ export class LangbaseMemoryStore implements MemoryStore {
 export class PgVectorMemoryStore implements MemoryStore {
   async all(): Promise<MemoryDocument[]> {
     return exportUnsupported('pgvector');
+  }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    await this.ensure();
+    const { rowCount } = await this.pool.query(
+      `DELETE FROM ${this.table} WHERE source = $1 AND access = ANY($2::text[])`,
+      [source, accessScopes],
+    );
+    return rowCount ?? 0;
   }
   private readonly pool: pg.Pool;
   private ready = false;
@@ -396,6 +419,14 @@ export class FileVectorMemoryStore implements MemoryStore {
       .filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''))
       .map((d) => ({ id: d.id, text: d.text, metadata: d.metadata }));
   }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    const allowed = new Set(accessScopes);
+    const all = await this.collection.read();
+    const kept = all.filter((d) => !(allowed.has(d.metadata[META_ACCESS] ?? '') && d.metadata[META_SOURCE] === source));
+    if (kept.length !== all.length) await this.collection.write(kept);
+    return all.length - kept.length;
+  }
   private readonly collection: JsonFileCollection<MemoryDocument & { embedding: number[] }>;
   constructor(
     dataDir: string,
@@ -460,6 +491,14 @@ export class FileKeywordMemoryStore implements MemoryStore {
     const allowed = new Set(accessScopes);
     return (await this.collection.read()).filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
   }
+
+  async removeSource(source: string, accessScopes: string[]): Promise<number> {
+    const allowed = new Set(accessScopes);
+    const all = await this.collection.read();
+    const kept = all.filter((d) => !(allowed.has(d.metadata[META_ACCESS] ?? '') && d.metadata[META_SOURCE] === source));
+    if (kept.length !== all.length) await this.collection.write(kept);
+    return all.length - kept.length;
+  }
   private readonly collection: JsonFileCollection<MemoryDocument>;
   constructor(dataDir: string) {
     this.collection = new JsonFileCollection<MemoryDocument>(path.join(dataDir, 'keyword-docs.json'));
@@ -519,6 +558,10 @@ const S3_TEXT_KEY = '__text';
 export class S3VectorsMemoryStore implements MemoryStore {
   async all(): Promise<MemoryDocument[]> {
     return exportUnsupported('s3-vectors');
+  }
+
+  async removeSource(): Promise<number> {
+    throw new Error('comb ingest --replace works on the local stores (keyword / file-vector); not on the s3-vectors backend yet.');
   }
   private readonly embedder: Embedder;
   // Typed loosely: the SDK client type is only available behind the lazy import.

@@ -239,7 +239,7 @@ export class Brain {
    * universal data-in path the dashboard, uploads, and the workflow webhook share.
    */
   async ingest(
-    input: { format: IngestFormat; content: string; source?: string; scope?: string; kind?: string; themes?: string },
+    input: { format: IngestFormat; content: string; source?: string; scope?: string; kind?: string; themes?: string; replace?: boolean },
     callerScopes: string[],
   ): Promise<{ ingested: number; source: string; scope: string; reactions: FanoutResult[]; divergences: number; candidates: number }> {
     const access =
@@ -247,6 +247,9 @@ export class Brain {
         ? input.scope
         : (callerScopes[0] ?? config.demoUserAccessScope);
     const source = normalizeSource(input.source ?? 'notes');
+    // --replace: clear this source in this scope FIRST, so a re-ingested URL/feed
+    // refreshes cleanly instead of piling stale snapshots next to the new one.
+    if (input.replace) await this.memory.removeSource(source, [access]);
     // Refinery CLEAN stage: strip boilerplate, drop exact duplicates (per
     // scope) BEFORE embedding — dirty data costs embed spend, wastes topK
     // retrieval slots, and feeds composition conflicting near-copies.
