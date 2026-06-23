@@ -47,8 +47,6 @@ import { readFile, writeFile, rm, stat, mkdir } from 'node:fs/promises';
 import { collectFiles, extractText, baseName } from './ingest-files.js';
 import { RESET_ALWAYS, RESET_ALL_ONLY } from './reset-targets.js';
 import { toOkfBundle } from './okf-export.js';
-import { JsonFileCollection } from '../storage/json-file.js';
-import type { MemoryDocument } from '../brain/documents.js';
 import pg from 'pg';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
@@ -674,6 +672,8 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
     let content: string;
     let format: 'text' | 'csv' | 'json';
     let source: string;
+    let kind: string | undefined;
+    let themes: string | undefined;
     try {
       if (url) {
         const page = await fetchUrl(f);
@@ -681,11 +681,16 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
         format = 'text';
         source = sourceOverride ?? page.source;
       } else {
-        ({ content, format } = await extractText(f));
-        source = sourceOverride ?? baseName(f);
+        const ex = await extractText(f);
+        content = ex.content;
+        format = ex.format;
+        // OKF: a concept's title is its provenance; type/tags become kind/themes.
+        source = sourceOverride ?? ex.meta?.title ?? baseName(f);
+        kind = ex.meta?.kind;
+        themes = ex.meta?.themes;
       }
       spin.start(`embedding ${f}`);
-      const r = await brain.ingest({ format, content, source, scope }, [scope]);
+      const r = await brain.ingest({ format, content, source, scope, kind, themes }, [scope]);
       spin.stop();
       total += r.ingested;
       reactions += r.reactions.length;
@@ -713,23 +718,38 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
 /**
  * `comb export [--out dir] [--scope s]` — write the brain (model-free keyword
  * store) out as a Google OKF bundle: one markdown concept file per source,
- * scope-gated like every read. Emits valid OKF; not a byte-identical round-trip
- * (ingest folds frontmatter into body text — see okf-export.ts).
+ * scope-gated like every read. Works on the local stores (keyword / file-vector);
+ * type/tags/timestamp round-trip via metadata (see okf-export.ts).
  */
+/** Read a flag value supporting both `--name val` and `--name=val`. */
+function flagValue(argv: string[], name: string): string | undefined {
+  const eq = argv.find((a) => a.startsWith(`${name}=`));
+  if (eq) return eq.slice(name.length + 1);
+  const i = argv.indexOf(name);
+  return i !== -1 ? argv[i + 1] : undefined;
+}
+
 async function exportOkf(argv: string[], scopes: string[]): Promise<void> {
-  const oi = argv.indexOf('--out');
-  const outDir = oi !== -1 ? (argv[oi + 1] ?? './okf-out') : './okf-out';
-  const sci = argv.indexOf('--scope');
-  const scope = sci !== -1 ? (argv[sci + 1] ?? scopes[0]!) : scopes[0]!;
-  const docs = await new JsonFileCollection<MemoryDocument>(`${config.comb.dataDir}/keyword-docs.json`).read();
-  const bundle = toOkfBundle(docs, [scope]);
+  const outDir = flagValue(argv, '--out') ?? './okf-out';
+  const scopeArg = flagValue(argv, '--scope');
+  const scopeList = scopeArg ? scopeArg.split(',').map((s) => s.trim()).filter(Boolean) : scopes;
+  const brain = await Brain.create();
+  let docs;
+  try {
+    docs = await brain.exportDocs(scopeList);
+  } catch (err) {
+    // Non-local backend (pgvector/langbase/s3) — honest message, not a crash.
+    stdout.write(coral(`✗ ${err instanceof Error ? err.message : String(err)}\n`));
+    return;
+  }
+  const bundle = toOkfBundle(docs, scopeList);
   if (!bundle.length) {
-    stdout.write(gray(`Nothing to export under scope "${scope}" from the model-free keyword store.\n`));
+    stdout.write(gray(`Nothing to export under scope(s) "${scopeList.join(', ')}".\n`));
     return;
   }
   await mkdir(outDir, { recursive: true });
   for (const f of bundle) await writeFile(`${outDir}/${f.filename}`, f.content);
-  stdout.write(`${butter('✓')} exported ${bold(String(bundle.length))} OKF concept${bundle.length === 1 ? '' : 's'} → ${bold(outDir)}  ${dim(`· scope=${scope}`)}\n`);
+  stdout.write(`${butter('✓')} exported ${bold(String(bundle.length))} OKF concept${bundle.length === 1 ? '' : 's'} → ${bold(outDir)}  ${dim(`· scope=${scopeList.join(',')}`)}\n`);
 }
 
 /**

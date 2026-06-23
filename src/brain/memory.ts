@@ -56,7 +56,14 @@ export interface MemoryStore {
   retrieve(opts: RetrieveOptions): Promise<RetrievedChunk[]>;
   /** Real per-source document counts the caller can see — powers honest viz. */
   stats(accessScopes: string[]): Promise<SourceCount[]>;
+  /** Every scoped document, for export (OKF bundle). Local stores only. */
+  all(accessScopes: string[]): Promise<MemoryDocument[]>;
 }
+
+/** Backends that don't enumerate locally throw this on export. */
+const exportUnsupported = (backend: string): never => {
+  throw new Error(`comb export reads the local stores (keyword / file-vector); not supported on the ${backend} backend yet.`);
+};
 
 /**
  * WRITE-BOUNDARY GUARD: every stored document MUST carry a non-empty access
@@ -116,6 +123,10 @@ function tokenize(s: string): string[] {
 }
 
 export class MockMemoryStore implements MemoryStore {
+  async all(accessScopes: string[]): Promise<MemoryDocument[]> {
+    const allowed = new Set(accessScopes);
+    return this.docs.filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
+  }
   private docs: MemoryDocument[] = [];
 
   async upsert(docs: MemoryDocument[]): Promise<number> {
@@ -174,6 +185,9 @@ export class MockMemoryStore implements MemoryStore {
  * name differs in your installed version you fix it here and nowhere else.
  */
 export class LangbaseMemoryStore implements MemoryStore {
+  async all(): Promise<MemoryDocument[]> {
+    return exportUnsupported('langbase');
+  }
   private readonly apiKey: string;
   private readonly memoryName: string;
   private lb: Langbase | undefined;
@@ -273,6 +287,9 @@ export class LangbaseMemoryStore implements MemoryStore {
  * SQL so out-of-scope chunks never leave the database.
  */
 export class PgVectorMemoryStore implements MemoryStore {
+  async all(): Promise<MemoryDocument[]> {
+    return exportUnsupported('pgvector');
+  }
   private readonly pool: pg.Pool;
   private ready = false;
 
@@ -373,6 +390,12 @@ export class PgVectorMemoryStore implements MemoryStore {
  * Brute-force search is fine to ~10k chunks; past that, move to pgvector/S3.
  */
 export class FileVectorMemoryStore implements MemoryStore {
+  async all(accessScopes: string[]): Promise<MemoryDocument[]> {
+    const allowed = new Set(accessScopes);
+    return (await this.collection.read())
+      .filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''))
+      .map((d) => ({ id: d.id, text: d.text, metadata: d.metadata }));
+  }
   private readonly collection: JsonFileCollection<MemoryDocument & { embedding: number[] }>;
   constructor(
     dataDir: string,
@@ -433,6 +456,10 @@ export class FileVectorMemoryStore implements MemoryStore {
  * scope-filter + assertScoped contract as every store.
  */
 export class FileKeywordMemoryStore implements MemoryStore {
+  async all(accessScopes: string[]): Promise<MemoryDocument[]> {
+    const allowed = new Set(accessScopes);
+    return (await this.collection.read()).filter((d) => allowed.has(d.metadata[META_ACCESS] ?? ''));
+  }
   private readonly collection: JsonFileCollection<MemoryDocument>;
   constructor(dataDir: string) {
     this.collection = new JsonFileCollection<MemoryDocument>(path.join(dataDir, 'keyword-docs.json'));
@@ -490,6 +517,9 @@ const S3_TEXT_KEY = '__text';
  * recommended default); score = 1 - distance, clamped to [0,1].
  */
 export class S3VectorsMemoryStore implements MemoryStore {
+  async all(): Promise<MemoryDocument[]> {
+    return exportUnsupported('s3-vectors');
+  }
   private readonly embedder: Embedder;
   // Typed loosely: the SDK client type is only available behind the lazy import.
   private client: unknown;

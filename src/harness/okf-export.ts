@@ -3,15 +3,15 @@
  * directory of markdown concept files with YAML frontmatter. Pure (testable;
  * the CLI self-executes on import, so the file-writing wrapper lives in cli.ts).
  *
- * A record's `kind` becomes OKF `type`, `themes` become `tags`, and same-source
- * records group into one concept file. NOT a byte-identical round-trip: ingest
- * folds an OKF concept's frontmatter into searchable body text (it isn't stored
- * as structured `kind`/`themes`), so an ingest→export cycle re-wraps with default
- * metadata. The export is still valid, scope-gated OKF.
+ * A record's `kind` becomes OKF `type`, `themes` → `tags`, `last_verified` →
+ * `timestamp`, and same-source records group into one concept file. Ingest stores
+ * an OKF concept's `type`/`tags` as structured metadata, so those fields
+ * round-trip faithfully (the body also keeps a folded header for keyword search,
+ * so it isn't byte-identical, but the structured fields survive). Scope-gated.
  */
 
 import type { MemoryDocument } from '../brain/documents.js';
-import { META_ACCESS, META_SOURCE, META_KIND, META_THEMES } from '../constants.js';
+import { META_ACCESS, META_SOURCE, META_KIND, META_THEMES, META_LAST_VERIFIED } from '../constants.js';
 
 export interface OkfFile {
   filename: string;
@@ -36,9 +36,15 @@ export function toOkfBundle(docs: MemoryDocument[], scopes: string[]): OkfFile[]
   for (const [source, group] of bySource) {
     const type = group[0]?.metadata[META_KIND] || 'concept';
     const tags = group[0]?.metadata[META_THEMES];
-    const frontmatter = ['---', `type: ${type}`, `title: ${source}`, tags ? `tags: ${tags}` : '', '---']
-      .filter(Boolean)
-      .join('\n');
+    const timestamp = group[0]?.metadata[META_LAST_VERIFIED];
+    const frontmatter = [
+      '---',
+      `type: ${type}`,
+      `title: ${source}`,
+      tags ? `tags: ${tags}` : '',
+      timestamp ? `timestamp: ${timestamp}` : '',
+      '---',
+    ].filter(Boolean).join('\n');
     const body = group.map((d) => d.text).join('\n\n');
     files.push({ filename: `${slug(source)}.md`, content: `${frontmatter}\n${body}\n` });
   }

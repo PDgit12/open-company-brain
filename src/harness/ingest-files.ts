@@ -20,41 +20,55 @@ export const formatFor = (f: string): 'text' | 'csv' | 'json' => {
   return ext === 'csv' ? 'csv' : ext === 'json' ? 'json' : 'text';
 };
 
+/** OKF metadata mapped from a concept's frontmatter (for faithful round-trip). */
+export interface OkfMeta {
+  kind?: string;
+  themes?: string;
+  title?: string;
+}
+
 /**
- * Fold an OKF (Google Open Knowledge Format, 2026) concept's YAML frontmatter
- * into the body so its metadata (type, title, tags, description) is searchable —
- * instead of ingesting raw `---` YAML as opaque text. OKF v0.1 frontmatter is
- * flat (type required; title/description/resource/tags/timestamp optional), so a
- * tiny parser is enough — no YAML dependency for a handful of `key: value` lines.
- * A file with no frontmatter passes through unchanged.
+ * Parse an OKF (Google Open Knowledge Format, 2026) concept's YAML frontmatter.
+ * OKF v0.1 frontmatter is flat (type required; title/description/resource/tags/
+ * timestamp optional), so a tiny parser is enough — no YAML dependency for a
+ * handful of `key: value` lines. No frontmatter → empty fields, body = raw.
  */
-export function foldFrontmatter(raw: string): string {
+export function parseFrontmatter(raw: string): { fields: Record<string, string>; body: string } {
   const m = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
-  if (!m) return raw;
-  const fm = m[1] ?? '';
-  const body = m[2] ?? '';
+  if (!m) return { fields: {}, body: raw };
   const fields: Record<string, string> = {};
-  for (const line of fm.split('\n')) {
+  for (const line of (m[1] ?? '').split('\n')) {
     const f = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
     if (f?.[1]) fields[f[1].toLowerCase()] = (f[2] ?? '').replace(/^\[|\]$/g, '').replace(/^["']|["']$/g, '').trim();
   }
-  const head = [
+  return { fields, body: m[2] ?? '' };
+}
+
+/** Searchable header so OKF metadata is retrievable even on the keyword path. */
+function foldHead(fields: Record<string, string>): string {
+  return [
     fields.title && `# ${fields.title}`,
     fields.type && `type: ${fields.type}`,
     fields.tags && `tags: ${fields.tags}`,
     fields.description,
   ].filter(Boolean).join('\n');
-  return `${head}\n\n${body}`.trim();
+}
+
+/** Fold a concept's frontmatter into the body so its fields are searchable. */
+export function foldFrontmatter(raw: string): string {
+  const { fields, body } = parseFrontmatter(raw);
+  if (!Object.keys(fields).length) return raw;
+  return `${foldHead(fields)}\n\n${body}`.trim();
 }
 
 /**
- * Read a file's content as ingestable text + its format. Real company docs are
- * docx/pdf, not just .md — so binary office formats are extracted to plain text
- * (parsers loaded lazily, only when that extension is actually hit). Markdown is
- * OKF-folded (frontmatter → searchable text). Everything else is read as UTF-8
- * and keeps its csv/json/text format.
+ * Read a file's content as ingestable text + its format + any OKF metadata.
+ * Real company docs are docx/pdf, not just .md — binary office formats are
+ * extracted to plain text (parsers loaded lazily). Markdown is OKF-folded so
+ * its frontmatter is both searchable (in the body) AND structured (in `meta`,
+ * so `comb export` round-trips type/tags). csv/json pass through untouched.
  */
-export async function extractText(file: string): Promise<{ content: string; format: 'text' | 'csv' | 'json' }> {
+export async function extractText(file: string): Promise<{ content: string; format: 'text' | 'csv' | 'json'; meta?: OkfMeta }> {
   const ext = extOf(file);
   if (ext === 'docx') {
     const mammoth = await import('mammoth');
@@ -67,9 +81,15 @@ export async function extractText(file: string): Promise<{ content: string; form
     return { content: text, format: 'text' };
   }
   const raw = await readFile(file, 'utf8');
-  // OKF concepts are markdown with YAML frontmatter — fold it so the metadata is
-  // searchable. Only .md/.txt (text format); csv/json pass through untouched.
-  if (ext === 'md' || ext === 'txt') return { content: foldFrontmatter(raw), format: 'text' };
+  if (ext === 'md' || ext === 'txt') {
+    const { fields, body } = parseFrontmatter(raw);
+    if (!Object.keys(fields).length) return { content: raw, format: 'text' };
+    const meta: OkfMeta = {};
+    if (fields.type) meta.kind = fields.type;
+    if (fields.tags) meta.themes = fields.tags;
+    if (fields.title) meta.title = fields.title;
+    return { content: `${foldHead(fields)}\n\n${body}`.trim(), format: 'text', meta };
+  }
   return { content: raw, format: formatFor(file) };
 }
 

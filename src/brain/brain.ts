@@ -20,6 +20,7 @@
 
 import { config } from '../config.js';
 import { createMemoryStore, type MemoryStore, type RetrievedChunk, type SourceCount } from './memory.js';
+import type { MemoryDocument } from './documents.js';
 import { createGenerator, OllamaGenerator, DRAFT_SYSTEM, type Generator } from '../agents/generator.js';
 import { assessGrounding, resolveGroundingPolicy, type GroundingPolicy } from './grounding.js';
 import { answered, refusal, type AnswerRecord } from './record.js';
@@ -238,7 +239,7 @@ export class Brain {
    * universal data-in path the dashboard, uploads, and the workflow webhook share.
    */
   async ingest(
-    input: { format: IngestFormat; content: string; source?: string; scope?: string },
+    input: { format: IngestFormat; content: string; source?: string; scope?: string; kind?: string; themes?: string },
     callerScopes: string[],
   ): Promise<{ ingested: number; source: string; scope: string; reactions: FanoutResult[]; divergences: number; candidates: number }> {
     const access =
@@ -249,7 +250,7 @@ export class Brain {
     // Refinery CLEAN stage: strip boilerplate, drop exact duplicates (per
     // scope) BEFORE embedding — dirty data costs embed spend, wastes topK
     // retrieval slots, and feeds composition conflicting near-copies.
-    const docs = cleanDocuments(buildDocuments({ format: input.format, content: input.content, source, access }));
+    const docs = cleanDocuments(buildDocuments({ format: input.format, content: input.content, source, access, kind: input.kind, themes: input.themes }));
     const ingested = docs.length ? await this.memory.upsert(docs) : 0;
     // Fan-out: configured reaction agents run automatically over the new data
     // (no-op + zero generations when none are configured). Both the library
@@ -273,6 +274,11 @@ export class Brain {
   /** Real per-source document counts the caller can see — for honest viz. */
   async knowledgeStats(scopes: string[]): Promise<SourceCount[]> {
     return this.memory.stats(scopes);
+  }
+
+  /** Every scoped document, for `comb export` (OKF). Throws on non-local backends. */
+  async exportDocs(scopes: string[]): Promise<MemoryDocument[]> {
+    return this.memory.all(scopes);
   }
 
   /**

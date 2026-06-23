@@ -2,7 +2,26 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { collectFiles, formatFor, baseName, INGEST_EXTS, foldFrontmatter } from '../src/harness/ingest-files.js';
+import { collectFiles, formatFor, baseName, INGEST_EXTS, foldFrontmatter, extractText } from '../src/harness/ingest-files.js';
+
+describe('extractText OKF metadata (round-trip)', () => {
+  it('maps a concept\'s type/tags/title into meta for faithful export', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'okf-'));
+    const file = path.join(dir, 'oncall.md');
+    await writeFile(file, '---\ntype: runbook\ntitle: Oncall\ntags: [sev1, paging]\n---\nSEV1: page on-call.\n');
+    const out = await extractText(file);
+    expect(out.meta).toEqual({ kind: 'runbook', themes: 'sev1, paging', title: 'Oncall' });
+    expect(out.content).toContain('SEV1: page on-call.');
+  });
+
+  it('returns no meta for a plain file', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'okf-'));
+    const file = path.join(dir, 'plain.md');
+    await writeFile(file, 'just a note');
+    const out = await extractText(file);
+    expect(out.meta).toBeUndefined();
+  });
+});
 
 describe('OKF frontmatter folding', () => {
   it('folds an OKF concept\'s metadata into searchable text', () => {
