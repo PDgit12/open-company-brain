@@ -200,26 +200,6 @@ const { answer, sources } = await brain.ask('…', ['my-team']);   // grounded +
 
 ---
 
-## Proof, not claims
-
-- **279 tests pass** (typecheck + lint + build green).
-- **Cite-or-refuse, asserted in CI:** the brain refuses an unseen topic, answers across sources,
-  and **hides leadership-only records from a default-team caller** — scope isolation on every read.
-- **No demo-data leak:** a guard test proves a real `comb install` brain starts empty — it holds
-  only what you ingest.
-- **Resilient ingest** and **scope-aware record ids** (the same text in two scopes stays two records),
-  both regression-tested.
-
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for how it's built and what's shipped vs roadmap.
-
----
-
-## Status
-
-**Alpha.** The engineering is real and tested; the product is early. Not yet battle-tested for
-production — the write-path API is open by default for local dev (set `INGEST_API_KEY` for any
-shared deployment). Architected for production; not claiming production-ready.
-
 ## Development
 
 ```bash
