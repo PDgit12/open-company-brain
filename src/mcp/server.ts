@@ -60,6 +60,18 @@ export async function createMcpServer(): Promise<McpServer> {
   const { version } = createRequire(import.meta.url)('../../package.json') as { version: string };
   const server = new McpServer({ name: 'open-company-brain', version });
 
+  // Shared retrieval: scope-filter → CCR serving optimizer (compress + dedup
+  // against the session manifest + cache-align). Returns the served text, or
+  // null when nothing is grounded. Used by search_brain and the GTM tools.
+  async function servedRecords(query: string, scopes?: string): Promise<string | null> {
+    const chunks = await brain.search(query, resolveScopes(scopes));
+    if (chunks.length === 0) return null;
+    const opt = await new ServingOptimizer(principalName()).serve(
+      chunks.map((c) => ({ text: c.text, source: c.source })),
+    );
+    return opt.text;
+  }
+
   // ── search_brain: governed retrieval, host synthesizes ──────────────────────
   server.tool(
     'search_brain',
@@ -69,16 +81,8 @@ export async function createMcpServer(): Promise<McpServer> {
       scopes: z.string().optional().describe('Comma-separated access scopes; defaults to the configured scope.'),
     },
     async ({ query, scopes }) => {
-      const chunks = await brain.search(query, resolveScopes(scopes));
-      if (chunks.length === 0) {
-        return { content: [{ type: 'text', text: 'No matching records in the brain for that query (within the allowed scopes).' }] };
-      }
-      // CCR serving optimizer: compress + dedup against this session's manifest
-      // + cache-align, so the host never re-pays for context it already has.
-      const opt = await new ServingOptimizer(principalName()).serve(
-        chunks.map((c) => ({ text: c.text, source: c.source })),
-      );
-      return { content: [{ type: 'text', text: opt.text }] };
+      const text = await servedRecords(query, scopes);
+      return { content: [{ type: 'text', text: text ?? 'No matching records in the brain for that query (within the allowed scopes).' }] };
     },
   );
 
@@ -331,14 +335,11 @@ export async function createMcpServer(): Promise<McpServer> {
     },
     async ({ name, company, role, context, scopes }) => {
       const query = [company, role, context, name].filter(Boolean).join(' ');
-      const chunks = await brain.search(query, resolveScopes(scopes));
-      if (chunks.length === 0) {
+      const text = await servedRecords(query, scopes);
+      if (!text) {
         return { content: [{ type: 'text', text: `No grounded records in the brain relevant to ${name} at ${company}. Ingest your ICP / case studies / product facts first — do not invent a dossier.` }] };
       }
-      const opt = await new ServingOptimizer(principalName()).serve(
-        chunks.map((c) => ({ text: c.text, source: c.source })),
-      );
-      return { content: [{ type: 'text', text: `Dossier for ${name} (${role ?? 'unknown role'}) at ${company} — grounded in cited records:\n\n${opt.text}` }] };
+      return { content: [{ type: 'text', text: `Dossier for ${name} (${role ?? 'unknown role'}) at ${company} — grounded in cited records:\n\n${text}` }] };
     },
   );
 
@@ -361,14 +362,11 @@ export async function createMcpServer(): Promise<McpServer> {
       // Model-free: Comb runs no model. Hand the host agent the cited records to
       // draft from (grounded by construction) rather than fabricate an email.
       if (!config.generationEnabled) {
-        const chunks = await brain.search(query, resolved);
-        if (chunks.length === 0) {
+        const text = await servedRecords(query, scopes);
+        if (!text) {
           return { content: [{ type: 'text', text: `No grounded records for ${who}. Ingest relevant product facts/case studies first — refusing to draft ungrounded outreach.` }] };
         }
-        const opt = await new ServingOptimizer(principalName()).serve(
-          chunks.map((c) => ({ text: c.text, source: c.source })),
-        );
-        return { content: [{ type: 'text', text: `${instruction}\n\nCONTEXT (cite these, draft from these only):\n${opt.text}` }] };
+        return { content: [{ type: 'text', text: `${instruction}\n\nCONTEXT (cite these, draft from these only):\n${text}` }] };
       }
       // Model configured: Comb drafts, inheriting draft()'s grounding gate.
       const { text, sources } = await brain.draft(query, instruction, resolved);

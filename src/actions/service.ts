@@ -18,7 +18,7 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import type { Brain } from '../brain/brain.js';
 import { createActionStore, type ActionStore } from './store.js';
-import { createActionExecutor, type ActionExecutor } from './executor.js';
+import { createDeliverySink, type DeliverySink } from './delivery.js';
 import { getFeedbackStore } from '../feedback/feedback.js';
 import type {
   ProposedAction,
@@ -27,6 +27,7 @@ import type {
   AuditEvent,
   ActionOutcome,
   OutcomeResult,
+  ExecutionOutcome,
 } from './types.js';
 
 const nowIso = (): string => new Date().toISOString();
@@ -84,12 +85,12 @@ export class ActionService {
   constructor(
     private readonly brain: Brain,
     private readonly store: ActionStore,
-    private readonly executor: ActionExecutor,
+    private readonly sink: DeliverySink,
     private readonly policy: AutoApprovePolicy = { enabled: false, perHour: 20 },
   ) {}
 
   static create(brain: Brain, policy?: AutoApprovePolicy): ActionService {
-    return new ActionService(brain, createActionStore(), createActionExecutor(), policy ?? {
+    return new ActionService(brain, createActionStore(), createDeliverySink(), policy ?? {
       enabled: config.actions.autoApprove,
       perHour: config.actions.autoApprovePerHour,
     });
@@ -198,7 +199,7 @@ export class ActionService {
       scopes: [],
     });
     try {
-      const outcome = await this.executor.execute(action);
+      const outcome: ExecutionOutcome = { effect: await this.sink.deliver(action) };
       const executed: ProposedAction = {
         ...action,
         status: 'executed',

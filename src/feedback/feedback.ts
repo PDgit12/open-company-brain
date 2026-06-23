@@ -54,15 +54,6 @@ export function rewardFor(verdict: Verdict): number {
   }
 }
 
-export interface FeedbackStore {
-  record(event: Omit<FeedbackEvent, 'id' | 'at' | 'reward'> & { reward?: number }): Promise<void>;
-  /** Approved, positively-rewarded examples similar to `query`, scope-gated. */
-  approvedExamples(query: string, scopes: string[], k: number): Promise<ApprovedExample[]>;
-  /** Accumulated reward per citation source, scope-gated — drives the reranker. */
-  sourceRewards(scopes: string[]): Promise<Map<string, number>>;
-  all(): Promise<FeedbackEvent[]>;
-}
-
 /**
  * Reorder retrieved chunks by relevance *nudged* by accumulated source reward.
  * Pure and deterministic: relevance dominates (the nudge is bounded via tanh and
@@ -96,7 +87,7 @@ function overlap(a: Set<string>, b: Set<string>): number {
 let counter = 0;
 const nextId = (): string => `fb_${++counter}_${process.pid}`;
 
-export class InMemoryFeedbackStore implements FeedbackStore {
+export class InMemoryFeedbackStore {
   private events: FeedbackEvent[] = [];
 
   async record(
@@ -150,9 +141,9 @@ export class InMemoryFeedbackStore implements FeedbackStore {
   }
 }
 
-let singleton: FeedbackStore | null = null;
+let singleton: InMemoryFeedbackStore | null = null;
 /** Process-wide store so API requests and the action layer share one substrate. */
-export function getFeedbackStore(): FeedbackStore {
+export function getFeedbackStore(): InMemoryFeedbackStore {
   if (!singleton) singleton = new InMemoryFeedbackStore();
   return singleton;
 }

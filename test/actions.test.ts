@@ -2,24 +2,24 @@ import { describe, it, expect } from 'vitest';
 import { Brain } from '../src/brain/brain.js';
 import { ActionService } from '../src/actions/service.js';
 import { InMemoryActionStore } from '../src/actions/store.js';
-import type { ActionExecutor } from '../src/actions/executor.js';
-import type { ProposedAction, ExecutionOutcome } from '../src/actions/types.js';
+import type { DeliverySink } from '../src/actions/delivery.js';
+import type { ProposedAction } from '../src/actions/types.js';
 
 const SCOPES = ['default-team'];
 const GROUNDED = { title: 'Follow-up', instruction: 'Draft a short follow-up note.', query: 'Project Atlas migration plan' };
 
-/** Executor that counts how many times it actually ran (to prove idempotency). */
-class CountingExecutor implements ActionExecutor {
+/** Delivery sink that counts how many times it actually ran (to prove idempotency). */
+class CountingSink implements DeliverySink {
   public runs = 0;
-  async execute(_a: ProposedAction): Promise<ExecutionOutcome> {
+  async deliver(_a: ProposedAction): Promise<string> {
     this.runs++;
-    return { effect: `executed #${this.runs}` };
+    return `executed #${this.runs}`;
   }
 }
 
-async function makeService(): Promise<{ svc: ActionService; exec: CountingExecutor }> {
+async function makeService(): Promise<{ svc: ActionService; exec: CountingSink }> {
   const brain = await Brain.create();
-  const exec = new CountingExecutor();
+  const exec = new CountingSink();
   return { svc: new ActionService(brain, new InMemoryActionStore(), exec), exec };
 }
 

@@ -33,7 +33,7 @@ import { candidateCasesFromFeedback, type GoldenCase } from '../eval/golden.js';
 import {
   getFeedbackStore,
   rerankByReward,
-  type FeedbackStore,
+  type InMemoryFeedbackStore,
   type Verdict,
 } from '../feedback/feedback.js';
 import {
@@ -59,7 +59,7 @@ export class Brain {
   private constructor(
     private readonly memory: MemoryStore,
     private generator: Generator,
-    private readonly feedback: FeedbackStore,
+    private readonly feedback: InMemoryFeedbackStore,
     private readonly grounding: GroundingPolicy,
   ) {}
 
