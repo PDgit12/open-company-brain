@@ -2,7 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { collectFiles, formatFor, baseName, INGEST_EXTS } from '../src/harness/ingest-files.js';
+import { collectFiles, formatFor, baseName, INGEST_EXTS, foldFrontmatter } from '../src/harness/ingest-files.js';
+
+describe('OKF frontmatter folding', () => {
+  it('folds an OKF concept\'s metadata into searchable text', () => {
+    const okf = '---\ntype: runbook\ntitle: Refund Handling\ntags: [billing, refunds]\n---\nRefunds over $2000 require Finance approval.\n';
+    const out = foldFrontmatter(okf);
+    expect(out).toContain('# Refund Handling');
+    expect(out).toContain('type: runbook');
+    expect(out).toContain('billing, refunds');
+    expect(out).toContain('Refunds over $2000 require Finance approval.');
+    expect(out).not.toContain('---'); // raw YAML fence gone
+  });
+
+  it('passes plain content through unchanged', () => {
+    expect(foldFrontmatter('just a note, no frontmatter')).toBe('just a note, no frontmatter');
+  });
+});
 
 describe('folder ingest — file collection (the EISDIR-regression guard)', () => {
   it('formatFor maps extensions, defaulting to text', () => {
