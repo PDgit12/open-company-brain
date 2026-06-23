@@ -32,6 +32,25 @@ when it doesn't know** instead of hallucinating.
 
 ---
 
+## Value proposition
+
+> **For** teams whose AI assistants keep guessing about how the company actually works,
+> **Comb** is a model-free, self-hosted knowledge layer any AI plugs into over MCP.
+> **It** turns scattered docs into one governed source your agents answer from — with
+> citations, access scopes, a refusal when ungrounded, and an audit trail on every action.
+> **Unlike** enterprise search suites, you self-host it and it runs **no model** ($0/query);
+> **unlike** a RAG wrapper, it enforces who-sees-what, refuses instead of hallucinating, and
+> governs real actions — and it **compounds**: every recorded outcome re-ranks what it trusts.
+
+**In one line:** the trusted, governed memory that makes your AI's answers about your company
+**correct, consistent, and accountable — or honestly absent.**
+
+**Who it's for:** engineering and ops teams running AI agents on their own knowledge who need
+the answers to be *right and governed*, not just fluent. **Who it's not for:** a single person
+who just wants to ask one file a question — your AI tool already does that.
+
+---
+
 ## Quickstart — no model, no database, no Docker
 
 ```bash
