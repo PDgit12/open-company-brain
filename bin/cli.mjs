@@ -315,6 +315,7 @@ const run = () => {
   if (cmd === 'chat') return harnessCmd(['chat', ...process.argv.slice(3)]);
   if (cmd === 'new') return harnessCmd(['new', ...process.argv.slice(3)]);
   if (cmd === 'ingest') return harnessCmd(['ingest', ...process.argv.slice(3)]);
+  if (cmd === 'export') return harnessCmd(['export', ...process.argv.slice(3)]);
   if (cmd === 'demo-data') return harnessCmd(['demo-data', ...process.argv.slice(3)]);
   if (cmd === 'reset') return harnessCmd(['reset', ...process.argv.slice(3)]);
   if (cmd === 'create') return harnessCmd(['create', ...process.argv.slice(3)]);

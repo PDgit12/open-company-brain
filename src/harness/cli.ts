@@ -43,9 +43,12 @@ import {
   type CalibrationPoint,
   type LabeledQuery,
 } from '../brain/grounding.js';
-import { readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { readFile, writeFile, rm, stat, mkdir } from 'node:fs/promises';
 import { collectFiles, extractText, baseName } from './ingest-files.js';
 import { RESET_ALWAYS, RESET_ALL_ONLY } from './reset-targets.js';
+import { toOkfBundle } from './okf-export.js';
+import { JsonFileCollection } from '../storage/json-file.js';
+import type { MemoryDocument } from '../brain/documents.js';
 import pg from 'pg';
 import type { Agent, AgentContext, AgentResult, AgentStep } from './agent.js';
 import type { ToolFabric } from '../tools/fabric.js';
@@ -708,6 +711,28 @@ async function ingestFile(argv: string[], scopes: string[]): Promise<void> {
 }
 
 /**
+ * `comb export [--out dir] [--scope s]` — write the brain (model-free keyword
+ * store) out as a Google OKF bundle: one markdown concept file per source,
+ * scope-gated like every read. Emits valid OKF; not a byte-identical round-trip
+ * (ingest folds frontmatter into body text — see okf-export.ts).
+ */
+async function exportOkf(argv: string[], scopes: string[]): Promise<void> {
+  const oi = argv.indexOf('--out');
+  const outDir = oi !== -1 ? (argv[oi + 1] ?? './okf-out') : './okf-out';
+  const sci = argv.indexOf('--scope');
+  const scope = sci !== -1 ? (argv[sci + 1] ?? scopes[0]!) : scopes[0]!;
+  const docs = await new JsonFileCollection<MemoryDocument>(`${config.comb.dataDir}/keyword-docs.json`).read();
+  const bundle = toOkfBundle(docs, [scope]);
+  if (!bundle.length) {
+    stdout.write(gray(`Nothing to export under scope "${scope}" from the model-free keyword store.\n`));
+    return;
+  }
+  await mkdir(outDir, { recursive: true });
+  for (const f of bundle) await writeFile(`${outDir}/${f.filename}`, f.content);
+  stdout.write(`${butter('✓')} exported ${bold(String(bundle.length))} OKF concept${bundle.length === 1 ? '' : 's'} → ${bold(outDir)}  ${dim(`· scope=${scope}`)}\n`);
+}
+
+/**
  * `comb reset [--all] [--yes]` — clean slate so you can ingest YOUR data.
  * Default: wipe knowledge + the closed-loop state (chunks, intents,
  * divergences, runs, conversations), KEEP your saved agents + calibration.
@@ -893,6 +918,7 @@ async function main(): Promise<void> {
 
   // Registry-only commands: no brain/fabric assembly needed.
   if (mode === 'ingest') return ingestFile(argv, scopes);
+  if (mode === 'export') return exportOkf(argv, scopes);
   if (mode === 'demo-data') return loadDemoData(scopes);
   if (mode === 'reset') return resetBrain(argv);
   if (mode === 'new') return newAgent(rest.join(' '));
