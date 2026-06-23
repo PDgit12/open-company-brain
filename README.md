@@ -32,22 +32,22 @@ when it doesn't know** instead of hallucinating.
 
 ---
 
-## Value proposition
+## Why Comb
 
-> **For** teams whose AI assistants keep guessing about how the company actually works,
-> **Comb** is a model-free, self-hosted knowledge layer any AI plugs into over MCP.
-> **It** turns scattered docs into one governed source your agents answer from — with
-> citations, access scopes, a refusal when ungrounded, and an audit trail on every action.
-> **Unlike** enterprise search suites, you self-host it and it runs **no model** ($0/query);
-> **unlike** a RAG wrapper, it enforces who-sees-what, refuses instead of hallucinating, and
-> governs real actions — and it **compounds**: every recorded outcome re-ranks what it trusts.
+Most tools in this space are either enterprise search you can't self-host or a thin RAG wrapper
+that still makes things up. Comb is different on three axes that matter for real work:
 
-**In one line:** the trusted, governed memory that makes your AI's answers about your company
-**correct, consistent, and accountable — or honestly absent.**
+- **Governed, not just retrieved.** Access scopes are enforced on every read, every action is
+  human-approved and audited, and answers are cited or refused — never invented.
+- **Model-free and self-hosted.** Comb runs no model of its own; your AI tool brings the
+  intelligence over MCP. The default is keyword retrieval over a single file — $0/query, no database.
+- **It compounds.** Every recorded outcome re-ranks what the brain trusts, so answers get better
+  with use instead of going stale.
 
-**Who it's for:** engineering and ops teams running AI agents on their own knowledge who need
-the answers to be *right and governed*, not just fluent. **Who it's not for:** a single person
-who just wants to ask one file a question — your AI tool already does that.
+Comb is built for engineering and ops teams running AI agents on their own knowledge, where the
+answers need to be right and accountable, not just fluent. If you only want to ask a single file a
+question, your AI tool already does that — Comb earns its place when many people and agents need
+the same trusted, current knowledge.
 
 ---
 
